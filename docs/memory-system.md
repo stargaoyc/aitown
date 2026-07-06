@@ -266,15 +266,15 @@ class PlanRepository:
 | 单角色 Top-10 检索 | 100 万条 | < 30ms |
 | 全局 Top-10 检索 | 1000 万条 | < 50ms |
 
-### 7.3 扩展到独立向量库的判定
+### 7.3 切换到独立向量库的判定
 
-满足任一条件时，建议把 `memory_episodes` 迁回独立向量库（如 Milvus），PG 仅存元数据：
+满足任一条件时，建议把 `memory_episodes` 切换到独立向量库（如 Milvus），PG 仅存元数据：
 
 - 单角色记忆数 > 500 万，或总记忆数 > 1 亿；
 - HNSW 索引构建内存占用超过 PG `shared_buffers` 50%；
 - 检索 p95 > 200ms 且调参无效。
 
-`MemoryRepository` 已抽象，切换成本仅限实现类。详见 [迁移指南](migration-guide.md#向量库切换)。
+`MemoryRepository` 已抽象，切换成本仅限实现类。详见 [架构设计 - 向量检索](architecture.md#53-向量检索pgvector--hnsw)。
 
 ---
 

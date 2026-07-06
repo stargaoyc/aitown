@@ -99,14 +99,6 @@
 | `CHARACTER_MAX_CONCURRENT` | 否 | 10 | 并发角色 Tick 上限 |
 | `CHARACTER_LOCK_TTL_SECONDS` | 否 | 30 | 角色锁 TTL |
 
-### 1.10 迁移（仅迁移期）
-
-| 变量 | 必填 | 默认 | 说明 |
-|------|------|------|------|
-| `MONGO_URL` | 否 | — | 旧 Mongo 连接串（迁移期） |
-| `MIGRATION_READ_SOURCE` | 否 | pg | 读源：`mongo` / `pg` / `dual_compare` |
-| `MIGRATION_DUAL_WRITE` | 否 | false | 是否双写 |
-
 ---
 
 ## 二、config.yaml
@@ -196,13 +188,6 @@ modules:
     - code-executor
     - web-search
     - weather
-
-# 迁移期配置（仅迁移时启用）
-migration:
-  enabled: false
-  mongo_url: ${MONGO_URL}
-  read_source: pg
-  dual_write: false
 ```
 
 ---
@@ -431,4 +416,3 @@ scenes:
 | 部署环境变量 | [deployment.md](deployment.md#三环境变量清单) |
 | 模块系统 | [module-system.md](module-system.md) |
 | 世界引擎参数 | [world-engine.md](world-engine.md#六配置参数) |
-| 迁移期配置 | [migration-guide.md](migration-guide.md) |

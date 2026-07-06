@@ -12,7 +12,7 @@
 | uv / Poetry | 最新 | Python 包管理 |
 | Node.js | 22+ | 前端 |
 | pnpm | 11+ | 前端包管理 |
-| PostgreSQL | 17+ | 需启用 `vector`、`uuid-ossp`、`pg_trgm` 扩展 |
+| PostgreSQL | 17+ | 需启用 `pg_uuidv7`、`vector`、`pg_trgm` 扩展 |
 | Redis | 7.4+ | — |
 | Docker | 24+ | 容器化部署 |
 
@@ -184,13 +184,14 @@ from pgvector.sqlalchemy import Vector
 from sqlalchemy import String, Integer, Boolean, ForeignKey, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
+from uuid6 import uuid7                              # UUID v7, 时间有序
 from .base import Base
 import uuid
 
 class MemoryEpisode(Base):
     __tablename__ = "memory_episodes"
 
-    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid7)
     character_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("characters.id", ondelete="CASCADE")
     )
@@ -239,15 +240,27 @@ cd packages/backend
 alembic revision --autogenerate -m "add memory_episodes table"
 ```
 
-### 5.2 HNSW 索引需手写原生 SQL
+### 5.2 扩展与 HNSW 索引需手写原生 SQL
 
-HNSW 索引不能通过 ORM `Index` 自动生成，需在迁移脚本中用 `op.execute()`：
+`pg_uuidv7` 扩展与 HNSW 索引不能通过 ORM 自动生成，需在迁移脚本中用 `op.execute()`：
 
 ```python
 # migrations/versions/xxxx_init.py
 def upgrade():
+    # 1. 扩展
+    op.execute("CREATE EXTENSION IF NOT EXISTS pg_uuidv7;")
     op.execute("CREATE EXTENSION IF NOT EXISTS vector;")
-    # ... 建表 ...
+    op.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm;")
+
+    # 2. 建表 (主键用 uuidv7() 默认值)
+    op.create_table(
+        "memory_episodes",
+        sa.Column("id", sa.UUID, primary_key=True,
+                  server_default=sa.text("uuidv7()")),
+        # ... 其他字段 ...
+    )
+
+    # 3. HNSW 向量索引
     op.execute(
         "CREATE INDEX idx_mem_embedding_hnsw ON memory_episodes "
         "USING hnsw (embedding vector_cosine_ops) "

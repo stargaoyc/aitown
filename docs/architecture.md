@@ -1,6 +1,6 @@
 # 总体架构设计
 
-> 本文档定义 AI Town 的分层架构、数据流闭环、技术栈选型，以及关键架构决策（含去除 MongoDB 的决策与权衡）。
+> 本文档定义 AI Town 的分层架构、数据流闭环、技术栈选型，以及关键架构决策。
 
 ---
 
@@ -74,6 +74,7 @@
 │  │  + pgvector (向量检索)    │  │ (缓存/队列/  │  │  (MinIO/S3)       │    │
 │  │  + JSONB (灵活字段)       │  │  实时状态)   │  │                   │    │
 │  │  + 分区表 (消息/行为历史) │  │             │  │                   │    │
+│  │  + pg_uuidv7 (主键)       │  │             │  │                   │    │
 │  └───────────────────────────┘  └─────────────┘  └───────────────────┘    │
 │  ┌────────────────────────────────────────────────────────────────────────┐ │
 │  │              可观测性 (OpenTelemetry + Langfuse)                       │ │
@@ -116,7 +117,7 @@
                      └───────────────┘
 ```
 
-**核心改进（去 MongoDB 后）**：Action 执行后的"写行为记录 + 写记忆向量 + 更新状态"在**同一个 PG 事务**中完成，杜绝跨库半写问题。
+**事务化保证**：Action 执行后的"写行为记录 + 写记忆向量 + 更新状态"在**同一个 PG 事务**中完成，任一失败则整体回滚。
 
 ### 3.2 五阶段角色 Tick
 
@@ -162,10 +163,11 @@
 | | 构建工具 | Vite 8 |
 | | 组件库 | shadcn/ui + Tailwind CSS v4 |
 | | 包管理 | pnpm 11 |
-| 数据存储 | 主数据库 | PostgreSQL 17 (+ pgvector + JSONB + 分区表) |
+| 数据存储 | 主数据库 | PostgreSQL 17 (+ pgvector + pg_uuidv7 + JSONB + 分区表) |
 | | 缓存/实时状态 | Redis 7.4+ |
 | | 对象存储 | MinIO / AWS S3 |
 | 中间件 | 消息队列 | Redis Streams |
+| | 连接池 | PgBouncer |
 | | 工具调用 | MCP 协议 (官方 mcp Python SDK) |
 | 可观测性 | LLM 追踪 | Langfuse |
 | | 链路追踪 | OpenTelemetry + Jaeger |
@@ -173,58 +175,173 @@
 
 ---
 
-## 五、关键架构决策：去除 MongoDB
+## 五、关键架构决策
 
-### 5.1 决策背景
+### 5.1 主键选型：UUID v7（时间有序 UUID）
 
-原方案使用 MongoDB 承载 6 个集合（Character / ActionRecord / Reflection / Plan / Message / Relation），PostgreSQL 仅承载 ModuleConfig，向量记忆放在独立向量库（Chroma/Milvus）。该方案存在跨库一致性、运维复杂、Schema 漂移等问题。
+#### 问题：为什么不用 UUID v4？
 
-### 5.2 决策结论
+UUID v4 完全随机，作为聚簇主键时存在严重问题：
 
-**将全部持久化数据统一收敛到 PostgreSQL 17 + pgvector**，移除 MongoDB 与独立向量库。基础设施从 4 套（PG + Redis + 向量库 + 对象存储）简化为 3 套（PG + Redis + 对象存储）。
+| 问题 | 影响 |
+|------|------|
+| B-tree 页分裂 | 随机插入导致频繁页分裂，索引碎片化 |
+| 缓存局部性差 | 新数据散落在不同数据页，cache hit rate 低 |
+| 写入性能衰减 | 数据量增大后插入性能明显下降（可达 30%–50%） |
+| 索引体积大 | 16 字节 vs BIGINT 8 字节，索引更大 |
+| WAL 写放大 | 随机写入产生更多 WAL 日志 |
 
-### 5.3 决策依据
+#### 决策：使用 UUID v7
 
-| 维度 | MongoDB 方案问题 | PostgreSQL 方案改善 |
-|------|------------------|---------------------|
-| 一致性 | 跨库无事务，状态/行为/记忆易半写 | 单事务完成 State→Action→Memory 闭环 |
-| 运维 | 独立部署/备份/监控 Mongo 与 PG | 单一数据库栈 |
-| Schema 演进 | 无强约束，字段漂移靠应用层防御 | DDL 约束 + JSONB 兼顾灵活 + alembic 版本化 |
-| 向量与结构分离 | 行为记录与向量跨库，查询需两阶段 join | pgvector 直接存向量，单 SQL 完成过滤+检索+取详情 |
-| 连接池 | motor 与 asyncpg 两套池 | 单一 asyncpg/SQLAlchemy 池 |
-| 测试 | 需 Mongo+PG+Redis+向量库 | 需 PG+Redis，CI 更轻 |
+UUID v7 是 RFC 9562 定义的时间有序 UUID，前 48 位为毫秒级 Unix 时间戳，剩余位随机。
 
-### 5.4 迁移映射
+| 维度 | UUID v4 | UUID v7 | BIGINT IDENTITY |
+|------|---------|---------|-----------------|
+| 有序性 | 完全随机 | 时间单调递增 | 完全顺序 |
+| 索引友好 | 差 | 好 | 最好 |
+| 防枚举 | 是 | 是（部分） | 否 |
+| 分布式友好 | 是 | 是 | 否（需中心化） |
+| 体积 | 16 字节 | 16 字节 | 8 字节 |
+| 信息泄露 | 无 | 创建时间（可接受） | 无 |
 
-| 原 MongoDB 集合 | 新 PG 表 | 关键字段处理 |
-|-----------------|----------|--------------|
-| Character | `characters` | `traits JSONB`、`personality TEXT[]` |
-| ActionRecord | `action_records` (按月分区) | `params JSONB`、`related_characters UUID[]` |
-| Reflection | `reflections` | `summary TEXT`、`source_memory_ids UUID[]` |
-| Plan | `plans` | `steps JSONB` |
-| Message | `messages` (按月分区) | `metadata JSONB` |
-| Relation | `relations` | 复合主键 `(from_id, to_id)` |
-| MemoryEpisode (原向量库) | `memory_episodes` | `embedding vector(1536)` + HNSW 索引 |
-| ModuleConfig (原 PG) | `module_configs` | 不变 |
+**选择 UUID v7 的理由**：
+1. 索引友好——时间有序，B-tree 顺序追加，页分裂少；
+2. 防枚举——后 80 位随机，无法通过 ID 遍历猜枚举；
+3. 分布式友好——无需中心化 ID 生成器，多实例可独立生成；
+4. 与外部 API 兼容——保持 UUID 字符串格式，前端/API 无感知。
 
-详细 DDL 见 [数据模型设计](data-model.md)。迁移步骤见 [迁移指南](migration-guide.md)。
+#### 实现：pg_uuidv7 扩展
 
-### 5.5 权衡与对策
+PG 18 内置 `uuidv7()` 函数；PG 17 使用 `pg_uuidv7` 扩展：
 
-| 权衡 | 风险 | 对策 |
-|------|------|------|
-| pgvector 检索性能在亿级向量下不如专用向量库 | 量级爆炸后退化 | 当前 10M 级 HNSW 足够；`MemoryRepository` 抽象层可平滑切换到 Milvus |
-| JSONB 写入比 Mongo 文档略慢 | 高频写场景 | 分区表 + 批量写；热数据先 Redis |
-| 单点 PG 故障影响面更大 | 数据库宕机 | 流复制 + Patroni 高可用 + 异地备份 |
-| Mongo 聚合管道能力缺失 | 复杂分析 | SQL 窗口函数 + 物化视图替代 |
+```sql
+CREATE EXTENSION IF NOT EXISTS pg_uuidv7;
 
-### 5.6 重新引入向量库的判定条件
+-- 建表时使用
+CREATE TABLE characters (
+    id UUID PRIMARY KEY DEFAULT uuidv7(),
+    ...
+);
+```
 
-满足任一条件时，建议把 `memory_episodes` 迁回独立向量库（如 Milvus），PG 仅存元数据：
+应用层兜底（Python `uuid6` 库）：
 
-- 单角色记忆数 > 500 万，或总记忆数 > 1 亿；
-- HNSW 索引构建内存占用超过 PG `shared_buffers` 50%；
+```python
+from uuid6 import uuid7
+
+class Character(Base):
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
+```
+
+#### 索引优化补充
+
+| 表 | 主键 | 额外排序键 |
+|----|------|------------|
+| `action_records` | `(id, created_at)` 复合 | 按 `created_at` 分区 + 索引 |
+| `messages` | `(id, created_at)` 复合 | 按 `created_at` 分区 + 索引 |
+| `memory_episodes` | `id` | `(character_id, timestamp DESC)` 二级索引 |
+
+分区表主键必须包含分区键，故用 `(id, created_at)` 复合主键。
+
+### 5.2 时间字段统一为 TIMESTAMPTZ
+
+#### 问题
+原方案部分字段用 `BIGINT`（epoch ms）、部分用 `TIMESTAMPTZ`，导致：
+- 查询时需在不同格式间转换；
+- 无法直接使用 PG 时间函数（`date_trunc`、`extract`）；
+- 时区处理不一致。
+
+#### 决策：全部使用 `TIMESTAMPTZ`
+
+- `created_at` / `updated_at` / `timestamp` / `due_at` 等业务时间字段统一为 `TIMESTAMPTZ`；
+- 仅 Redis 实时态中保留 epoch ms（Redis 不支持原生时间类型）；
+- 应用层通过 `datetime` 直接读写，无需手动转换。
+
+### 5.3 向量检索：pgvector + HNSW
+
+#### 决策：使用 pgvector 而非独立向量库
+
+| 维度 | 独立向量库（Milvus/Chroma） | pgvector |
+|------|------------------------------|----------|
+| 事务一致 | 跨库，无法与结构化数据同事务 | 单 PG 事务 |
+| 运维 | 多一套基础设施 | 复用 PG |
+| 检索表达力 | 仅向量 | 单 SQL 完成过滤+向量+JSONB+JOIN |
+| 性能（10M 级） | 略优 | HNSW p95 < 30ms，足够 |
+| 性能（亿级） | 优 | 退化 |
+
+当前数据量（50 角色 × 年千万级）下 pgvector 足够，且 `MemoryRepository` 已抽象，未来可平滑切换到独立向量库。
+
+#### HNSW 参数调优
+
+| 参数 | 推荐值 | 说明 |
+|------|--------|------|
+| `m` | 16 | 每层最大连接数，越大召回越高但内存占用增加 |
+| `ef_construction` | 64 | 构建时搜索宽度，越大构建越慢但索引质量越好 |
+| `ef_search` | 40 | 查询时搜索宽度（`SET hnsw.ef_search = 40`） |
+
+#### 重新引入独立向量库的判定条件
+
+满足任一条件时建议切换：
+- 总记忆数 > 1 亿；
+- HNSW 索引内存占用超过 PG `shared_buffers` 50%；
 - 检索 p95 > 200ms 且调参无效。
+
+### 5.4 World Tick 单实例运行
+
+#### 问题
+后端可水平扩展，但 World Tick 与 Character Tick 若多实例并发执行会导致重复推进。
+
+#### 决策：Leader 选举 + 服务拆分
+
+**方案 A（推荐，小规模）**：Redis 分布式锁选主
+- 所有实例竞争 `world:leader` 锁（TTL 60s）；
+- 仅持锁实例运行 World Tick 与 Character Tick；
+- 锁过期后其他实例接管（故障转移）。
+
+**方案 B（大规模）**：服务拆分
+- `engine` 服务：单实例（或主备），运行 Tick 循环；
+- `api` 服务：多实例，处理 API 请求；
+- 通过 `docker-compose` 或 K8s 部署隔离。
+
+### 5.5 连接池：PgBouncer
+
+#### 决策：生产环境使用 PgBouncer
+
+| 场景 | 是否需要 |
+|------|----------|
+| 开发环境 | 不需要，直接连接 |
+| 生产单实例 | 可选，SQLAlchemy 池已够 |
+| 生产多实例 | **必须**，避免连接数爆炸 |
+
+PgBouncer 配置（transaction 模式）：
+
+```ini
+[databases]
+ai_town = host=127.0.0.1 port=5432 dbname=ai_town
+
+[pgbouncer]
+listen_addr = 0.0.0.0
+listen_port = 6432
+pool_mode = transaction
+max_client_conn = 1000
+default_pool_size = 25
+```
+
+注意：transaction 模式下不支持 prepared statements，SQLAlchemy 需关闭 `prepared_statement_cache_size`。
+
+### 5.6 向量维度可配置
+
+不同 embedding 模型维度不同（OpenAI small=1536, large=3072, BGE=1024），向量维度应可配置：
+
+```yaml
+# config.yaml
+llm:
+  embedding:
+    model: text-embedding-3-small
+    dim: 1536
+```
+
+建表时通过 alembic 迁移动态生成 `vector(:dim)`，避免硬编码。
 
 ---
 
@@ -237,4 +354,4 @@
 | 记忆系统与 pgvector | [memory-system.md](memory-system.md) |
 | 模块管理与 MCP | [module-system.md](module-system.md) |
 | 数据模型 DDL | [data-model.md](data-model.md) |
-| 从 Mongo 迁移 | [migration-guide.md](migration-guide.md) |
+| 部署与高可用 | [deployment.md](deployment.md) |

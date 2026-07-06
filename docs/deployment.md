@@ -56,7 +56,26 @@
 
 ## 二、容器化部署
 
-### 2.1 后端 Dockerfile
+### 2.1 PostgreSQL Dockerfile（pgvector + pg_uuidv7）
+
+官方 `pgvector/pgvector:pg17` 镜像仅含 pgvector，需自定义镜像补装 `pg_uuidv7`：
+
+```dockerfile
+# docker/postgres/Dockerfile
+FROM pgvector/pgvector:pg17
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git build-essential postgresql-server-dev-17 && \
+    git clone --depth 1 https://github.com/fboulnois/pg_uuidv7.git /tmp/pg_uuidv7 && \
+    cd /tmp/pg_uuidv7 && make && make install && \
+    rm -rf /tmp/pg_uuidv7 && \
+    apt-get purge -y git build-essential postgresql-server-dev-17 && \
+    apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
+```
+
+> 应用层兜底：即使未安装 `pg_uuidv7` 扩展，Python `uuid6` 库的 `uuid7()` 也能在应用层生成 UUID v7，DB 列类型仍为 `UUID`。
+
+### 2.2 后端 Dockerfile
 
 ```dockerfile
 # packages/backend/Dockerfile
@@ -76,7 +95,7 @@ EXPOSE 8000
 CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
-### 2.2 前端 Dockerfile
+### 2.3 前端 Dockerfile
 
 ```dockerfile
 # packages/frontend/Dockerfile
@@ -93,7 +112,7 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 ```
 
-### 2.3 docker-compose.yml
+### 2.4 docker-compose.yml
 
 ```yaml
 # docker-compose.yml (节选)
@@ -101,7 +120,9 @@ version: "3.9"
 
 services:
   postgres:
-    image: pgvector/pgvector:pg17
+    build:
+      context: ./docker/postgres       # 自定义镜像: pgvector + pg_uuidv7
+      dockerfile: Dockerfile
     environment:
       POSTGRES_DB: ai_town
       POSTGRES_USER: ${DB_USER}
@@ -112,6 +133,21 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
       interval: 10s
+
+  # 生产环境推荐启用 PgBouncer (transaction 模式)
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    environment:
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_HOST: postgres
+      DB_NAME: ai_town
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 1000
+      DEFAULT_POOL_SIZE: 25
+    ports: ["6432:5432"]
+    depends_on:
+      postgres: { condition: service_healthy }
 
   redis:
     image: redis:7.4-alpine
@@ -189,9 +225,15 @@ volumes:
 # .env.example
 
 # ===== 数据库 =====
-DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/ai_town
+# 生产环境通过 PgBouncer 连接 (端口 6432), 直连 PG 用 5432
+DATABASE_URL=postgresql+asyncpg://user:pass@localhost:6432/ai_town
 DB_POOL_SIZE=20
 DB_MAX_OVERFLOW=10
+# PgBouncer transaction 模式下需关闭 prepared statements
+DB_PREPARED_STATEMENT_CACHE_SIZE=0
+
+# 主键: UUID v7 (时间有序, 索引友好)
+# DB 端通过 pg_uuidv7 扩展生成, 应用层用 uuid6 库兜底
 
 # pgvector
 EMBEDDING_DIM=1536
@@ -251,10 +293,12 @@ CHARACTER_MAX_CONCURRENT=10
 ### 4.1 启用扩展
 
 ```sql
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "vector";
-CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+CREATE EXTENSION IF NOT EXISTS pg_uuidv7;   -- 时间有序 UUID v7 (主键)
+CREATE EXTENSION IF NOT EXISTS "vector";    -- pgvector 向量检索
+CREATE EXTENSION IF NOT EXISTS pg_trgm;     -- 文本模糊检索
 ```
+
+> 不再使用 `uuid-ossp`（UUID v4 随机性导致 B-tree 索引碎片化）。详见 [架构设计 - 主键选型](architecture.md#51-主键选型uuid-v7时间有序-uuid)。
 
 ### 4.2 执行迁移
 
@@ -308,10 +352,10 @@ curl -X POST http://localhost:8000/api/v1/admin/partitions/precreate \
                 └───────┘ └────┘└───────┘
 ```
 
-**注意**：World Tick 与 Character Tick 循环需**单实例运行**（避免重复推进）。方案：
+**注意**：World Tick 与 Character Tick 循环需**单实例运行**（避免重复推进）。方案详见 [架构设计 - World Tick 单实例运行](architecture.md#54-world-tick-单实例运行)：
 
-- 使用 Redis 分布式锁选举 leader，仅 leader 运行 World Tick；
-- 或将引擎循环拆分为独立服务（`engine`），与 API 服务（`api`）分开部署。
+- **方案 A（推荐）**：Redis 分布式锁选主，仅持锁实例运行 Tick，锁过期自动故障转移；
+- **方案 B**：服务拆分，`engine` 单实例运行 Tick 循环，`api` 多实例处理请求。
 
 ### 5.4 MCP Server 扩展
 

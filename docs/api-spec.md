@@ -278,9 +278,10 @@ GET /api/v1/conversations/{id}/messages?page=1&page_size=20
 
 | 端点 | 方法 | 说明 |
 |------|------|------|
-| `/api/v1/admin/migrate` | POST | 一次性从旧 Mongo 导入历史数据 |
 | `/api/v1/admin/partitions` | GET | 查看分区表状态 |
 | `/api/v1/admin/partitions/precreate` | POST | 手动预创建分区 |
+| `/api/v1/admin/tick` | POST | 强制触发某角色 Tick（调试用） |
+| `/api/v1/admin/restore-snapshot` | POST | 用指定快照重置世界态（调试用） |
 
 ---
 
