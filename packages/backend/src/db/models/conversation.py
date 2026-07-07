@@ -1,0 +1,64 @@
+"""对话与消息模型 - 角色与用户/其他角色的交流记录
+
+消息来源：
+- user: 用户消息（QQ/飞书/Web）
+- character: 角色回复
+- system: 系统消息
+"""
+from datetime import datetime
+from uuid import UUID
+from uuid6 import uuid7
+
+from sqlalchemy import ForeignKey, Integer, String, Text, TIMESTAMPTZ
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from src.db.base import Base
+
+
+class Conversation(Base):
+    """对话会话表 - 一个用户与一个角色的对话线程
+
+    platform: 消息来源平台（qq/lark/web/internal）
+    context: 对话上下文（最近 N 条消息摘要，用于 LLM 回复）
+    """
+    __tablename__ = "conversations"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
+    character_id: Mapped[UUID] = mapped_column(
+        ForeignKey("characters.id", ondelete="CASCADE"), comment="角色 ID"
+    )
+    user_id: Mapped[str] = mapped_column(String(100), comment="用户标识")
+    platform: Mapped[str] = mapped_column(String(20), comment="来源平台")
+    context: Mapped[dict | None] = mapped_column(JSONB, comment="对话上下文")
+    last_message_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMPTZ, comment="最后消息时间"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP, server_default="now()", comment="创建时间"
+    )
+
+    messages: Mapped[list["Message"]] = relationship(back_populates="conversation")
+
+
+class Message(Base):
+    """消息表 - 单条消息记录
+
+    sender: 发送者（user/character/system）
+    content: 消息内容
+    metadata: 附加信息（LLM token 数、回复延迟等）
+    """
+    __tablename__ = "messages"
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
+    conversation_id: Mapped[UUID] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"), comment="会话 ID"
+    )
+    sender: Mapped[str] = mapped_column(String(20), comment="发送者")
+    content: Mapped[str] = mapped_column(Text, comment="消息内容")
+    metadata: Mapped[dict | None] = mapped_column(JSONB, comment="附加信息")
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP, server_default="now()", comment="创建时间"
+    )
+
+    conversation: Mapped[Conversation] = relationship(back_populates="messages")
