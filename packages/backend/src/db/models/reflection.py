@@ -7,7 +7,7 @@ from uuid import UUID
 from uuid6 import uuid7
 
 from sqlalchemy import ForeignKey, Text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.db.base import Base
@@ -35,5 +35,5 @@ class Reflection(Base):
         JSONB, default=list, comment="关联记忆 ID 列表"
     )
     created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP, server_default="now()", comment="创建时间"
+        TIMESTAMP(timezone=True), server_default="now()", comment="创建时间"
     )

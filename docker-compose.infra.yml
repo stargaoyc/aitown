@@ -1,6 +1,4 @@
 # docker-compose.infra.yml - 仅基础设施（用于本地开发）
-version: "3.9"
-
 services:
   postgres:
     build:

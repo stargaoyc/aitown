@@ -44,7 +44,7 @@ class ActionRecord(Base):
         JSONB, default=list, comment="相关角色 ID 列表"
     )
     timestamp: Mapped[datetime] = mapped_column(
-        TIMESTAMPTZ, server_default="now()", comment="执行时间"
+        TIMESTAMP(timezone=True), server_default="now()", comment="执行时间"
     )
 
     __table_args__ = (

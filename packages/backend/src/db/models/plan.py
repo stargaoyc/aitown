@@ -7,7 +7,8 @@ from datetime import datetime
 from uuid import UUID
 from uuid6 import uuid7
 
-from sqlalchemy import ForeignKey, Integer, String, Text, TIMESTAMPTZ
+from sqlalchemy import ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import TIMESTAMP
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.db.base import Base
@@ -39,8 +40,8 @@ class Plan(Base):
     description: Mapped[str | None] = mapped_column(Text, comment="详细描述")
     status: Mapped[str] = mapped_column(String(20), default="active", comment="状态")
     priority: Mapped[int] = mapped_column(Integer, default=3, comment="优先级 1-5")
-    deadline: Mapped[datetime | None] = mapped_column(TIMESTAMP, comment="截止时间")
+    deadline: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), comment="截止时间")
     progress: Mapped[int] = mapped_column(Integer, default=0, comment="进度 0-100")
     created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMPTZ, server_default="now()", comment="创建时间"
+        TIMESTAMP(timezone=True), server_default="now()", comment="创建时间"
     )

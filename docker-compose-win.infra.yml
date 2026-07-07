@@ -1,0 +1,61 @@
+# docker-compose.infra.yml - Windows 本地开发优化版
+
+services:
+  postgres:
+    build:
+      context: ./docker/postgres
+      dockerfile: Dockerfile
+    container_name: aitown-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ai_town
+      POSTGRES_USER: ai_town
+      POSTGRES_PASSWORD: password
+      TZ: Asia/Shanghai
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ai_town"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aitown-net
+
+  redis:
+    image: redis:alpine   # 使用稳定的 Alpine 版本，避免 8.0-alpine 拉取失败
+    container_name: aitown-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./data/redis:/data
+    command: redis-server --appendonly yes   # 开启 AOF 持久化
+    environment:
+      TZ: Asia/Shanghai
+    networks:
+      - aitown-net
+
+  minio:
+    image: minio/minio
+    container_name: aitown-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+      TZ: Asia/Shanghai
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - ./data/minio:/data
+    networks:
+      - aitown-net
+
+networks:
+  aitown-net:
+    driver: bridge

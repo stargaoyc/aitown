@@ -45,7 +45,7 @@ class MemoryEpisode(Base):
         Integer, default=5, comment="重要性 1-10"
     )
     timestamp: Mapped[datetime] = mapped_column(
-        TIMESTAMPTZ, server_default="now()", comment="发生时间"
+        TIMESTAMP(timezone=True), server_default="now()", comment="发生时间"
     )
     action_id: Mapped[str | None] = mapped_column(String(100), comment="关联 Action")
     location: Mapped[str | None] = mapped_column(String(50), comment="发生场景")

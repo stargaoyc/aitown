@@ -36,7 +36,7 @@ class WorldSnapshot(Base):
     resources: Mapped[dict] = mapped_column(JSONB, comment="资源状态")
     active_events: Mapped[list] = mapped_column(JSONB, default=list, comment="活跃事件")
     created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP, server_default="now()", comment="创建时间"
+        TIMESTAMP(timezone=True), server_default="now()", comment="创建时间"
     )
 
     __table_args__ = (Index("idx_world_tick", "tick_id"),)

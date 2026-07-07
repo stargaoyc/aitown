@@ -40,6 +40,6 @@ class Relation(Base):
         String(30), default="stranger", comment="关系类型"
     )
     last_interaction_at: Mapped[datetime | None] = mapped_column(
-        TIMESTAMPTZ, comment="最后互动时间"
+        TIMESTAMP(timezone=True), comment="最后互动时间"
     )
     notes: Mapped[str | None] = mapped_column(Text, comment="对该角色的认知笔记")

@@ -9,8 +9,8 @@ from datetime import datetime
 from uuid import UUID
 from uuid6 import uuid7
 
-from sqlalchemy import ForeignKey, Integer, String, Text, TIMESTAMPTZ
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.db.base import Base
@@ -32,10 +32,10 @@ class Conversation(Base):
     platform: Mapped[str] = mapped_column(String(20), comment="来源平台")
     context: Mapped[dict | None] = mapped_column(JSONB, comment="对话上下文")
     last_message_at: Mapped[datetime | None] = mapped_column(
-        TIMESTAMPTZ, comment="最后消息时间"
+        TIMESTAMP(timezone=True), comment="最后消息时间"
     )
     created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP, server_default="now()", comment="创建时间"
+        TIMESTAMP(timezone=True), server_default="now()", comment="创建时间"
     )
 
     messages: Mapped[list["Message"]] = relationship(back_populates="conversation")
@@ -56,9 +56,9 @@ class Message(Base):
     )
     sender: Mapped[str] = mapped_column(String(20), comment="发送者")
     content: Mapped[str] = mapped_column(Text, comment="消息内容")
-    metadata: Mapped[dict | None] = mapped_column(JSONB, comment="附加信息")
+    extra_data: Mapped[dict | None] = mapped_column(JSONB, comment="附加信息（token 数、延迟等）")
     created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP, server_default="now()", comment="创建时间"
+        TIMESTAMP(timezone=True), server_default="now()", comment="创建时间"
     )
 
     conversation: Mapped[Conversation] = relationship(back_populates="messages")
