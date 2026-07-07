@@ -1,0 +1,468 @@
+"""Character Tick - 角色行为决策与执行闭环
+
+五阶段流程：
+1. 感知环境：读取角色状态、世界状态、记忆
+2. 候选过滤：ActionRegistry.get_candidates(state)
+3. LLM 决策：结构化输出 DecisionResult
+4. 执行 Action：事务化执行，更新状态
+5. 记忆沉淀：写入 MemoryEpisode + 反思检查
+
+并发控制：
+- 使用 asyncio.Semaphore 限制并发 Tick 数量
+- 使用 Redis 分布式锁避免同一角色重复 Tick
+"""
+
+import asyncio
+from datetime import datetime, timezone
+from uuid import UUID
+
+from redis.asyncio import Redis
+from structlog import get_logger
+
+from src.actions import Action, ActionRegistry, DecisionResult
+from src.config import settings
+from src.db.models import ActionRecord
+from src.db.repositories import (
+    ActionRepository,
+    CharacterRepository,
+    MemoryRepository,
+    PlanRepository,
+    ReflectionRepository,
+)
+from src.db.session import db
+from src.llm import LLMClient, PromptTemplates
+from src.memory import EpisodeService, ReflectionService, RetrievalService
+
+logger = get_logger(__name__)
+
+
+class CharacterTickEngine:
+    """角色 Tick 引擎 - 管理所有角色的行为闭环"""
+
+    SEMAPHORE: asyncio.Semaphore | None = None  # 并发控制信号量
+    LOCK_PREFIX = "char:tick:lock:"  # 角色锁前缀
+    LOCK_TTL = 30  # 锁 TTL（秒）
+
+    def __init__(
+        self,
+        redis: Redis,
+        registry: ActionRegistry,
+        llm: LLMClient,
+        prompts: PromptTemplates,
+    ):
+        """初始化 Tick 引擎
+
+        Args:
+            redis: Redis 客户端（用于分布式锁和状态缓存）
+            registry: Action 注册表
+            llm: LLM 客户端
+            prompts: Prompt 模板管理器
+        """
+        self.redis = redis
+        self.registry = registry
+        self.llm = llm
+        self.prompts = prompts
+
+        # 初始化服务（延迟初始化，需要 db session）
+        self.episode_service: EpisodeService | None = None
+        self.retrieval_service: RetrievalService | None = None
+        self.reflection_service: ReflectionService | None = None
+
+        # 初始化并发信号量（类级别共享）
+        if CharacterTickEngine.SEMAPHORE is None:
+            CharacterTickEngine.SEMAPHORE = asyncio.Semaphore(
+                settings.character_max_concurrent
+            )
+
+    async def tick_character(self, character_id: UUID) -> None:
+        """执行单个角色的 Tick
+
+        流程：
+        1. 获取分布式锁（避免重复执行）
+        2. 并发信号量控制
+        3. 五阶段闭环
+        4. 释放锁
+
+        Args:
+            character_id: 角色 ID
+        """
+        lock_key = f"{self.LOCK_PREFIX}{character_id}"
+
+        # 尝试获取锁
+        acquired = await self.redis.set(
+            lock_key, "tick", ex=self.LOCK_TTL, nx=True
+        )
+        if not acquired:
+            logger.debug("character_tick_skipped", character_id=str(character_id))
+            return
+
+        try:
+            async with CharacterTickEngine.SEMAPHORE:
+                await self._execute_tick(character_id)
+        finally:
+            await self.redis.delete(lock_key)
+
+    async def _execute_tick(self, character_id: UUID) -> None:
+        """五阶段闭环核心逻辑
+
+        Args:
+            character_id: 角色 ID
+        """
+        logger.info("character_tick_start", character_id=str(character_id))
+
+        # 1. 感知环境
+        context = await self._perceive(character_id)
+
+        # 2. 候选过滤
+        candidates = self.registry.get_candidates(
+            context["state"], scene=context["state"].get("location")
+        )
+
+        if not candidates:
+            logger.warn("no_candidates", character_id=str(character_id))
+            return
+
+        # 3. LLM 决策
+        decision = await self._decide(character_id, context, candidates)
+
+        # 4. 执行 Action
+        await self._execute_action(character_id, decision, context)
+
+        # 5. 记忆沉淀
+        await self._memorize(character_id, decision, context)
+
+        logger.info(
+            "character_tick_end",
+            character_id=str(character_id),
+            action=decision.action,
+        )
+
+    async def _perceive(self, character_id: UUID) -> dict:
+        """感知环境 - 读取角色状态、世界状态、记忆
+
+        Args:
+            character_id: 角色 ID
+
+        Returns:
+            dict: {
+                "character": Character,  # 角色档案
+                "state": dict,           # 角色状态（Redis 缓存优先）
+                "world": dict,           # 世界状态
+                "memories": list[dict],  # 相关记忆
+                "plans": list[Plan],     # 当前计划
+            }
+        """
+        # 从数据库获取角色档案和状态
+        async with db.session() as session:
+            char_repo = CharacterRepository(session)
+            result = await char_repo.get_character_with_state(character_id)
+            if result is None:
+                raise ValueError(f"角色不存在: {character_id}")
+
+            character, char_state = result
+
+            plan_repo = PlanRepository(session)
+            plans = await plan_repo.get_active_plans(character_id)
+
+        # 从 Redis 读取实时状态（缓存优先）
+        redis_state = await self.redis.hgetall(f"char:{character_id}:state")
+        state = dict(redis_state) if redis_state else {
+            "location": char_state.location,
+            "stamina": char_state.stamina,
+            "satiety": char_state.satiety,
+            "mood": char_state.mood,
+            "money": char_state.money,
+            "phone_battery": char_state.phone_battery,
+            "social_energy": char_state.social_energy,
+        }
+
+        # 确保 state 中的值是正确类型
+        for key in ["stamina", "satiety", "mood", "money", "phone_battery", "social_energy"]:
+            if key in state and isinstance(state[key], bytes):
+                state[key] = int(state[key].decode())
+            elif key not in state:
+                # 使用默认值
+                state[key] = getattr(char_state, key, 50)
+
+        # 从 Redis 读取世界状态
+        world_state = await self.redis.hgetall("world:state")
+        world = dict(world_state) if world_state else {}
+
+        # 解码 world state 中的 bytes
+        for key, value in world.items():
+            if isinstance(value, bytes):
+                world[key] = value.decode()
+
+        # 检索相关记忆
+        query = f"角色{character.name}当前在{state.get('location')}，最近在做什么"
+        memories = await self._get_retrieval_service().search(
+            character_id, query, top_k=10
+        )
+
+        return {
+            "character": character,
+            "state": state,
+            "world": world,
+            "memories": memories,
+            "plans": plans,
+        }
+
+    def _get_episode_service(self) -> EpisodeService:
+        """获取记忆片段服务（延迟初始化）"""
+        if self.episode_service is None:
+            # EpisodeService 需要 LLMClient 和 MemoryRepository
+            # 这里需要在 db session 中使用
+            raise RuntimeError("EpisodeService 需要 db session")
+        return self.episode_service
+
+    def _get_retrieval_service(self) -> RetrievalService:
+        """获取记忆检索服务（延迟初始化）"""
+        if self.retrieval_service is None:
+            # RetrievalService 需要 LLMClient 和 MemoryRepository
+            raise RuntimeError("RetrievalService 需要 db session")
+        return self.retrieval_service
+
+    async def _decide(
+        self, character_id: UUID, context: dict, candidates: list[Action]
+    ) -> DecisionResult:
+        """LLM 决策 - 结构化输出
+
+        使用 PromptTemplates.render() 生成决策 Prompt
+        调用 LLMClient.structured_output() 获取结构化结果
+
+        Args:
+            character_id: 角色 ID
+            context: 感知环境结果
+            candidates: 候选 Action 列表
+
+        Returns:
+            DecisionResult: 决策结果
+        """
+        character = context["character"]
+        state = context["state"]
+        world = context["world"]
+
+        # 构建候选 Action 列表文本
+        candidates_text = "\n".join([
+            f"- {a.id}: {a.name}（耗时{a.duration_minutes}分钟，体力消耗{a.energy_cost}）"
+            for a in candidates
+        ])
+
+        # 构建记忆文本
+        memories_text = "\n".join([
+            m.get("content", str(m)) if isinstance(m, dict) else str(m)
+            for m in context["memories"]
+        ]) if context["memories"] else "暂无相关记忆"
+
+        # 构建计划文本
+        plans_text = "\n".join([
+            f"- {p.title}（进度{p.progress}%）"
+            for p in context["plans"]
+        ]) if context["plans"] else "暂无计划"
+
+        # 渲染决策 Prompt
+        prompt = self.prompts.render(
+            "decision",
+            name=character.name,
+            personality=character.personality or "无",
+            backstory=character.backstory or "无",
+            location=state.get("location", "未知"),
+            energy=state.get("stamina", 50),
+            hunger=state.get("satiety", 50),
+            mood=state.get("mood", "平静"),
+            world_time=world.get("world_time", datetime.now(timezone.utc).isoformat()),
+            weather=world.get("weather", "sunny"),
+            scenes="",  # 简化
+            memories=memories_text,
+            plans=plans_text,
+            candidates=candidates_text,
+        )
+
+        # 定义决策结果 schema
+        schema = {
+            "type": "object",
+            "properties": {
+                "action": {"type": "string"},
+                "reason": {"type": "string"},
+                "params": {"type": "object"},
+                "duration": {"type": "integer"},
+                "planChanges": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "planId": {"type": "string"},
+                            "action": {"type": "string"},  # update/complete/abandon
+                            "progress": {"type": "integer"},
+                        }
+                    }
+                },
+                "proactiveShareIntent": {"type": "boolean"},
+            },
+            "required": ["action", "reason"],
+        }
+
+        # 调用 LLM
+        result = await self.llm.structured_output(prompt, schema, model="strong")
+
+        # 验证 Action ID 合法性
+        action_id = result.get("action", "wait")
+        valid_action_ids = [a.id for a in candidates]
+        if action_id not in valid_action_ids:
+            logger.warn("invalid_action", action=action_id, fallback="wait")
+            action_id = "wait" if "wait" in valid_action_ids else valid_action_ids[0]
+
+        return DecisionResult(
+            action=action_id,
+            reason=result.get("reason", ""),
+            params=result.get("params", {}),
+            duration=result.get("duration"),
+            plan_changes=result.get("planChanges", []),
+            proactive_share_intent=result.get("proactiveShareIntent", False),
+        )
+
+    async def _execute_action(
+        self, character_id: UUID, decision: DecisionResult, context: dict
+    ) -> None:
+        """执行 Action - 事务化
+
+        流程：
+        1. 获取 Action 定义
+        2. 计算状态变更
+        3. 单一事务：写入 ActionRecord + 更新 PG 状态 + 写入 MemoryEpisode
+        4. 更新 Redis 实时状态
+
+        Args:
+            character_id: 角色 ID
+            decision: 决策结果
+            context: 感知环境结果
+        """
+        action_def = self.registry.get(decision.action)
+        if not action_def:
+            logger.error("action_not_found", action=decision.action)
+            return
+
+        # 计算状态变更
+        duration = decision.duration or action_def.duration_minutes
+        new_state = context["state"].copy()
+
+        # 应用资源变更（使用 apply_cost_fields 辅助函数）
+        from src.actions.base import apply_cost_fields
+
+        changes = apply_cost_fields(new_state, action_def)
+        new_state.update(changes)
+
+        # 更新位置（如果是移动 Action）
+        if decision.action == "move" and decision.params.get("target_scene"):
+            new_state["location"] = decision.params["target_scene"]
+
+        # 事务化执行
+        async with db.session() as session:
+            action_repo = ActionRepository(session)
+            char_repo = CharacterRepository(session)
+
+            # 写入行为记录
+            record = ActionRecord(
+                character_id=character_id,
+                action_id=action_def.id,
+                action_name=action_def.name,
+                params=decision.params,
+                reason=decision.reason,
+                duration_minutes=duration,
+                location=new_state.get("location", "unknown"),
+                timestamp=datetime.now(timezone.utc),
+            )
+            await action_repo.add(record)
+
+            # 更新 PG 状态
+            await char_repo.update_state(
+                character_id,
+                stamina=new_state.get("stamina"),
+                satiety=new_state.get("satiety"),
+                mood=new_state.get("mood"),
+                money=new_state.get("money"),
+                phone_battery=new_state.get("phone_battery"),
+                social_energy=new_state.get("social_energy"),
+                location=new_state.get("location"),
+            )
+
+        # 更新 Redis 实时状态
+        await self.redis.hset(
+            f"char:{character_id}:state",
+            mapping={k: str(v) for k, v in new_state.items() if v is not None},
+        )
+
+        logger.info(
+            "action_executed",
+            character_id=str(character_id),
+            action=decision.action,
+            duration=duration,
+        )
+
+    async def _memorize(
+        self, character_id: UUID, decision: DecisionResult, context: dict
+    ) -> None:
+        """记忆沉淀
+
+        流程：
+        1. 生成记忆内容（基于 Action + 状态）
+        2. 写入 MemoryEpisode
+        3. 检查是否需要反思
+
+        Args:
+            character_id: 角色 ID
+            decision: 决策结果
+            context: 感知环境结果
+        """
+        character = context["character"]
+        state = context["state"]
+
+        # 生成记忆内容
+        memory_content = (
+            f"{character.name}在{state.get('location')}执行了{decision.action}。"
+            f"理由：{decision.reason}"
+        )
+
+        # 写入记忆（需要 db session）
+        async with db.session() as session:
+            mem_repo = MemoryRepository(session)
+            ref_repo = ReflectionRepository(session)
+
+            # 创建服务实例
+            episode_service = EpisodeService(self.llm, mem_repo)
+            reflection_service = ReflectionService(self.llm, mem_repo, ref_repo)
+
+            # 写入记忆片段
+            await episode_service.create_episode(
+                character_id,
+                memory_content,
+                action_id=decision.action,
+                location=state.get("location"),
+                importance=5,  # 默认重要性
+            )
+
+            # 检查反思
+            await reflection_service.check_and_reflect(character_id)
+
+        logger.debug(
+            "memory_created",
+            character_id=str(character_id),
+            action=decision.action,
+        )
+
+    async def tick_all_active(self) -> None:
+        """执行所有活跃角色的 Tick
+
+        从数据库获取所有活跃角色，并发执行 Tick
+        """
+        async with db.session() as session:
+            char_repo = CharacterRepository(session)
+            characters = await char_repo.get_active_characters()
+
+        logger.info("tick_all_start", count=len(characters))
+
+        # 并发执行所有角色的 Tick
+        tasks = [self.tick_character(char.id) for char in characters]
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+        logger.info("tick_all_end", count=len(characters))
