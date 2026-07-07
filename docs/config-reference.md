@@ -68,6 +68,11 @@
 | `LANGFUSE_PUBLIC_KEY` | 否 | — | Langfuse 公钥 |
 | `LANGFUSE_SECRET_KEY` | 否 | — | Langfuse 密钥 |
 | `LANGFUSE_HOST` | 否 | — | Langfuse 地址 |
+| `LOKI_URL` | 否 | http://loki:3100 | Loki 推送地址（Promtail 用） |
+| `LOG_LEVEL` | 否 | info | 日志级别（debug/info/warn/error） |
+| `LOG_FORMAT` | 否 | json | 日志格式（json/text） |
+
+---
 
 ### 1.7 消息平台
 
@@ -176,6 +181,12 @@ observability:
     host: ${LANGFUSE_HOST}
     public_key: ${LANGFUSE_PUBLIC_KEY}
     secret_key: ${LANGFUSE_SECRET_KEY}
+  loki:
+    enabled: true
+    url: http://loki:3100        # Promtail 推送目标
+  logging:
+    level: info                   # debug | info | warn | error
+    format: json                  # structlog 输出格式
 
 auth:
   jwt_secret: ${JWT_SECRET}

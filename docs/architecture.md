@@ -70,15 +70,15 @@
 ┌──────────────────────────────────▼──────────────────────────────────────────┐
 │                   基础设施层 (Infrastructure Layer)                         │
 │  ┌───────────────────────────┐  ┌─────────────┐  ┌───────────────────┐    │
-│  │     PostgreSQL 17         │  │   Redis 7.4 │  │  对象存储          │    │
+│  │     PostgreSQL 17         │  │   Redis 8.0 │  │  对象存储          │    │
 │  │  + pgvector (向量检索)    │  │ (缓存/队列/  │  │  (MinIO/S3)       │    │
 │  │  + JSONB (灵活字段)       │  │  实时状态)   │  │                   │    │
 │  │  + 分区表 (消息/行为历史) │  │             │  │                   │    │
 │  │  + pg_uuidv7 (主键)       │  │             │  │                   │    │
 │  └───────────────────────────┘  └─────────────┘  └───────────────────┘    │
-│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  └────────────────────────────────────────────────────────────────────────┐ │
 │  │              可观测性 (OpenTelemetry + Langfuse)                       │ │
-│  │        链路追踪(Traces)  │  指标(Metrics)  │  日志(Logs)              │ │
+│  │   链路追踪(Jaeger)  │  指标(Prometheus+Grafana)  │  日志(Loki+Promtail) │ │
 │  └────────────────────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -150,28 +150,62 @@
 
 ## 四、技术栈总览
 
-| 层次 | 类别 | 技术选型 |
-|------|------|----------|
-| 后端核心 | Agent 框架 | LangGraph (Python) |
-| | Web 框架 | FastAPI |
-| | 包管理 | uv / Poetry |
-| | 异步驱动 | asyncpg + SQLAlchemy 2.0 (async) |
-| | ORM 迁移 | alembic |
-| 前端 | UI 框架 | React 19 |
-| | 路由 | TanStack Router |
-| | 状态管理 | TanStack Query + Zustand |
-| | 构建工具 | Vite 8 |
-| | 组件库 | shadcn/ui + Tailwind CSS v4 |
-| | 包管理 | pnpm 11 |
-| 数据存储 | 主数据库 | PostgreSQL 17 (+ pgvector + pg_uuidv7 + JSONB + 分区表) |
-| | 缓存/实时状态 | Redis 7.4+ |
-| | 对象存储 | MinIO / AWS S3 |
-| 中间件 | 消息队列 | Redis Streams |
-| | 连接池 | PgBouncer |
-| | 工具调用 | MCP 协议 (官方 mcp Python SDK) |
-| 可观测性 | LLM 追踪 | Langfuse |
-| | 链路追踪 | OpenTelemetry + Jaeger |
-| | 指标 | Prometheus + Grafana |
+### 4.1 后端
+
+| 类别 | 技术 | 版本 | 说明 |
+|------|------|------|------|
+| 语言 | Python | 3.13 | 性能与错误信息改进 |
+| 包管理 | uv | 最新 | 极速依赖解析与虚拟环境管理 |
+| Agent 框架 | LangGraph | 1.x | 多智能体编排 |
+| Web 框架 | FastAPI | 0.118+ | 异步 API |
+| 异步驱动 | asyncpg | 0.30+ | 原生 PG 异步协议 |
+| ORM | SQLAlchemy | 2.0+ | 仅用于模型/迁移/简单 CRUD（混合策略，见 §5.7） |
+| 迁移工具 | alembic | 1.14+ | Schema 版本化 |
+| 向量扩展 | pgvector | 0.8+ | HNSW 索引 |
+| UUID 扩展 | pg_uuidv7 | 最新 | 时间有序主键 |
+| 可观测 SDK | OpenTelemetry | 1.28+ | Traces/Metrics/Logs |
+| LLM 追踪 | Langfuse | 3.x | Prompt/Token/Cost |
+| MCP SDK | mcp (官方) | 1.x | 工具调用协议 |
+
+### 4.2 前端
+
+| 类别 | 技术 | 版本 | 说明 |
+|------|------|------|------|
+| UI 渲染 | React | 19.2 | 并发特性 + Actions |
+| 类型 | TypeScript | 7.0 | 类型系统 |
+| 构建 | Vite (Rolldown) | 8.1 | Rust 内核极速构建 |
+| 编译器 | React Compiler | 1.0 | 自动记忆化优化，免手写 useMemo |
+| 路由 | TanStack Router | 1.170 | 类型安全路由 |
+| 数据 | TanStack Query | 5.101 | 服务端状态 |
+| 校验 | Zod | 4.4 | 表单与运行时校验 |
+| 客户端状态 | Zustand | 5.0 | 轻量全局状态 |
+| 组件库 | shadcn/ui | 最新 | 可定制 Radix 基础组件 |
+| 样式 | Tailwind CSS | v4 | 原子化 CSS |
+| Lint | oxlint | 最新 | Rust 内核极速 lint |
+| 格式化 | Prettier | 3.x | 配合 oxlint |
+| 包管理 | pnpm | 11 | 硬链接节省磁盘 |
+| 图表 | Recharts | 3.x | 数据可视化 |
+| 动效 | Framer Motion | 12.x | 二次元风格动效 |
+
+### 4.3 数据存储与中间件
+
+| 类别 | 技术 | 版本 | 说明 |
+|------|------|------|------|
+| 主数据库 | PostgreSQL | 17 | + pgvector + pg_uuidv7 + JSONB + 分区表 |
+| 缓存/实时 | Redis | 8.0 | 缓存/队列/实时状态/锁 |
+| 对象存储 | MinIO | 最新 | S3 兼容，头像/图片/附件 |
+| 消息队列 | Redis Streams | — | 入站消息/推送/事件总线 |
+| 连接池 | PgBouncer | 1.23+ | transaction 模式 |
+
+### 4.4 可观测性
+
+| 类别 | 技术 | 版本 | 说明 |
+|------|------|------|------|
+| 链路追踪 | OpenTelemetry + Jaeger | 最新 | 分布式 Trace |
+| LLM 追踪 | Langfuse | 3.x | Prompt/Token/Cost 审计 |
+| 指标 | Prometheus + Grafana | 最新 | 时序指标与告警 |
+| **日志聚合** | **Loki + Promtail** | **3.x** | **结构化日志聚合，与 Grafana 统一面板** |
+| 采集器 | OTel Collector | 最新 | OTLP 接收/批处理/导出 |
 
 ---
 
@@ -343,12 +377,104 @@ llm:
 
 建表时通过 alembic 迁移动态生成 `vector(:dim)`，避免硬编码。
 
+### 5.7 数据访问策略：ORM 与原生 SQL 混合
+
+#### 问题：纯 ORM 还是纯原生 SQL？
+
+本项目重度使用 pgvector、JSONB、数组、分区表、HNSW 索引，需在 ORM 与原生 SQL 间权衡：
+
+| 维度 | 纯 ORM (SQLAlchemy) | 纯原生 SQL (asyncpg) | 混合方案 |
+|------|---------------------|----------------------|----------|
+| 开发效率 | 高（模型驱动） | 低（手写 SQL） | 高 |
+| 类型安全 | 强 | 弱（需手动映射） | 强 |
+| 迁移管理 | alembic 自动 | 手写脚本 | alembic |
+| pgvector 算子 (`<=>`) | 支持（pgvector adapter） | 原生支持 | 原生 SQL |
+| HNSW 索引创建 | ❌ 需 raw SQL | ✅ | 原生 SQL |
+| `SET hnsw.ef_search` | ❌ 需 raw SQL | ✅ | 原生 SQL |
+| 混合检索 CTE | 表达吃力，可读性差 | ✅ 清晰 | 原生 SQL |
+| 分区表 DDL | ❌ 需 raw SQL | ✅ | 原生 SQL |
+| 简单 CRUD | ✅ 简洁 | 啰嗦 | ORM |
+| N+1 防护 | selectinload 等机制 | 手动 JOIN | ORM |
+| 性能 | 中（对象水合开销） | 高 | 各取所长 |
+| SQL 注入防护 | 自动参数化 | 需手动参数化 | 二者皆用 |
+
+#### 决策：混合方案
+
+**ORM（SQLAlchemy 2.0）负责：**
+- 模型定义（`Declarative Base`）
+- alembic 迁移版本管理
+- 简单 CRUD（characters、module_configs、plans 等）
+- 关系加载（`selectinload` 防 N+1）
+- 类型推导与 IDE 提示
+
+**原生 SQL（asyncpg / SQLAlchemy `text()`）负责：**
+- 向量检索（Top-K、混合检索 CTE）
+- HNSW 索引创建与 `ef_search` 调优
+- 复杂分析查询（窗口函数、物化视图）
+- 分区表 DDL 与维护
+- 批量写入（`COPY` 协议）
+- 性能热点路径
+
+#### 代码组织
+
+```python
+# db/repositories/memory_repo.py
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+class MemoryRepository:
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    # ✅ 简单 CRUD 用 ORM
+    async def add(self, ep: MemoryEpisode) -> MemoryEpisode:
+        self.session.add(ep)
+        await self.session.flush()
+        return ep
+
+    # ✅ 向量检索用原生 SQL (含 ef_search 调优 + 混合排序 CTE)
+    async def search_hybrid(
+        self, character_id: UUID, query_vec: list[float], top_k: int = 10
+    ) -> list[dict]:
+        stmt = text("""
+            SET LOCAL hnsw.ef_search = :ef_search;
+            WITH candidates AS (
+                SELECT id, content, importance, timestamp,
+                       1 - (embedding <=> :q_vec) AS sim_score
+                FROM memory_episodes
+                WHERE character_id = :cid
+                ORDER BY embedding <=> :q_vec
+                LIMIT :limit
+            )
+            SELECT id, content,
+                   sim_score * 0.6 + importance * 0.05
+                   + EXTRACT(EPOCH FROM (now() - timestamp)) / 86400.0 * (-0.05) AS final_score
+            FROM candidates
+            ORDER BY final_score DESC
+            LIMIT :top_k;
+        """)
+        result = await self.session.execute(stmt, {
+            "cid": character_id, "q_vec": str(query_vec),
+            "limit": top_k * 3, "top_k": top_k, "ef_search": 40,
+        })
+        return [dict(r._mapping) for r in result]
+```
+
+#### 收益
+
+- 向量与复杂查询**零抽象损失**，性能等同纯 asyncpg；
+- 简单 CRUD 享受 ORM 的类型安全与迁移管理；
+- HNSW/分区/CTE 等高级特性可直接使用，不被 ORM 限制；
+- 团队心智负担可控：90% 代码用 ORM，10% 性能/向量热点用原生 SQL。
+
 ---
 
 ## 六、相关文档
 
 | 主题 | 文档 |
 |------|------|
+| 角色设计 | [character-design.md](character-design.md) |
+| 小镇与场景 | [town-design.md](town-design.md) |
 | 世界引擎与角色 Tick | [world-engine.md](world-engine.md) |
 | Action 系统与执行闭环 | [action-system.md](action-system.md) |
 | 记忆系统与 pgvector | [memory-system.md](memory-system.md) |

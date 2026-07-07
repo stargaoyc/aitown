@@ -1,40 +1,206 @@
 # 前端设计
 
-> 本文档定义 AI Town Web Dashboard 的页面结构、目录结构、状态管理与实时数据流。前端为 React 19 单页应用，作为运维与观察小镇运行的管理面板。
+> 本文档定义 AI Town Web Dashboard 的设计语言、页面结构、目录结构、状态管理与实时数据流。前端为 React 19 单页应用，采用**二次元现代风**视觉语言，作为运维与观察小镇运行的管理面板。
 
 ---
 
 ## 一、技术栈
 
-| 类别 | 选型 |
-|------|------|
-| UI 框架 | React 19 |
-| 路由 | TanStack Router |
-| 服务端状态 | TanStack Query |
-| 客户端状态 | Zustand |
-| 构建工具 | Vite 8 |
-| 组件库 | shadcn/ui + Tailwind CSS v4 |
-| 图表 | Recharts |
-| 包管理 | pnpm 11 |
-| 类型生成 | openapi-typescript（从后端 OpenAPI 生成） |
+| 类别 | 技术 | 版本 | 说明 |
+|------|------|------|------|
+| UI 渲染 | React | 19.2 | 并发特性 + Actions |
+| 类型 | TypeScript | 7.0 | 类型系统 |
+| 构建 | Vite (Rolldown) | 8.1 | Rust 内核极速构建 |
+| 编译器 | React Compiler | 1.0 | 自动记忆化，免手写 useMemo/useCallback |
+| 路由 | TanStack Router | 1.170 | 类型安全路由，文件路由 |
+| 服务端状态 | TanStack Query | 5.101 | 缓存/重试/乐观更新 |
+| 校验 | Zod | 4.4 | 表单与 API 运行时校验 |
+| 客户端状态 | Zustand | 5.0 | 轻量全局状态 |
+| 组件库 | shadcn/ui | 最新 | Radix UI 基础 + 可定制 |
+| 样式 | Tailwind CSS | v4 | 原子化 CSS，零运行时 |
+| Lint | oxlint | 最新 | Rust 内核极速 lint（替代 ESLint） |
+| 格式化 | Prettier | 3.x | 配合 oxlint |
+| 图表 | Recharts | 3.x | 数据可视化 |
+| 动效 | Framer Motion | 12.x | 二次元风格过渡动效 |
+| 图标 | Lucide React | 最新 | 现代图标库 |
+| 包管理 | pnpm | 11 | 硬链接节省磁盘 |
+
+### React Compiler 说明
+
+启用 React Compiler 后，**无需手写 `useMemo`/`useCallback`/`React.memo`**，编译器自动分析并记忆化。代码更简洁，性能更优：
+
+```typescript
+// ❌ 旧写法（不再需要）
+const value = useMemo(() => compute(a, b), [a, b]);
+const handler = useCallback((e) => onClick(e), [onClick]);
+
+// ✅ 新写法（React Compiler 自动优化）
+const value = compute(a, b);
+const handler = (e) => onClick(e);
+```
+
+`vite.config.ts` 启用：
+
+```typescript
+import { reactCompiler } from 'babel-plugin-react-compiler';
+
+export default defineConfig({
+  plugins: [react({ babel: { plugins: [reactCompiler] } })],
+});
+```
 
 ---
 
-## 二、页面结构
+## 二、设计语言：二次元现代风
+
+### 2.1 设计关键词
+
+**"轻盈、有呼吸感、带二次元温度"** —— 不堆砌粉嫩卡通元素，而是用现代设计语言承载二次元氛围。
+
+### 2.2 视觉风格组合
+
+| 风格元素 | 说明 |
+|----------|------|
+| **玻璃拟态 (Glassmorphism)** | 半透明卡片 + 背景模糊 + 细边框，营造轻盈层次感 |
+| **柔和渐变** | 樱花粉→天蓝、暮光紫→粉，作为背景与大色块 |
+| **角色卡牌化** | 角色以"卡牌"形式展示，hover 翻转/浮起，呼应抽卡/立绘文化 |
+| **圆角与阴影** | 大圆角（12–20px）+ 多层柔和阴影，避免尖锐感 |
+| **微动效** | Framer Motion 实现入场、悬停、状态切换的弹性动效 |
+| **二次元配色** | 主色樱粉 `#FF8FAB`、辅色天蓝 `#7EC8E3`、点缀暮紫 `#B19CD9` |
+| **字体** | 中文用思源黑体/HarmonyOS Sans，英文用 Inter，标题可选衬线增加质感 |
+
+### 2.3 配色系统（Tailwind v4 CSS 变量）
+
+```css
+/* styles/globals.css */
+@import "tailwindcss";
+
+@theme {
+  /* 主色调 - 樱花粉 */
+  --color-sakura-50:  #fff5f8;
+  --color-sakura-500: #ff8fab;
+  --color-sakura-600: #f472a3;
+
+  /* 辅色 - 天蓝 */
+  --color-sky-soft-400: #7ec8e3;
+  --color-sky-soft-500: #5bb5d8;
+
+  /* 点缀 - 暮紫 */
+  --color-twilight-400: #b19cd9;
+  --color-twilight-500: #9b7ed6;
+
+  /* 玻璃拟态 */
+  --color-glass-bg:     rgba(255, 255, 255, 0.55);
+  --color-glass-border: rgba(255, 255, 255, 0.35);
+  --color-glass-blur:   16px;
+
+  /* 圆角 */
+  --radius-card: 16px;
+  --radius-pill: 9999px;
+
+  /* 阴影 */
+  --shadow-soft:  0 4px 20px rgba(255, 143, 171, 0.12);
+  --shadow-hover: 0 8px 32px rgba(255, 143, 171, 0.20);
+}
+```
+
+### 2.4 玻璃拟态卡片组件示例
+
+```tsx
+// components/ui/glass-card.tsx
+import { motion } from 'framer-motion';
+import { cn } from '@/lib/utils';
+
+export function GlassCard({ children, className, hover = true }: GlassCardProps) {
+  return (
+    <motion.div
+      whileHover={hover ? { y: -4, scale: 1.01 } : undefined}
+      transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+      className={cn(
+        'rounded-[--radius-card] border border-[--color-glass-border]',
+        'bg-[--color-glass-bg] backdrop-blur-[--color-glass-blur]',
+        'shadow-[--shadow-soft] hover:shadow-[--shadow-hover]',
+        'transition-shadow',
+        className
+      )}
+    >
+      {children}
+    </motion.div>
+  );
+}
+```
+
+### 2.5 角色卡牌组件（二次元立绘风）
+
+```tsx
+// components/characters/character-card.tsx
+import { motion } from 'framer-motion';
+import { GlassCard } from '@/components/ui/glass-card';
+
+export function CharacterCard({ character }: { character: Character }) {
+  return (
+    <GlassCard className="overflow-hidden group">
+      {/* 立绘区 - 渐变背景 + 头像 */}
+      <div className="relative h-64 bg-gradient-to-br from-sakura-50 via-sky-soft-400/30 to-twilight-400/30">
+        <img
+          src={character.avatar_url}
+          alt={character.name}
+          className="absolute inset-0 w-full h-full object-cover object-top
+                     transition-transform duration-500 group-hover:scale-105"
+        />
+        {/* 状态徽章 */}
+        <span className="absolute top-3 right-3 px-3 py-1 rounded-full
+                         bg-white/80 backdrop-blur text-xs font-medium">
+          {character.mood}
+        </span>
+      </div>
+
+      {/* 信息区 */}
+      <div className="p-5">
+        <h3 className="text-lg font-semibold">{character.name}</h3>
+        <p className="text-sm text-muted-foreground">{character.occupation}</p>
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {character.personality.map(tag => (
+            <span key={tag} className="px-2 py-0.5 text-xs rounded-full
+                         bg-sakura-500/15 text-sakura-600">
+              {tag}
+            </span>
+          ))}
+        </div>
+
+        {/* 状态条 - 精力/饥饿 */}
+        <div className="mt-4 space-y-2">
+          <StatBar label="精力" value={character.energy} color="bg-sky-soft-500" />
+          <StatBar label="饱腹" value={100 - character.hunger} color="bg-sakura-500" />
+        </div>
+      </div>
+    </GlassCard>
+  );
+}
+```
+
+### 2.6 页面布局
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────┐
-│  Sidebar (导航)   │   Content Area                                 │
-│  ─────────────    │                                               │
-│  📊 仪表盘        │                                               │
-│  🏘️ 小镇管理     │                                               │
-│  👤 角色管理      │                                               │
-│  🧩 模块管理      │                                               │
-│  💬 会话监控      │                                               │
-│  📈 可观测性      │                                               │
-│  ⚙️ 系统设置      │                                               │
-└─────────────────────────────────────────────────────────────────────┘
+│  顶部栏: Logo + 世界时钟 + 天气 + 全局搜索                          │
+├──────────┬──────────────────────────────────────────────────────────┤
+│          │                                                          │
+│  侧边栏  │   主内容区 (玻璃拟态卡片网格)                            │
+│  (毛玻璃)│                                                          │
+│          │   ┌────────┐ ┌────────┐ ┌────────┐                      │
+│  📊 仪表盘│   │ 角色卡 │ │ 角色卡 │ │ 角色卡 │                      │
+│  🏘️ 小镇 │   └────────┘ └────────┘ └────────┘                      │
+│  👥 角色 │                                                          │
+│  🧩 模块 │   ┌────────────────────────────────────────┐            │
+│  💬 会话 │   │  实时事件流 (左侧滚动列表)              │            │
+│  📈 观测 │   └────────────────────────────────────────┘            │
+│  ⚙️ 设置 │                                                          │
+│          │                                                          │
+└──────────┴──────────────────────────────────────────────────────────┘
 ```
+
+侧边栏采用毛玻璃效果，悬浮于渐变背景之上。背景使用动态渐变（随虚拟时间变化：清晨粉橙→正午天蓝→黄昏紫粉→深夜靛蓝）。
 
 ---
 
@@ -42,11 +208,11 @@
 
 | 页面 | 核心功能 | 关键组件 |
 |------|----------|----------|
-| 仪表盘 | 总览卡片、趋势图、最近事件流 | Recharts、滚动列表 |
+| 仪表盘 | 总览卡片、趋势图、最近事件流、世界时钟 | GlassCard、Recharts、滚动列表 |
 | 小镇管理 | 世界状态控制（时间/天气）、场景地图、事件广播 | 可视化地图、控制面板 |
-| 角色管理 | 角色列表/创建/编辑、实时状态卡片、关系图谱 | 表格+表单、关系图 |
+| 角色管理 | 角色卡牌墙、详情侧滑、实时状态、关系图谱 | CharacterCard、关系图 |
 | 模块管理 | 模块列表（类型/状态/依赖）、开关控制、MCP Server 管理 | 表格、开关组件、日志查看器 |
-| 会话监控 | 多渠道会话列表、对话详情、人工干预 | 聊天界面、消息编辑器 |
+| 会话监控 | 多渠道会话列表、对话详情、人工干预 | 聊天气泡（二次元风格）、消息编辑器 |
 | 可观测性 | 调用链追踪、日志查询、指标图表、告警配置 | Trace 视图、日志搜索、图表面板 |
 | 系统设置 | 模型配置、Prompt 编辑、权限管理 | 表单、代码编辑器 |
 
@@ -59,13 +225,14 @@ packages/frontend/
 ├── index.html
 ├── package.json
 ├── pnpm-workspace.yaml
-├── vite.config.ts
+├── vite.config.ts              # 含 React Compiler 配置
+├── oxlint.config.json          # oxlint 配置
 ├── tailwind.config.ts
 ├── tsconfig.json
 ├── src/
-│   ├── main.tsx                    # 入口文件
-│   ├── App.tsx                     # 根组件
-│   ├── routes/                     # TanStack Router 路由定义
+│   ├── main.tsx                # 入口
+│   ├── App.tsx                 # 根组件 + RouterProvider
+│   ├── routes/                 # TanStack Router 文件路由
 │   │   ├── __root.tsx
 │   │   ├── dashboard/
 │   │   ├── town/
@@ -75,38 +242,35 @@ packages/frontend/
 │   │   ├── observability/
 │   │   └── settings/
 │   ├── components/
-│   │   ├── ui/                     # shadcn/ui 基础组件
-│   │   ├── layout/                 # 布局组件 (Sidebar, Header)
-│   │   ├── dashboard/
-│   │   ├── town/
-│   │   ├── characters/
+│   │   ├── ui/                 # shadcn/ui 基础组件
+│   │   ├── glass-card.tsx      # 玻璃拟态卡片
+│   │   ├── layout/             # 布局 (Sidebar, Header, Background)
+│   │   ├── characters/         # 角色卡牌、状态条
 │   │   ├── modules/
-│   │   └── shared/                 # 通用组件 (Loading, ErrorBoundary)
-│   ├── stores/                     # Zustand 状态管理
+│   │   └── shared/
+│   ├── stores/                 # Zustand
 │   │   ├── app-store.ts
 │   │   ├── character-store.ts
 │   │   ├── module-store.ts
 │   │   └── websocket-store.ts
-│   ├── api/                        # OpenAPI 生成的客户端
+│   ├── api/                    # OpenAPI 生成的客户端
 │   │   ├── client.ts
 │   │   ├── types.ts
-│   │   └── hooks/                  # TanStack Query hooks
-│   ├── hooks/                      # 自定义 Hooks
+│   │   └── hooks/
+│   ├── hooks/
 │   │   ├── use-websocket.ts
-│   │   ├── use-toast.ts
-│   │   └── use-debounce.ts
-│   ├── lib/                        # 工具函数
+│   │   └── use-toast.ts
+│   ├── lib/
 │   │   ├── utils.ts
 │   │   └── constants.ts
 │   ├── styles/
-│   │   └── globals.css
-│   └── types/                      # 共享类型定义
-│       └── index.ts
+│   │   └── globals.css         # Tailwind v4 + 主题变量
+│   └── types/
 ├── public/
 ├── tests/
-│   ├── unit/
-│   └── e2e/
-└── storybook/
+│   ├── unit/                   # Vitest
+│   └── e2e/                    # Playwright
+└── storybook/                  # 组件故事书
 ```
 
 ---
@@ -117,7 +281,7 @@ packages/frontend/
 ┌─────────────┐      WebSocket      ┌─────────────────────────────┐
 │  后端服务   │ ──────────────────▶ │  前端状态管理               │
 │  (FastAPI)  │                     │  ┌─────────────────────────┐│
-└─────────────┘                     │  │  Zustand Store (全局)   ││
+└─────────────┘                     │  │  Zustand Store (实时)   ││
                                     │  │  - 角色实时状态         ││
                                     │  │  - 世界状态             ││
                                     │  │  - 模块状态             ││
@@ -143,51 +307,59 @@ packages/frontend/
 
 ```typescript
 // hooks/use-websocket.ts
+import { useEffect } from 'react';
 import { useWebSocketStore } from '@/stores/websocket-store';
+import { useCharacterStore } from '@/stores/character-store';
+import { useWorldStore } from '@/stores/world-store';
 
 export function useDashboardSocket() {
   const ws = useWebSocketStore((s) => s.ws);
+  const upsertCharacter = useCharacterStore((s) => s.upsert);
+  const setWorld = useWorldStore((s) => s.set);
+
   useEffect(() => {
     if (!ws) return;
     const handler = (event: MessageEvent) => {
       const msg = JSON.parse(event.data);
       switch (msg.type) {
         case 'character.state_update':
-          useCharacterStore.getState().upsert(msg.data);
+          upsertCharacter(msg.data);
           break;
         case 'world.state_update':
-          useWorldStore.getState().set(msg.data);
-          break;
-        case 'module.status_change':
-          useModuleStore.getState().upsert(msg.data);
+          setWorld(msg.data);
           break;
       }
     };
     ws.addEventListener('message', handler);
     return () => ws.removeEventListener('message', handler);
-  }, [ws]);
+  }, [ws, upsertCharacter, setWorld]);
 }
 ```
 
-### 5.3 TanStack Query Hooks
+### 5.3 TanStack Query Hooks（Zod 校验）
 
 ```typescript
 // api/hooks/use-characters.ts
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { z } from 'zod';
 import { api } from '../client';
+
+const CharacterSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  age: z.number(),
+  occupation: z.string(),
+  personality: z.array(z.string()),
+  status: z.enum(['active', 'archived', 'deleted']),
+});
 
 export function useCharacters() {
   return useQuery({
     queryKey: ['characters'],
-    queryFn: () => api.characters.list(),
-  });
-}
-
-export function useCreateCharacter() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: CharacterInput) => api.characters.create(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['characters'] }),
+    queryFn: async () => {
+      const raw = await api.characters.list();
+      return z.array(CharacterSchema).parse(raw);   // 运行时校验
+    },
   });
 }
 ```
@@ -196,63 +368,81 @@ export function useCreateCharacter() {
 
 ## 六、API 客户端生成
 
-### 6.1 类型生成
-
 ```bash
 # 从后端 OpenAPI 生成 TypeScript 类型
 pnpm exec openapi-typescript http://localhost:8000/openapi.json \
   -o src/api/types.ts
 ```
 
-### 6.2 客户端封装
+---
 
-```typescript
-// api/client.ts
-import type { paths } from './types';
+## 七、动态背景
 
-const BASE = import.meta.env.VITE_API_BASE ?? '/api/v1';
+背景渐变随虚拟世界时间变化，增强沉浸感：
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    ...init,
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
-  });
-  if (!res.ok) throw new ApiError(res.status, await res.json());
-  return (await res.json()).data;
-}
-
-export const api = {
-  characters: {
-    list: () => request<paths['/characters']['get']['responses']['200']>('/characters'),
-    create: (input: CharacterInput) =>
-      request('/characters', { method: 'POST', body: JSON.stringify(input) }),
-    // ...
-  },
-  // ...
+```tsx
+// components/layout/dynamic-background.tsx
+const GRADIENTS = {
+  dawn:      'from-[#FFE5B4] via-[#FFCCE5] to-[#B19CD9]',  // 清晨粉橙
+  day:       'from-[#A8D8FF] via-[#C7CEEA] to-[#E0C3FC]',  // 正午天蓝
+  dusk:      'from-[#FFB088] via-[#FF8FAB] to-[#B19CD9]',  // 黄昏紫粉
+  night:     'from-[#2C3E50] via-[#4A4063] to-[#6C5B7B]',  // 深夜靛蓝
 };
+
+export function DynamicBackground({ worldTime }: { worldTime: Date }) {
+  const phase = getDayPhase(worldTime);  // dawn | day | dusk | night
+  return (
+    <div className={`fixed inset-0 -z-10 bg-gradient-to-br ${GRADIENTS[phase]}
+                     transition-all duration-[3000ms]`} />
+  );
+}
 ```
 
 ---
 
-## 七、构建与部署
+## 八、构建与部署
 
-### 7.1 开发
+### 8.1 开发
 
 ```bash
 cd packages/frontend
 pnpm install
-pnpm dev                  # Vite 开发服务器
-pnpm gen:api              # 生成 OpenAPI 类型
+pnpm gen:api                # 生成 OpenAPI 类型
+pnpm dev                    # Vite 开发服务器
 ```
 
-### 7.2 构建
+### 8.2 Lint 与格式化
 
 ```bash
-pnpm build                # 输出到 dist/
-pnpm preview              # 预览生产构建
+pnpm lint                   # oxlint
+pnpm format                 # Prettier
+pnpm typecheck              # tsc --noEmit
 ```
 
-### 7.3 测试
+`oxlint.config.json` 示例：
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/oxlint/oxlint/main/schema.json",
+  "rules": {
+    "no-unused-vars": "warn",
+    "react/exhaustive-deps": "off",
+    "react-hooks/rules-of-hooks": "error"
+  },
+  "ignorePatterns": ["dist", "node_modules", "src/api/types.ts"]
+}
+```
+
+> React Compiler 启用后，`react/exhaustive-deps` 可关闭——编译器已保证依赖正确性。
+
+### 8.3 构建
+
+```bash
+pnpm build                  # 输出到 dist/
+pnpm preview                # 预览生产构建
+```
+
+### 8.4 测试
 
 | 类型 | 工具 |
 |------|------|
@@ -260,29 +450,6 @@ pnpm preview              # 预览生产构建
 | 组件测试 | Testing Library |
 | E2E | Playwright |
 | 视觉回归 | Storybook + Chromatic（可选） |
-
----
-
-## 八、关键页面交互
-
-### 8.1 角色管理
-
-- 列表支持搜索（按名字模糊）、过滤（按 status）、排序；
-- 详情页含实时状态卡片（WebSocket 推送）、行为时间轴、关系图谱（D3 力导向图）；
-- 编辑表单支持 `personality` 标签数组与 `traits` JSONB 动态字段。
-
-### 8.2 模块管理
-
-- 表格展示模块名/类型/状态/依赖；
-- 开关组件调用 `POST /modules/{name}/enable|disable`；
-- 健康状态徽章颜色：`healthy`(绿) / `unhealthy`(红) / `unknown`(灰)；
-- 日志查看器实时滚动展示模块调用日志。
-
-### 8.3 会话监控
-
-- 左侧会话列表（按用户×角色）；
-- 右侧聊天界面，支持人工干预（插入 user/assistant 消息）；
-- 可切换平台视图（QQ/飞书/Web）。
 
 ---
 

@@ -15,7 +15,7 @@
 | 数据格式 | JSON (`Content-Type: application/json`) |
 | 字符编码 | UTF-8 |
 | 时间格式 | ISO 8601 UTC（`2026-07-06T08:00:00Z`） |
-| ID 格式 | UUID v4 |
+| ID 格式 | UUID v7（时间有序） |
 | 分页 | `?page=1&page_size=20`，响应含 `total` |
 
 ### 1.2 统一响应格式

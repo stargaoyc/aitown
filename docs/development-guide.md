@@ -8,12 +8,12 @@
 
 | 工具 | 版本 | 说明 |
 |------|------|------|
-| Python | 3.12+ | 后端 |
-| uv / Poetry | 最新 | Python 包管理 |
+| Python | 3.13+ | 后端 |
+| uv | 最新 | Python 包管理（替代 Poetry） |
 | Node.js | 22+ | 前端 |
 | pnpm | 11+ | 前端包管理 |
 | PostgreSQL | 17+ | 需启用 `pg_uuidv7`、`vector`、`pg_trgm` 扩展 |
-| Redis | 7.4+ | — |
+| Redis | 8.0+ | — |
 | Docker | 24+ | 容器化部署 |
 
 ---
@@ -102,6 +102,8 @@ packages/backend/src/
 ---
 
 ## 四、数据访问层
+
+> **混合策略**：ORM（SQLAlchemy 2.0）负责模型定义/迁移/简单 CRUD，原生 SQL（`text()`）负责向量检索/复杂查询/性能热点。详见 [架构设计 §5.7](architecture.md#57-数据访问策略orm-与原生-sql-混合)。
 
 ### 4.1 异步会话工厂
 
@@ -362,16 +364,16 @@ async def list_items(db: DB = Depends(get_db)):
 | `black`（可选） | 备用格式化 |
 
 ```bash
-ruff check src/            # lint
-ruff format src/           # format
-mypy src/                  # 类型检查
+uv run ruff check src/     # lint
+uv run ruff format src/    # format
+uv run mypy src/           # 类型检查
 ```
 
 ### 7.2 TypeScript
 
 | 工具 | 用途 |
 |------|------|
-| `eslint` | lint |
+| `oxlint` | lint（Rust 内核，替代 ESLint） |
 | `prettier` | format |
 | `tsc --noEmit` | 类型检查 |
 

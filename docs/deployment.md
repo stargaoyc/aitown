@@ -40,17 +40,20 @@
 | 组件 | 镜像/版本 | 端口 | 说明 |
 |------|-----------|------|------|
 | Nginx | `nginx:alpine` | 80/443 | 反向代理 |
-| 前端 | 自构 | 80 (容器内) | 静态文件 |
-| 后端 | 自构 (Python 3.12) | 8000 | FastAPI |
-| PostgreSQL | `postgres:17` + pgvector | 5432 | 主数据库 |
-| Redis | `redis:7.4` | 6379 | 缓存/队列 |
+| 前端 | 自构 (Node 22) | 80 (容器内) | 静态文件 |
+| 后端 | 自构 (Python 3.13) | 8000 | FastAPI |
+| PostgreSQL | `pgvector/pgvector:pg17` + pg_uuidv7 | 5432 | 主数据库 |
+| PgBouncer | `edoburu/pgbouncer` | 6432 | 连接池 |
+| Redis | `redis:8.0-alpine` | 6379 | 缓存/队列 |
 | MinIO | `minio/minio` | 9000/9001 | 对象存储 |
-| MCP Servers | 自构 | 8001–8005 | 工具服务 |
+| MCP Servers | 自构 + 社区 | 8001–8006 | 工具服务 |
 | Jaeger | `jaegertracing/all-in-one` | 16686 | 链路追踪 |
 | Prometheus | `prom/prometheus` | 9090 | 指标 |
-| Grafana | `grafana/grafana` | 3000 | 可视化 |
-| OTel Collector | `otel/opentelemetry-collector` | 4318 | 收集器 |
-| Langfuse | `langfuse/langfuse` | 3001 | LLM 追踪 |
+| Grafana | `grafana/grafana:12.x` | 3000 | 可视化 |
+| OTel Collector | `otel/opentelemetry-collector-contrib` | 4318 | 收集器 |
+| Langfuse | `langfuse/langfuse:3` | 3001 | LLM 追踪 |
+| **Loki** | **`grafana/loki:3.x`** | **3100** | **日志聚合** |
+| **Promtail** | **`grafana/promtail`** | **9080** | **日志采集** |
 
 ---
 
@@ -79,14 +82,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 ```dockerfile
 # packages/backend/Dockerfile
-FROM python:3.12-slim AS builder
+FROM python:3.13-slim AS builder
 
 RUN pip install uv
 WORKDIR /app
 COPY pyproject.toml .
 RUN uv sync --frozen --no-dev
 
-FROM python:3.12-slim
+FROM python:3.13-slim
 WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 COPY . .
@@ -150,7 +153,7 @@ services:
       postgres: { condition: service_healthy }
 
   redis:
-    image: redis:7.4-alpine
+    image: redis:8.0-alpine
     ports: ["6379:6379"]
     volumes: [redis_data:/data]
 
@@ -199,12 +202,32 @@ services:
     ports: ["9090:9090"]
 
   grafana:
-    image: grafana/grafana
+    image: grafana/grafana:12.x
     ports: ["3000:3000"]
-    volumes: [grafana_data:/var/lib/grafana]
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources
+
+  # 日志聚合
+  loki:
+    image: grafana/loki:3.x
+    command: -config.file=/etc/loki/local-config.yaml
+    ports: ["3100:3100"]
+    volumes: [loki_data:/loki]
+
+  promtail:
+    image: grafana/promtail
+    volumes:
+      - /var/log:/var/log
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./promtail.yml:/etc/promtail/config.yml
+    command: -config.file=/etc/promtail/config.yml
+    depends_on: [loki]
 
   langfuse:
-    image: langfuse/langfuse:latest
+    image: langfuse/langfuse:3
     env_file: .env
     ports: ["3001:3001"]
 
@@ -213,6 +236,7 @@ volumes:
   redis_data:
   minio_data:
   grafana_data:
+  loki_data:
 ```
 
 完整编排文件位于仓库根目录 `docker-compose.yml`。

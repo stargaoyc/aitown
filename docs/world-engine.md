@@ -23,13 +23,15 @@
 
 ### 2.2 子功能与更新频率
 
-| 子功能 | 说明 | 更新频率 |
-|--------|------|----------|
-| 时间推进 | 虚拟时钟按 Tick 步进（如每 30 秒推进 10 分钟） | 每 Tick |
-| 天气系统 | 晴天/多云/阴雨/雪/大风，影响角色行为选择 | 每 60 Tick |
-| 场景状态 | 各地点（咖啡店、学校、公园）开放/关闭/拥挤度 | 每 Tick |
-| 资源循环 | 城镇资源（食物、能源）动态增减 | 每 Tick |
-| 节日系统 | 特殊日期的触发与广播 | 按日期 |
+World Tick 通过**可配置的演化列表（Evolution List）**驱动：每一轮读取当前世界状态，依次交给各 Evolution 项计算下一份世界状态，再写回存储。新增世界规则时只需补一个 Evolution 项，无需改动主循环。
+
+| Evolution 项 | 说明 | 更新频率 |
+|--------------|------|----------|
+| `TimeEvolution` | 虚拟时钟按 Tick 步进（如每 30 秒推进 10 分钟） | 每 Tick |
+| `WeatherEvolution` | 晴天/多云/阴雨/雪/大风，影响角色行为选择 | 每 60 Tick |
+| `SceneEvolution` | 各地点（咖啡店、学校、公园）开放/关闭/拥挤度 | 每 Tick |
+| `ResourceEvolution` | 城镇资源（食物、能源）动态增减 | 每 Tick |
+| `EventEvolution` | 节日/突发事件触发与广播 | 按日期 |
 
 ### 2.3 设计约束
 
@@ -46,35 +48,41 @@ async def world_tick_loop(engine: WorldEngine):
             tick_id = engine.next_tick_id()
             span = start_span("world.tick", tick_id=tick_id)
 
-            # 1. 推进虚拟时钟
-            engine.advance_clock(minutes=engine.config.tick_minutes)
+            # 1. 读取当前世界状态
+            state = await engine.load_world_state()
 
-            # 2. 更新天气（按频率）
-            if tick_id % engine.config.weather_interval == 0:
-                engine.update_weather()
+            # 2. 依次执行 Evolution 列表，计算下一份世界状态
+            for evolution in engine.evolutions:        # 可配置的演化项
+                if evolution.should_run(tick_id, state):
+                    state = await evolution.apply(state, tick_id)
 
-            # 3. 更新场景开放/拥挤度
-            engine.update_scenes()
+            # 3. 写回 Redis 实时态
+            await engine.save_world_state(state)
 
-            # 4. 资源循环
-            engine.update_resources()
-
-            # 5. 节日/事件触发
-            engine.check_events()
-
-            # 6. 持久化快照（每 N Tick 一次）
+            # 4. 持久化快照（每 N Tick 一次）
             if tick_id % engine.config.snapshot_interval == 0:
-                await engine.persist_snapshot()
+                await engine.persist_snapshot(state)
 
-            # 7. 广播给订阅的 WebSocket 客户端
-            await engine.broadcast_state()
+            # 5. 广播给订阅的 WebSocket 客户端
+            await engine.broadcast_state(state)
 
             span.end()
 
         await asyncio.sleep(engine.config.tick_seconds)
 ```
 
-### 2.5 世界状态结构（Redis Hash）
+### 2.5 Evolution 接口
+
+```python
+class WorldEvolution(Protocol):
+    """世界演化项：读取当前状态，返回更新后的状态。"""
+    def should_run(self, tick_id: int, state: WorldState) -> bool: ...
+    async def apply(self, state: WorldState, tick_id: int) -> WorldState: ...
+```
+
+新增世界规则（如季节系统、物价波动）只需实现 `WorldEvolution` 并注册到 `engine.evolutions`，主循环不变。
+
+### 2.6 世界状态结构（Redis Hash）
 
 ```text
 world:state
@@ -89,6 +97,52 @@ world:state
 ```
 
 详细字段定义见 [数据模型设计](data-model.md#world_snapshots)。
+
+### 2.7 作息系统
+
+角色卡 `traits.schedule` 声明作息类型，World Tick 不直接修改角色状态，但 `TimeEvolution` 推进时钟后，Character Tick 会结合作息窗口判断可执行行为。
+
+| 作息类型 | 起床窗口 | 睡眠窗口 | 影响 |
+|----------|----------|----------|------|
+| `early_bird` | 05:30–07:00 | 21:00–23:00 | 早起 Action 候选；晚于 23:00 强烈倾向睡眠 |
+| `normal` | 06:30–08:00 | 22:30–00:00 | 标准作息 |
+| `night_owl` | 09:00–11:00 | 01:00–03:00 | 夜间 Action 候选；早晨精力恢复慢 |
+
+> 作息只影响 Action 候选过滤与决策 Prompt，不强制改状态。角色仍可能因剧情熬夜，但代价是次日 `stamina` 恢复减少。
+
+### 2.8 动态耗时系统
+
+Action 的 `duration_minutes` 默认是静态值，但部分 Action 允许 LLM 在决策时给出**动态耗时**，或由世界状态动态调整。
+
+| 场景 | 调整规则 |
+|------|----------|
+| 室外移动 + 恶劣天气 | 静态耗时 ×1.5（rainy/snowy/windy） |
+| 拥挤场景购物 | 耗时 ×1.2（`crowdedness > 80`） |
+| LLM 动态耗时 | 决策结果 `durationMinute` 字段覆盖默认值（少数 Action 允许） |
+
+```python
+def resolve_duration(action: Action, decision: Decision, state: WorldState) -> int:
+    base = decision.duration_minute or action.duration_minutes
+    if action.category == ActionCategory.MOVE and not action.indoor:
+        if state.weather in ("rainy", "snowy", "windy"):
+            base = int(base * 1.5)
+    if state.crowdedness(action.scene) > 80:
+        base = int(base * 1.2)
+    return base
+```
+
+### 2.9 天气影响矩阵
+
+天气不仅影响场景拥挤度（详见 [小镇设计 - 天气与场景联动](town-design.md#八天气与场景联动)），也进入角色决策 Prompt，影响行为偏好：
+
+| 天气 | Prompt 描述影响 | 行为偏好 |
+|------|------------------|----------|
+| sunny | "阳光明媚，适合外出" | 户外放松/运动 Action 加分 |
+| rainy | "下雨了，室外不便" | 室内 Action 优先；移动耗时 ×1.5 |
+| snowy | "下雪了，有些冷" | 室内优先；触发打雪仗等季节 Action |
+| windy | "风很大" | 海岸/森林 Action 减分 |
+
+天气描述由 `WeatherEvolution` 写入 `world:state.weather`，Character Tick 感知阶段注入决策上下文。
 
 ---
 
@@ -270,6 +324,8 @@ await engine.pause_character(character_id)
 
 | 主题 | 文档 |
 |------|------|
+| 角色设计 | [character-design.md](character-design.md) |
+| 小镇与场景 | [town-design.md](town-design.md) |
 | Action 系统与执行闭环 | [action-system.md](action-system.md) |
 | 记忆系统 | [memory-system.md](memory-system.md) |
 | 数据模型 | [data-model.md](data-model.md) |

@@ -225,17 +225,61 @@ tool_node = ToolNode(tools)
 
 ---
 
-## 四、内置 MCP Server 清单
+## 四、内置 MCP Server 清单与开发分工
+
+### 4.1 自研 vs 社区现成划分
+
+并非所有 MCP Server 都需自研。社区已有大量现成 MCP Server，可直接复用；只有业务专属或需深度定制的才自研。
+
+| Server | 来源 | 理由 |
+|--------|------|------|
+| `code-executor` | **自研** | 需沙箱隔离、自定义资源限制、与小镇角色上下文绑定 |
+| `web-search` | **社区** | 可直接用 Tavily MCP / Brave Search MCP，仅需配置 API Key |
+| `weather` | **社区** | 可用 OpenWeatherMap MCP / 开源天气 MCP |
+| `shop-simulator` | **自研** | 小镇专属业务逻辑（商品/库存/价格/角色消费），无现成方案 |
+| `knowledge-base` | **自研/社区** | 取决于知识库类型：通用文档可用社区 RAG MCP；小镇设定库需自研 |
+| `image-generator` | **社区** | 可直接用 Stable Diffusion / DALL-E MCP |
+| `time-tool` | **社区** | 时间/时区/日历查询有现成 MCP |
+| `character-social` | **自研** | 小镇社交系统专属（送礼/约会/冲突），强业务绑定 |
+
+### 4.2 自研 MCP Server 清单
+
+需自研的 Server 集中在 `packages/mcp-servers/`：
 
 | Server | 端口 | 工具 | 说明 |
 |--------|------|------|------|
-| `code-executor` | 8001 | `run_python`, `run_javascript` | 沙箱代码执行 |
-| `web-search` | 8002 | `search_web`, `fetch_page` | 网页搜索与抓取 |
-| `weather` | 8003 | `get_weather` | 天气查询 |
-| `shop-simulator` | 8004 | `buy_item`, `list_items` | 商店模拟 |
-| `knowledge-base` | 8005 | `query_kb` | 知识库查询 |
+| `code-executor` | 8001 | `run_python`, `run_javascript` | 沙箱代码执行（Docker 隔离） |
+| `shop-simulator` | 8004 | `buy_item`, `list_items`, `get_inventory` | 商店模拟（小镇经济系统） |
+| `character-social` | 8006 | `give_gift`, `invite_date`, `resolve_conflict` | 角色社交（业务专属） |
+| `knowledge-base` | 8005 | `query_kb` | 小镇设定库（若社区方案不满足） |
 
-各 Server 独立部署（多进程/Docker），通过 `MCP_*_SERVER` 环境变量配置地址。
+### 4.3 社区 MCP Server 接入
+
+社区 MCP Server 无需自研，仅需在 `config.yaml` 注册并配置 API Key：
+
+```yaml
+# config.yaml
+mcp:
+  community_servers:
+    - name: web-search
+      package: @mcp/tavily-search          # 社区包名
+      config:
+        api_key: ${TAVILY_API_KEY}
+    - name: weather
+      package: @mcp/openweathermap
+      config:
+        api_key: ${OPENWEATHER_API_KEY}
+    - name: image-generator
+      package: @mcp/stable-diffusion
+      config:
+        endpoint: ${SD_ENDPOINT}
+```
+
+启动时由模块管理器拉起社区 MCP Server 进程，注册到 `module_configs` 表。
+
+### 4.4 各 Server 独立部署
+
+无论自研还是社区，各 MCP Server 独立部署（多进程/Docker），通过 `MCP_*_SERVER` 环境变量配置地址。
 
 ---
 
