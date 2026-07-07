@@ -1,0 +1,56 @@
+# 世界地图 - 场景连通矩阵（移动耗时，单位：虚拟分钟）
+# 格式：{from: {to: minutes}}
+
+adjacency:
+  home:
+    school: 5
+    cafe: 8
+    bookstore: 8
+    park: 10
+    shrine: 10
+    coast: 12
+    library: 7
+    plaza: 6
+    shopping_street: 10
+
+  school:
+    home: 5
+    cafe: 6
+    bookstore: 5
+    park: 8
+    shrine: 12
+    coast: 14
+    library: 4
+    plaza: 5
+    shopping_street: 7
+
+  cafe:
+    home: 8
+    school: 6
+    bookstore: 3
+    park: 7
+    shrine: 12
+    coast: 12
+    library: 5
+    plaza: 3
+    shopping_street: 3
+
+  plaza:
+    home: 6
+    school: 5
+    cafe: 3
+    bookstore: 3
+    park: 4
+    shrine: 10
+    coast: 8
+    library: 4
+    shopping_street: 4
+
+  shopping_street:
+    cafe: 3
+    bookstore: 3
+    convenience_store: 2
+    plaza: 4
+    home: 10
+    school: 7
+    coast: 8

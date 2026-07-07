@@ -1,0 +1,55 @@
+[project]
+name = "ai-town-backend"
+version = "0.1.0"
+description = "AI Town Backend - World Engine + LangGraph"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "sqlalchemy[asyncio]>=2.0",
+    "alembic>=1.14",
+    "asyncpg>=0.30",
+    "pgvector>=0.3",
+    "uuid6>=2024.7.10",
+    "redis[hiredis]>=5.2",
+    "pydantic>=2.10",
+    "pydantic-settings>=2.6",
+    "openai>=1.58",
+    "langchain>=0.3",
+    "langgraph>=0.2",
+    "opentelemetry-api>=1.28",
+    "opentelemetry-sdk>=1.28",
+    "opentelemetry-exporter-otlp>=1.28",
+    "structlog>=24.4",
+    "httpx>=0.28",
+    "python-multipart>=0.0.12",
+    "python-jose[cryptography]>=3.3",
+    "passlib[bcrypt]>=1.7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    "testcontainers>=4.9",
+    "ruff>=0.8",
+    "mypy>=1.14",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+ignore_missing_imports = true

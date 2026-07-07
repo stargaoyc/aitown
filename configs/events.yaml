@@ -1,0 +1,22 @@
+events:
+  - id: sakura_festival
+    name: 樱花祭
+    date: "04-05"
+    duration_days: 3
+    main_scenes: [shrine, plaza]
+    activities: [festival_stall, watch_fireworks, pray, chat]
+    weather_preference: sunny
+
+  - id: summer_festival
+    name: 夏日祭
+    date: "08-15"
+    duration_days: 1
+    main_scenes: [shrine, coast]
+    activities: [watch_fireworks, eat_stall_food, wear_yukata]
+
+  - id: cultural_festival
+    name: 文化祭
+    date: "11-03"
+    duration_days: 2
+    main_scenes: [school]
+    activities: [exhibit, performance, chat]

@@ -1,0 +1,39 @@
+@import 'tailwindcss';
+
+/* 二次元配色（Tailwind v4 @theme） */
+@theme {
+  --color-sakura-50: #fff5f8;
+  --color-sakura-100: #ffe8ef;
+  --color-sakura-200: #ffcdd9;
+  --color-sakura-300: #ffa3b5;
+  --color-sakura-400: #ff7a94;
+  --color-sakura-500: #ff8fab;
+  --color-sakura-600: #f06680;
+  --color-sakura-700: #d94968;
+  --color-sakura-800: #be3b54;
+  --color-sakura-900: #a33146;
+
+  --color-sky-soft-50: #f0faff;
+  --color-sky-soft-100: #e0f5ff;
+  --color-sky-soft-200: #baeaff;
+  --color-sky-soft-300: #7ec8e3;
+  --color-sky-soft-400: #5db8d5;
+  --color-sky-soft-500: #3ba8c7;
+
+  --color-twilight-50: #f8f5ff;
+  --color-twilight-100: #ede7ff;
+  --color-twilight-200: #dcd0ff;
+  --color-twilight-300: #b19cd9;
+  --color-twilight-400: #9b7fd1;
+  --color-twilight-500: #7a5fc3;
+
+  --color-glass-bg: rgba(255, 255, 255, 0.55);
+  --color-glass-blur: 16px;
+  --shadow-soft: 0 4px 20px rgba(255, 143, 171, 0.12);
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', 'HarmonyOS Sans', 'Source Han Sans CN', sans-serif;
+  background: linear-gradient(135deg, var(--color-sakura-100), var(--color-sky-soft-100));
+}

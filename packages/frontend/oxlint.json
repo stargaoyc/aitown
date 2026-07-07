@@ -1,0 +1,21 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oxlint/oxlint/main/schema.json",
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn",
+    "style": "warn",
+    "perf": "warn"
+  },
+  "rules": {
+    "correctness": {
+      "noUnusedVariables": "error"
+    },
+    "react": {
+      "exhaustiveDeps": "off"
+    },
+    "reactHooks": {
+      "rulesOfHooks": "error"
+    }
+  },
+  "ignorePatterns": ["dist", "node_modules", "src/api/types.ts"]
+}
