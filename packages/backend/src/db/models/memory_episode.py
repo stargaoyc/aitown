@@ -4,8 +4,8 @@
 向量字段用于语义检索，importance + timestamp 用于混合排序。
 
 ⚠️ 性能优化（0002_optimize 迁移）：
-- 表已改为按 character_id HASH 分区（10 分区）
-- 每分区独立 HNSW 索引（ef_construction=128）
+- 表已改为按 character_id HASH 分区（16 分区，2 的幂便于扩展）
+- HNSW 索引在父表创建，PostgreSQL 自动传播到所有子分区（含未来新增）
 - 查询 WHERE character_id = :cid 时分区裁剪，避免全局扫描
 - materialized 标志区分原始日志与向量化记忆
 - embedding 异步批量生成，不阻塞 Tick 循环
@@ -15,8 +15,8 @@ from uuid import UUID
 from uuid6 import uuid7
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Boolean, Index, Integer, String, Text
-from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP
+from sqlalchemy import Boolean, Index, Integer, String, Text, Uuid
+from sqlalchemy.dialects.postgresql import ARRAY, TIMESTAMP
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.config import settings
@@ -24,7 +24,7 @@ from src.db.base import Base
 
 
 class MemoryEpisode(Base):
-    """记忆片段表 - HASH 分区 + 分区级 HNSW 索引
+    """记忆片段表 - HASH 分区（16 分区）+ 父表 HNSW 索引
 
     设计要点：
     - 复合主键 (id, character_id)：分区表要求分区键在主键中
@@ -62,8 +62,8 @@ class MemoryEpisode(Base):
     )
     action_id: Mapped[str | None] = mapped_column(String(100), comment="关联 Action")
     location: Mapped[str | None] = mapped_column(String(50), comment="发生场景")
-    related_characters: Mapped[list] = mapped_column(
-        JSONB, default=list, comment="相关角色 ID 列表"
+    related_characters: Mapped[list[UUID]] = mapped_column(
+        ARRAY(Uuid), default=list, comment="相关角色 ID 列表"
     )
     is_reflected: Mapped[bool] = mapped_column(
         Boolean, default=False, comment="是否已被反思消化"

@@ -66,12 +66,17 @@ class CharacterImporter:
         logger.info("角色卡校验通过: %s", card.name)
 
         # 2. 写入 characters 表
+        # ⚠️ personality 列已在 0002_optimize 迁移中删除
+        # 角色卡的 personality 字段合并到 traits.personality 中
+        traits = dict(card.traits)
+        if card.personality:
+            traits["personality"] = card.personality
+
         character = Character(
             name=card.name,
             age=card.age,
             occupation=card.occupation,
-            personality=card.personality,
-            traits=card.traits,
+            traits=traits,
             backstory=card.backstory,
             avatar_url=card.avatar_url,
             voice_preset=card.voice_preset,

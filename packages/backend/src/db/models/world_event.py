@@ -1,7 +1,8 @@
 """世界事件模型 - 差分事件记录
 
-替代 world_snapshots 的高频全量写入，仅记录变更事件。
-world_snapshots 降频到 10 分钟一次，world_events 记录每个 Tick 的变更。
+⚠️ 0002_optimize 迁移后，world_snapshots 表已删除，仅保留 world_events。
+每个周期持久化各维度的世界状态变更（time/weather/scene/resource/event），
+回放时从事件流重建状态，冷启动从 Redis 恢复当前态。
 """
 from datetime import datetime
 from uuid import UUID

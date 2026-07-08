@@ -33,7 +33,7 @@ from src.db.repositories import (
     ActionRepository,
     CharacterRepository,
     MemoryRepository,
-    SnapshotRepository,
+    WorldEventRepository,
 )
 from src.db.session import db
 from src.llm import LLMClient, PromptTemplates
@@ -342,7 +342,7 @@ async def get_character(character_id: str):
             "name": character.name,
             "age": character.age,
             "occupation": character.occupation,
-            "personality": character.personality,
+            "personality": character.traits.get("personality", []),
             "traits": character.traits,
             "backstory": character.backstory,
             "is_active": character.is_active,
@@ -371,31 +371,33 @@ async def get_world_state():
     return {"data": dict(state)}
 
 
-@app.get("/api/v1/world/snapshot/{tick_id}")
-async def get_world_snapshot(tick_id: int):
-    """获取历史快照
+@app.get("/api/v1/world/events/{tick_id}")
+async def get_world_events(tick_id: int):
+    """获取指定 Tick 的世界事件
 
     Args:
         tick_id: Tick ID
 
     Returns:
-        世界历史快照
+        该 Tick 的所有世界事件（差分记录）
     """
     async with db.session() as session:
-        repo = SnapshotRepository(session)
-        snapshot = await repo.get_by_tick(tick_id)
+        repo = WorldEventRepository(session)
+        events = await repo.get_by_tick(tick_id)
 
-    if not snapshot:
-        raise HTTPException(status_code=404, detail="Snapshot not found")
+    if not events:
+        raise HTTPException(status_code=404, detail="No events found for this tick")
 
     return {
-        "tick_id": snapshot.tick_id,
-        "world_time": snapshot.world_time.isoformat() if snapshot.world_time else None,
-        "weather": snapshot.weather,
-        "locations": snapshot.locations,
-        "resources": snapshot.resources,
-        "active_events": snapshot.active_events,
-        "created_at": snapshot.created_at.isoformat(),
+        "tick_id": tick_id,
+        "events": [
+            {
+                "event_type": e.event_type,
+                "payload": e.payload,
+                "created_at": e.created_at.isoformat(),
+            }
+            for e in events
+        ],
     }
 
 

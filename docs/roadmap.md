@@ -26,7 +26,7 @@ Phase 2: 角色与小镇            ✅ 已完成
    └─ 角色关系图谱
         ↓
 Phase 2.5: 性能与数据完整性优化 ← 当前
-   ├─ memory_episodes HASH 分区 + 分区级 HNSW
+   ├─ memory_episodes HASH 分区（16）+ 父表 HNSW
    ├─ 异步 embedding worker（解耦 Tick 与 LLM）
    ├─ world_events 差分事件表（替代高频快照）
    ├─ reflection_sources 外键中间表
@@ -116,9 +116,9 @@ Phase 5: 前端 Dashboard
 
 | # | 问题 | 严重度 | 解决方案 | 状态 |
 |---|------|--------|----------|------|
-| 1 | 全局 HNSW + character_id 过滤 → 召回率崩塌 | 致命 | HASH 分区（10 分区）+ 分区级 HNSW | ✅ |
+| 1 | 全局 HNSW + character_id 过滤 → 召回率崩塌 | 致命 | HASH 分区（16 分区）+ 父表 HNSW | ✅ |
 | 2 | Action:Memory 1:1 写放大 → Tick 阻塞 | 高 | materialized 标志 + 异步 embedding worker | ✅ |
-| 3 | DEFAULT 分区兜底 → 慢查询定时炸弹 | 中 | 保留 DEFAULT + 触发器告警 | ✅ |
+| 3 | DEFAULT 分区兜底 → 慢查询定时炸弹 | 中 | 删除 DEFAULT + RAISE EXCEPTION 触发器 | ✅ |
 | 4 | world_snapshots 全量 JSONB → IO 灾难 | 高 | 降频 10 分钟 + world_events 差分表 | ✅ |
 | 5 | personality TEXT[] 与 traits JSONB 冗余 | 中 | 统一到 traits.personality | ✅ |
 | 6 | reflections.source_memory_ids 无外键 | 中 | reflection_sources 中间表 | ✅ |
@@ -142,7 +142,7 @@ Phase 5: 前端 Dashboard
 | 项目 | 原估算 | 修正后 | 说明 |
 |------|--------|--------|------|
 | memory_episodes 存储 | 80 GB/年 | 108 GB/年（向量）+ 50 GB（HNSW 索引） | 1536 维 float32 = 6KB/条 |
-| world_snapshots | 1.2 TB/年（30s 落盘） | ~50 MB/年（10 分钟落盘） | 差分事件表分担 |
+| world_snapshots → world_events | 1.2 TB/年（30s 落盘） | ~50 MB/年（差分事件） | 表已删除，仅保留 world_events |
 | 建议冷热分离 | — | 3 个月前 action_records.params 迁移至对象存储 | PG 仅存轻量索引字段 |
 
 ---
@@ -345,7 +345,7 @@ Phase 5: 前端 Dashboard
 | PgBouncer prepared statements | 与事务模式冲突 | `DB_PREPARED_STATEMENT_CACHE_SIZE=0` | ✅ 已缓解 |
 | MCP Server 不稳定 | 工具调用失败 | 超时 + fallback + 告警 | ⏳ Phase 3 |
 | 角色 Tick 并发过多 | 资源耗尽 | 信号量限制 + 优先级调度 | ✅ 部分（信号量已有） |
-| HNSW 召回率崩塌 | 记忆检索空结果 | HASH 分区 + 分区级 HNSW | ✅ 已解决 |
+| HNSW 召回率崩塌 | 记忆检索空结果 | HASH 分区（16）+ 父表 HNSW | ✅ 已解决 |
 | Embedding 阻塞 Tick | 角色卡顿 | 异步 worker + materialized 标志 | ✅ 已解决 |
 | world_snapshots IO 灾难 | WAL 膨胀 | 差分事件表 + 降频 | ✅ 已解决 |
 | Redis ↔ PG 不一致 | 状态漂移 | 乐观锁 + 校验任务 | ⏳ Phase 3.5 |

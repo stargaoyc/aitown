@@ -70,7 +70,7 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;      -- 文本模糊检索
 └──────────────────────┘         └──────────────────────┘
 
 ┌──────────────────────┐
-│  world_snapshots     │  (周期性世界状态快照, 用于回放)
+│  world_events        │  (世界变更事件, 差分记录)
 └──────────────────────┘
 ```
 
@@ -86,8 +86,7 @@ CREATE TABLE characters (
     name         TEXT NOT NULL,
     age          INT  NOT NULL CHECK (age >= 0 AND age <= 200),
     occupation   TEXT NOT NULL,
-    personality  TEXT[] NOT NULL DEFAULT '{}',           -- ["开朗","细心"]
-    traits       JSONB NOT NULL DEFAULT '{}'::jsonb,      -- 自定义属性
+    traits       JSONB NOT NULL DEFAULT '{}'::jsonb,      -- 自定义属性（含 personality）
     backstory    TEXT NOT NULL DEFAULT '',
     avatar_url   TEXT,
     status       TEXT NOT NULL DEFAULT 'active'
@@ -107,11 +106,12 @@ CREATE INDEX idx_characters_status    ON characters (status);
 | `name` | TEXT | 角色名 |
 | `age` | INT | 年龄 |
 | `occupation` | TEXT | 职业 |
-| `personality` | TEXT[] | 性格标签数组 |
-| `traits` | JSONB | 自定义属性（灵活） |
+| `traits` | JSONB | 自定义属性（`personality`/`hobby`/`schedule`/`mbti` 等） |
 | `backstory` | TEXT | 背景故事 |
 | `avatar_url` | TEXT | 头像 URL |
 | `status` | TEXT | `active`/`archived`/`deleted` |
+
+> ⚠️ **0002_optimize 迁移**：`personality TEXT[]` 列已删除，性格标签统一存储在 `traits.personality`（`list[str]`）。角色卡导入时自动合并。
 
 ### 3.2 character_states（实时态持久镜像）
 
@@ -127,11 +127,12 @@ CREATE TABLE character_states (
     hunger            INT  NOT NULL DEFAULT 0   CHECK (hunger BETWEEN 0 AND 100),
     mood              TEXT,
     version           INT  NOT NULL DEFAULT 1,           -- 乐观锁版本号（0002_optimize）
-    last_updated      TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()  -- 自动更新触发器（0002_optimize）
 );
 
 -- 启动时: SELECT * FROM character_states; → 灌入 Redis
 -- 更新时: ... SET version = version + 1 WHERE version = :old_version
+-- updated_at 由 trg_character_states_updated_at 触发器自动更新
 ```
 
 ### 3.3 action_records（行为历史，按月分区）
@@ -157,8 +158,8 @@ CREATE TABLE action_records (
 CREATE TABLE action_records_2026_07 PARTITION OF action_records
     FOR VALUES FROM ('2026-07-01') TO ('2026-08-01');
 
--- 默认分区兜底, 防止插入失败
-CREATE TABLE action_records_default PARTITION OF action_records DEFAULT;
+-- ⚠️ 0002_optimize: 无 DEFAULT 分区，由 check_partition_exists() 触发器拦截
+-- 若分区不存在则 RAISE EXCEPTION，强制运维预创建
 
 CREATE INDEX idx_ar_char_time   ON action_records (character_id, created_at DESC);
 CREATE INDEX idx_ar_action      ON action_records (action_id);
@@ -168,12 +169,12 @@ CREATE INDEX idx_ar_params      ON action_records USING gin (params jsonb_path_o
 
 ### 3.4 memory_episodes（向量记忆，pgvector）
 
-> ⚠️ **性能优化（0002_optimize 迁移）**：表已改为按 `character_id` **HASH 分区**（10 分区），每分区独立 HNSW 索引。查询 `WHERE character_id = :cid` 触发分区裁剪，HNSW 只搜索该角色的数据（< 10ms），避免全局 HNSW + WHERE 过滤导致的召回率崩塌。
+> ⚠️ **性能优化（0002_optimize 迁移）**：表已改为按 `character_id` **HASH 分区**（16 分区，2 的幂便于扩展）。HNSW 索引在**父表**创建，PostgreSQL 自动传播到所有子分区（含未来新增）。查询 `WHERE character_id = :cid` 触发分区裁剪，HNSW 只搜索该角色的数据（< 10ms），避免全局 HNSW + WHERE 过滤导致的召回率崩塌。
 
 ```sql
 CREATE TABLE memory_episodes (
     id                 UUID NOT NULL DEFAULT uuidv7(),
-    character_id       UUID NOT NULL,                       -- 分区键（HASH 分区）
+    character_id       UUID NOT NULL,                       -- 分区键（HASH 分区，无 FK）
     content            TEXT NOT NULL,
     embedding          vector(1536),                        -- nullable: materialized=false 时为 NULL
     importance         INT  NOT NULL DEFAULT 5 CHECK (importance BETWEEN 1 AND 10),
@@ -188,16 +189,19 @@ CREATE TABLE memory_episodes (
     PRIMARY KEY (id, character_id)                          -- 分区表主键必须含分区键
 ) PARTITION BY HASH (character_id);
 
--- 10 个 HASH 分区
-CREATE TABLE memory_episodes_p0 PARTITION OF memory_episodes FOR VALUES WITH (MODULUS 10, REMAINDER 0);
-CREATE TABLE memory_episodes_p1 PARTITION OF memory_episodes FOR VALUES WITH (MODULUS 10, REMAINDER 1);
--- ... p2 ~ p9 同理
+-- 16 个 HASH 分区（MODULUS 16，2 的幂便于扩展）
+CREATE TABLE memory_episodes_p00 PARTITION OF memory_episodes FOR VALUES WITH (MODULUS 16, REMAINDER 0);
+CREATE TABLE memory_episodes_p01 PARTITION OF memory_episodes FOR VALUES WITH (MODULUS 16, REMAINDER 1);
+-- ... p02 ~ p15 同理
 
--- ⚠️ 每分区独立 HNSW 索引（ef_construction=128，原 64 偏低）
-CREATE INDEX idx_mem_p0_hnsw ON memory_episodes_p0 USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 128);
--- ... p1 ~ p9 同理
+-- ⚠️ HNSW 索引在父表创建，PostgreSQL 自动传播到所有子分区（含未来新增）
+--    无需手动为每个子分区建索引，避免运维噩梦
+--    ef_construction=128 提升图构建精度（原 64 偏低）
+CREATE INDEX idx_mem_embedding_hnsw ON memory_episodes
+    USING hnsw (embedding vector_cosine_ops)
+    WITH (m = 16, ef_construction = 128);
 
--- 辅助索引
+-- 辅助索引（同样在父表创建，自动传播）
 CREATE INDEX idx_mem_char_time ON memory_episodes (character_id, timestamp DESC);
 CREATE INDEX idx_mem_char_imp  ON memory_episodes (character_id, importance DESC);
 CREATE INDEX idx_mem_related   ON memory_episodes USING gin (related_characters);
@@ -313,17 +317,18 @@ CREATE TABLE messages (
 CREATE TABLE messages_2026_07 PARTITION OF messages
     FOR VALUES FROM ('2026-07-01') TO ('2026-08-01');
 
-CREATE TABLE messages_default PARTITION OF messages DEFAULT;
+-- ⚠️ 0002_optimize: 无 DEFAULT 分区，由 check_partition_exists() 触发器拦截
 
 CREATE INDEX idx_msg_conv_time ON messages (conversation_id, created_at);
 CREATE INDEX idx_msg_char_time ON messages (character_id, created_at DESC);
 CREATE INDEX idx_msg_user_time ON messages (user_id, created_at DESC);
 
--- ⚠️ 覆盖索引（0002_optimize）：避免分区表回表代价
+-- ⚠️ 覆盖索引（0002_optimize）：仅包含轻量字段，content 走主键回表
+--    原 INCLUDE(content) 会导致索引膨胀（content 可能 2000 字）
 CREATE INDEX idx_msg_user_time_cover
-    ON messages (user_id, created_at DESC) INCLUDE (content, role, platform);
+    ON messages (user_id, created_at DESC) INCLUDE (role, platform);
 CREATE INDEX idx_msg_conv_time_cover
-    ON messages (conversation_id, created_at) INCLUDE (content, role, character_id, platform);
+    ON messages (conversation_id, created_at) INCLUDE (role, character_id, platform);
 
 CREATE INDEX idx_msg_created_brin ON messages USING brin (created_at);
 ```
@@ -348,27 +353,11 @@ CREATE TABLE module_configs (
 CREATE INDEX idx_module_enabled ON module_configs (enabled) WHERE enabled = TRUE;
 ```
 
-### 3.10 world_snapshots（世界状态周期快照）
+### 3.10 world_events（世界变更事件，差分记录）
 
-> Redis 仅保留当前世界态，PG 周期落盘用于回放/调试。
->
-> ⚠️ **改进（0002_optimize 迁移）**：落盘频率从 30s/Tick 降为 10 分钟一次，避免 WAL 膨胀（原方案年 1.2TB）。增量变更通过 `world_events` 表记录。
-
-```sql
-CREATE TABLE world_snapshots (
-    id          UUID PRIMARY KEY DEFAULT uuidv7(),
-    tick_id     BIGINT NOT NULL,
-    state       JSONB NOT NULL,                          -- 完整 WorldState
-    captured_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE INDEX idx_world_tick ON world_snapshots (tick_id);
-CREATE INDEX idx_world_time ON world_snapshots (captured_at DESC);
-```
-
-### 3.11 world_events（世界变更事件，差分记录）
-
-> ⚠️ **新增（0002_optimize 迁移）**：记录每个 Tick 的增量变更（时间/天气/场景/资源/事件），替代 `world_snapshots` 的高频全量写入。
+> ⚠️ **0002_optimize 迁移**：`world_snapshots` 表已**删除**，仅保留 `world_events` 差分事件表。
+> 每个周期按维度记录世界状态变更（time/weather/scene/resource/event），回放时从事件流重建状态。
+> 冷启动从 Redis 恢复当前态，无需全量快照。
 
 ```sql
 CREATE TABLE world_events (
@@ -507,7 +496,7 @@ CREATE TABLE messages_2026_08 PARTITION OF messages
 |------|------|
 | `pg_cron` 扩展 | 每月 1 日定时执行 `CREATE TABLE ... PARTITION OF` |
 | 应用层定时任务 | Python `apscheduler` 每月 25 日预创建下月分区 |
-| 默认分区兜底 | `CREATE TABLE ..._default PARTITION OF ... DEFAULT;` 防止插入失败 |
+| ⚠️ 无 DEFAULT 分区 | 0002_optimize 已删除 DEFAULT 分区，改为 `check_partition_exists()` 触发器 `RAISE EXCEPTION`，强制运维预创建 |
 
 ### 6.3 历史分区归档
 
@@ -544,30 +533,31 @@ PG 在 HNSW + 分区表下，单表千万级行检索 p95 < 50ms（HNSW 检索 +
 ```python
 # db/models/memory_episode.py
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import String, Integer, Boolean, ForeignKey, Index, DateTime
+from sqlalchemy import String, Integer, Boolean, Index, DateTime, Uuid
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
+from uuid import UUID
 from uuid6 import uuid7                                  # 应用层兜底
 from .base import Base
-import uuid
 
 class MemoryEpisode(Base):
     __tablename__ = "memory_episodes"
 
-    id: Mapped[uuid.UUID] = mapped_column(
+    id: Mapped[UUID] = mapped_column(
         primary_key=True, default=uuid7                  # 应用层生成 UUID v7
     )
-    character_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("characters.id", ondelete="CASCADE")
-    )
+    # ⚠️ 无 ForeignKey：分区表不支持跨分区外键，应用层保证引用完整性
+    character_id: Mapped[UUID] = mapped_column(primary_key=True)
     content: Mapped[str] = mapped_column(String)
     embedding: Mapped[list[float]] = mapped_column(Vector(1536))
     importance: Mapped[int] = mapped_column(Integer, default=5)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     action_id: Mapped[str | None]
     location: Mapped[str | None]
-    related_characters: Mapped[list[uuid.UUID]] = mapped_column(default=list)
+    related_characters: Mapped[list[UUID]] = mapped_column(ARRAY(Uuid), default=list)
     is_reflected: Mapped[bool] = mapped_column(Boolean, default=False)
+    materialized: Mapped[bool] = mapped_column(Boolean, default=False)
     source_type: Mapped[str] = mapped_column(String, default="action")
 
     __table_args__ = (
@@ -598,11 +588,11 @@ def upgrade():
         # ... 其他字段 ...
     )
 
-    # 3. HNSW 向量索引
+    # 3. HNSW 向量索引（父表创建，自动传播到所有子分区）
     op.execute(
         "CREATE INDEX idx_mem_embedding_hnsw ON memory_episodes "
         "USING hnsw (embedding vector_cosine_ops) "
-        "WITH (m = 16, ef_construction = 64);"
+        "WITH (m = 16, ef_construction = 128);"
     )
 
     # 4. 部分索引

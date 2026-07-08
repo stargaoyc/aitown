@@ -20,9 +20,9 @@ class Character(Base):
     来源：角色卡 YAML 导入
     关联：character_states / action_records / memory_episodes / plans / relations
 
-    ⚠️ personality 列已废弃（0002_optimize 迁移）：
-    - 性格标签统一存储在 traits.personality 中
-    - 保留此列仅为向后兼容，新代码不应读写
+    ⚠️ personality 列已在 0002_optimize 迁移中删除：
+    - 性格标签统一存储在 traits.personality（list[str]）中
+    - 角色卡导入时 importer 会自动将 personality 合并到 traits
     """
     __tablename__ = "characters"
 
@@ -30,10 +30,6 @@ class Character(Base):
     name: Mapped[str] = mapped_column(String(100), comment="角色名")
     age: Mapped[int | None] = mapped_column(Integer, comment="年龄")
     occupation: Mapped[str | None] = mapped_column(String(100), comment="职业")
-    personality: Mapped[dict] = mapped_column(
-        JSONB, default=list,
-        comment="DEPRECATED: 使用 traits.personality 代替"
-    )
     traits: Mapped[dict] = mapped_column(
         JSONB, default=dict,
         comment="特征字典（personality/hobby/schedule/mbti 等）"

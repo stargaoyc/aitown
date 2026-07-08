@@ -6,9 +6,9 @@
   重要性/时间衰减的混合排序能力，这是 ORM 难以表达的关键路径
 
 ⚠️ 性能优化（0002_optimize 迁移后）：
-- memory_episodes 已按 character_id HASH 分区（10 分区）
+- memory_episodes 已按 character_id HASH 分区（16 分区，2 的幂）
 - 查询 WHERE character_id = :cid 会触发分区裁剪，仅搜索单分区
-- HNSW 索引为分区级（每分区独立），避免全局召回率崩塌
+- HNSW 索引在父表创建，自动传播到所有子分区（含未来新增）
 - materialized 标志区分原始日志与向量化记忆
 
 混合排序公式：

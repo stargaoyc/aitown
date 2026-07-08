@@ -356,7 +356,7 @@ Langfuse 与 OTel 通过 `trace_id` 关联，可在 Jaeger 中跳转到 Langfuse
 
 ### 9.2 基于快照的世界回放
 
-结合 `world_snapshots` 表与 `action_records`，可重放历史某段时间内小镇的演化过程。详见 [世界引擎设计](world-engine.md#暂停--恢复--回放)。
+结合 `world_events` 差分事件表与 `action_records`，可重放历史某段时间内小镇的演化过程。详见 [世界引擎设计](world-engine.md#暂停--恢复--回放)。
 
 ---
 

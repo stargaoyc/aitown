@@ -264,7 +264,7 @@ class CharacterTickEngine:
         prompt = self.prompts.render(
             "decision",
             name=character.name,
-            personality=character.personality or "无",
+            personality=", ".join(character.traits.get("personality", [])) or "无",
             backstory=character.backstory or "无",
             location=state.get("location", "未知"),
             energy=state.get("stamina", 50),

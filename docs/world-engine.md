@@ -37,7 +37,7 @@ World Tick 通过**可配置的演化列表（Evolution List）**驱动：每一
 
 - World Tick **不依赖用户消息**——世界在用户不在时依然运转。
 - World Tick **不直接修改角色状态**，只修改世界状态（天气、场景、资源、事件）。
-- 世界实时态存 Redis，周期性快照存 PG `world_snapshots`（用于回放/调试）。
+- 世界实时态存 Redis，周期性差分事件存 PG `world_events`（用于回放/调试）。
 
 ### 2.4 伪代码
 
@@ -96,7 +96,7 @@ world:state
   tick_id:         <bigint>
 ```
 
-详细字段定义见 [数据模型设计](data-model.md#world_snapshots)。
+详细字段定义见 [数据模型设计](data-model.md#310-world_events世界变更事件差分记录)。
 
 ### 2.7 作息系统
 
@@ -281,7 +281,7 @@ await engine.pause_character(character_id)
 
 ### 5.2 状态回放
 
-世界状态周期性快照到 PG `world_snapshots`。回放流程：
+世界状态周期性差分事件存 PG `world_events`。回放流程：
 
 1. 选定快照 `tick_id`；
 2. 从该快照恢复 Redis `world:state`；

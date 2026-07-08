@@ -24,8 +24,8 @@ from structlog import get_logger
 
 from src.config import settings
 from src.core.evolutions import default_evolutions
-from src.db.models import WorldSnapshot
-from src.db.repositories import SnapshotRepository
+from src.db.models import WorldEvent
+from src.db.repositories import WorldEventRepository
 from src.db.session import db
 
 logger = get_logger(__name__)
@@ -204,9 +204,9 @@ class WorldEngine:
             # 3. 持久化到 Redis world:state
             await self._save_world_state(world_state)
 
-            # 4. 每 N Tick 持久化快照到 PG
+            # 4. 每 N Tick 持久化世界事件到 PG
             if self.tick_id % settings.world_snapshot_interval == 0:
-                await self._save_snapshot(world_state)
+                await self._save_world_events(world_state)
 
             duration = (datetime.now() - start_time).total_seconds()
             logger.info(
@@ -284,10 +284,11 @@ class WorldEngine:
 
         logger.debug("world_state_saved", tick_id=self.tick_id)
 
-    async def _save_snapshot(self, world_state: dict[str, Any]) -> None:
-        """持久化快照到 PostgreSQL
+    async def _save_world_events(self, world_state: dict[str, Any]) -> None:
+        """持久化世界事件到 PostgreSQL
 
-        定期将世界状态快照持久化到数据库，用于回放和灾难恢复
+        ⚠️ 0002_optimize 迁移后，world_snapshots 表已删除。
+        改为按维度创建差分事件记录，回放时从事件流重建状态。
 
         Args:
             world_state: 世界状态字典
@@ -295,39 +296,66 @@ class WorldEngine:
         try:
             time_state = world_state.get("time", {})
             weather_state = world_state.get("weather", {})
+            scenes_state = world_state.get("scenes", {})
+            resources_state = world_state.get("resources", {})
+            events_state = world_state.get("events", {})
 
-            # 解析虚拟时间
+            # 按维度创建事件记录
+            events: list[WorldEvent] = []
+
+            # 时间事件
             world_time_str = time_state.get("world_time", "")
-            world_time = None
             if world_time_str:
-                try:
-                    world_time = datetime.fromisoformat(str(world_time_str))
-                except (ValueError, TypeError):
-                    logger.warning(
-                        "invalid_world_time",
-                        world_time=world_time_str,
-                        tick_id=self.tick_id,
-                    )
+                events.append(WorldEvent(
+                    tick_id=self.tick_id,
+                    event_type="time",
+                    payload={"virtual_time": world_time_str, "tick_id": self.tick_id},
+                ))
 
-            snapshot = WorldSnapshot(
-                tick_id=self.tick_id,
-                world_time=world_time,
-                weather=str(weather_state.get("weather", "sunny")),
-                locations=world_state.get("scenes", {}),
-                resources=world_state.get("resources", {}),
-                active_events=list(world_state.get("events", {}).values()),
-            )
+            # 天气事件
+            weather = weather_state.get("weather", "sunny")
+            if weather:
+                events.append(WorldEvent(
+                    tick_id=self.tick_id,
+                    event_type="weather",
+                    payload={"weather": weather},
+                ))
 
-            async with db.session() as session:
-                repo = SnapshotRepository(session)
-                await repo.add(snapshot)
-                # session 会自动 commit（session 上下文管理器）
+            # 场景事件
+            if scenes_state:
+                events.append(WorldEvent(
+                    tick_id=self.tick_id,
+                    event_type="scene",
+                    payload=scenes_state,
+                ))
 
-            logger.info("world_snapshot_saved", tick_id=self.tick_id)
+            # 资源事件
+            if resources_state:
+                events.append(WorldEvent(
+                    tick_id=self.tick_id,
+                    event_type="resource",
+                    payload=resources_state,
+                ))
+
+            # 特殊事件
+            if events_state:
+                events.append(WorldEvent(
+                    tick_id=self.tick_id,
+                    event_type="event",
+                    payload=list(events_state.values()),
+                ))
+
+            if events:
+                async with db.session() as session:
+                    repo = WorldEventRepository(session)
+                    await repo.add_batch(events)
+                    # session 会自动 commit（session 上下文管理器）
+
+            logger.info("world_events_saved", tick_id=self.tick_id, count=len(events))
 
         except Exception as e:
             logger.error(
-                "snapshot_save_failed",
+                "world_events_save_failed",
                 tick_id=self.tick_id,
                 error=str(e),
                 exc_info=True,
