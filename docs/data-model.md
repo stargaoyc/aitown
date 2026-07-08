@@ -126,10 +126,12 @@ CREATE TABLE character_states (
     energy            INT  NOT NULL DEFAULT 100 CHECK (energy BETWEEN 0 AND 100),
     hunger            INT  NOT NULL DEFAULT 0   CHECK (hunger BETWEEN 0 AND 100),
     mood              TEXT,
+    version           INT  NOT NULL DEFAULT 1,           -- 乐观锁版本号（0002_optimize）
     last_updated      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- 启动时: SELECT * FROM character_states; → 灌入 Redis
+-- 更新时: ... SET version = version + 1 WHERE version = :old_version
 ```
 
 ### 3.3 action_records（行为历史，按月分区）
@@ -166,38 +168,54 @@ CREATE INDEX idx_ar_params      ON action_records USING gin (params jsonb_path_o
 
 ### 3.4 memory_episodes（向量记忆，pgvector）
 
+> ⚠️ **性能优化（0002_optimize 迁移）**：表已改为按 `character_id` **HASH 分区**（10 分区），每分区独立 HNSW 索引。查询 `WHERE character_id = :cid` 触发分区裁剪，HNSW 只搜索该角色的数据（< 10ms），避免全局 HNSW + WHERE 过滤导致的召回率崩塌。
+
 ```sql
 CREATE TABLE memory_episodes (
-    id                 UUID PRIMARY KEY DEFAULT uuidv7(),
-    character_id       UUID NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
+    id                 UUID NOT NULL DEFAULT uuidv7(),
+    character_id       UUID NOT NULL,                       -- 分区键（HASH 分区）
     content            TEXT NOT NULL,
-    embedding          vector(1536) NOT NULL,            -- 维度由 config 决定
+    embedding          vector(1536),                        -- nullable: materialized=false 时为 NULL
     importance         INT  NOT NULL DEFAULT 5 CHECK (importance BETWEEN 1 AND 10),
     timestamp          TIMESTAMPTZ NOT NULL DEFAULT now(),
     action_id          TEXT,
     location           TEXT,
     related_characters UUID[] NOT NULL DEFAULT '{}',
     is_reflected       BOOLEAN NOT NULL DEFAULT FALSE,
+    materialized       BOOLEAN NOT NULL DEFAULT FALSE,      -- embedding 是否已生成（异步 worker）
     source_type        TEXT NOT NULL DEFAULT 'action'
-                       CHECK (source_type IN ('action','conversation','reflection','event'))
-);
+                       CHECK (source_type IN ('action','conversation','reflection','event')),
+    PRIMARY KEY (id, character_id)                          -- 分区表主键必须含分区键
+) PARTITION BY HASH (character_id);
 
--- HNSW 向量索引 (生产首选, 优于 IVFFlat)
-CREATE INDEX idx_mem_embedding_hnsw
-    ON memory_episodes
-    USING hnsw (embedding vector_cosine_ops)
-    WITH (m = 16, ef_construction = 64);
+-- 10 个 HASH 分区
+CREATE TABLE memory_episodes_p0 PARTITION OF memory_episodes FOR VALUES WITH (MODULUS 10, REMAINDER 0);
+CREATE TABLE memory_episodes_p1 PARTITION OF memory_episodes FOR VALUES WITH (MODULUS 10, REMAINDER 1);
+-- ... p2 ~ p9 同理
 
--- 查询时调优搜索宽度
--- SET hnsw.ef_search = 40;  -- 会话级, 越大召回越高
+-- ⚠️ 每分区独立 HNSW 索引（ef_construction=128，原 64 偏低）
+CREATE INDEX idx_mem_p0_hnsw ON memory_episodes_p0 USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 128);
+-- ... p1 ~ p9 同理
 
--- 过滤+检索联合索引 (角色内检索最常见)
+-- 辅助索引
 CREATE INDEX idx_mem_char_time ON memory_episodes (character_id, timestamp DESC);
-CREATE INDEX idx_mem_char_imp   ON memory_episodes (character_id, importance DESC);
-CREATE INDEX idx_mem_related    ON memory_episodes USING gin (related_characters);
-CREATE INDEX idx_mem_unreflected ON memory_episodes (character_id)
-    WHERE is_reflected = FALSE;                          -- 部分索引, 反思触发专用
+CREATE INDEX idx_mem_char_imp  ON memory_episodes (character_id, importance DESC);
+CREATE INDEX idx_mem_related   ON memory_episodes USING gin (related_characters);
+CREATE INDEX idx_mem_unreflected ON memory_episodes (character_id) WHERE is_reflected = FALSE;
+CREATE INDEX idx_mem_unmaterialized ON memory_episodes (timestamp) WHERE materialized = FALSE;  -- embedding worker
+
+-- 查询时调优（分区后可适当提高，单分区数据量小）
+-- SET hnsw.ef_search = 100;
 ```
+
+| 字段 | 变更 | 说明 |
+|------|------|------|
+| `character_id` | 移除 FK | 分区表不支持 FK 引用，由应用层 ORM 保证 |
+| `embedding` | 改为 nullable | `materialized=false` 时为 NULL |
+| `materialized` | **新增** | embedding 是否已生成（异步 worker 处理） |
+| `PRIMARY KEY` | 改为复合 | `(id, character_id)` 分区表要求 |
+
+> **异步 embedding**：记忆写入时 `materialized=false, embedding=NULL`，不阻塞 Tick 循环。后台 [EmbeddingWorker](../packages/backend/src/memory/embedding_worker.py) 批量拉取并生成向量。
 
 ### 3.5 reflections（反思总结）
 
@@ -207,7 +225,7 @@ CREATE TABLE reflections (
     character_id       UUID NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
     summary            TEXT NOT NULL,                    -- "我习惯早睡早起"
     detail             TEXT NOT NULL DEFAULT '',
-    source_memory_ids  UUID[] NOT NULL DEFAULT '{}',     -- 由哪些记忆归纳而来
+    source_memory_ids  UUID[] NOT NULL DEFAULT '{}',     -- DEPRECATED: 使用 reflection_sources 中间表
     importance         INT  NOT NULL DEFAULT 5 CHECK (importance BETWEEN 1 AND 10),
     embedding          vector(1536),                     -- 反思向量(可选, 高层语义检索)
     created_at         TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -216,7 +234,22 @@ CREATE TABLE reflections (
 CREATE INDEX idx_refl_char_time ON reflections (character_id, created_at DESC);
 CREATE INDEX idx_refl_embedding_hnsw
     ON reflections USING hnsw (embedding vector_cosine_ops)
-    WITH (m = 16, ef_construction = 64);
+    WITH (m = 16, ef_construction = 128);                -- ef_construction 同步提升
+```
+
+#### 3.5.1 reflection_sources（反思来源中间表）
+
+> ⚠️ **改进（0002_optimize 迁移）**：替代 `reflections.source_memory_ids UUID[]`，解决数组无法建立外键约束的问题。
+
+```sql
+CREATE TABLE reflection_sources (
+    reflection_id  UUID NOT NULL REFERENCES reflections(id) ON DELETE CASCADE,
+    memory_id      UUID NOT NULL,                         -- memory_episodes.id（应用层保证存在）
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (reflection_id, memory_id)
+);
+
+CREATE INDEX idx_refl_sources_memory ON reflection_sources (memory_id);
 ```
 
 ### 3.6 plans（长期规划）
@@ -285,6 +318,13 @@ CREATE TABLE messages_default PARTITION OF messages DEFAULT;
 CREATE INDEX idx_msg_conv_time ON messages (conversation_id, created_at);
 CREATE INDEX idx_msg_char_time ON messages (character_id, created_at DESC);
 CREATE INDEX idx_msg_user_time ON messages (user_id, created_at DESC);
+
+-- ⚠️ 覆盖索引（0002_optimize）：避免分区表回表代价
+CREATE INDEX idx_msg_user_time_cover
+    ON messages (user_id, created_at DESC) INCLUDE (content, role, platform);
+CREATE INDEX idx_msg_conv_time_cover
+    ON messages (conversation_id, created_at) INCLUDE (content, role, character_id, platform);
+
 CREATE INDEX idx_msg_created_brin ON messages USING brin (created_at);
 ```
 
@@ -311,6 +351,8 @@ CREATE INDEX idx_module_enabled ON module_configs (enabled) WHERE enabled = TRUE
 ### 3.10 world_snapshots（世界状态周期快照）
 
 > Redis 仅保留当前世界态，PG 周期落盘用于回放/调试。
+>
+> ⚠️ **改进（0002_optimize 迁移）**：落盘频率从 30s/Tick 降为 10 分钟一次，避免 WAL 膨胀（原方案年 1.2TB）。增量变更通过 `world_events` 表记录。
 
 ```sql
 CREATE TABLE world_snapshots (
@@ -323,6 +365,31 @@ CREATE TABLE world_snapshots (
 CREATE INDEX idx_world_tick ON world_snapshots (tick_id);
 CREATE INDEX idx_world_time ON world_snapshots (captured_at DESC);
 ```
+
+### 3.11 world_events（世界变更事件，差分记录）
+
+> ⚠️ **新增（0002_optimize 迁移）**：记录每个 Tick 的增量变更（时间/天气/场景/资源/事件），替代 `world_snapshots` 的高频全量写入。
+
+```sql
+CREATE TABLE world_events (
+    id          UUID PRIMARY KEY DEFAULT uuidv7(),
+    tick_id     BIGINT NOT NULL,
+    event_type  TEXT NOT NULL,                           -- time/weather/scene/resource/event
+    payload     JSONB NOT NULL,                          -- 变更内容（仅差分）
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_world_events_tick      ON world_events (tick_id);
+CREATE INDEX idx_world_events_type_time ON world_events (event_type, created_at DESC);
+```
+
+| event_type | payload 示例 |
+|------------|-------------|
+| `time` | `{"virtual_time": "2026-07-06T10:30:00", "tick_id": 42}` |
+| `weather` | `{"from": "sunny", "to": "rainy"}` |
+| `scene` | `{"scene_id": "cafe", "crowdedness": 0.8}` |
+| `resource` | `{"resource": "coffee_beans", "delta": -5}` |
+| `event` | `{"event_id": "sakura_festival", "action": "start"}` |
 
 ---
 

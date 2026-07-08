@@ -2,13 +2,20 @@
 
 存储角色的所有经历片段，是记忆系统的核心数据。
 向量字段用于语义检索，importance + timestamp 用于混合排序。
+
+⚠️ 性能优化（0002_optimize 迁移）：
+- 表已改为按 character_id HASH 分区（10 分区）
+- 每分区独立 HNSW 索引（ef_construction=128）
+- 查询 WHERE character_id = :cid 时分区裁剪，避免全局扫描
+- materialized 标志区分原始日志与向量化记忆
+- embedding 异步批量生成，不阻塞 Tick 循环
 """
 from datetime import datetime
 from uuid import UUID
 from uuid6 import uuid7
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Boolean, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import Boolean, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -17,13 +24,18 @@ from src.db.base import Base
 
 
 class MemoryEpisode(Base):
-    """记忆片段表 - 含 HNSW 向量索引
+    """记忆片段表 - HASH 分区 + 分区级 HNSW 索引
 
     设计要点：
-    - embedding: pgvector Vector(1536)，HNSW 索引加速
+    - 复合主键 (id, character_id)：分区表要求分区键在主键中
+    - embedding: nullable，materialized=false 时为 NULL（异步生成）
+    - materialized: 是否已生成 embedding（worker 批量处理）
     - importance: 重要性评分（1-10），影响检索排序权重
     - is_reflected: 是否已被反思消化，部分索引优化未反思查询
     - source_type: 来源类型（action/conversation/reflection）
+
+    ⚠️ 分区表不支持 FOREIGN KEY 引用 characters 表，
+       引用完整性由应用层 ORM 保证。
 
     检索策略（混合排序）：
         final_score = sim_score * 0.6 + importance * 0.05 + time_decay
@@ -35,11 +47,12 @@ class MemoryEpisode(Base):
         primary_key=True, default=uuid7, comment="记忆 ID"
     )
     character_id: Mapped[UUID] = mapped_column(
-        ForeignKey("characters.id", ondelete="CASCADE"), comment="所属角色"
+        primary_key=True, comment="所属角色（分区键）"
     )
     content: Mapped[str] = mapped_column(Text, comment="记忆内容（自然语言）")
-    embedding: Mapped[list[float]] = mapped_column(
-        Vector(settings.embedding_dim), comment="向量嵌入"
+    embedding: Mapped[list[float] | None] = mapped_column(
+        Vector(settings.embedding_dim), nullable=True,
+        comment="向量嵌入（materialized=false 时为 NULL）"
     )
     importance: Mapped[int] = mapped_column(
         Integer, default=5, comment="重要性 1-10"
@@ -55,6 +68,10 @@ class MemoryEpisode(Base):
     is_reflected: Mapped[bool] = mapped_column(
         Boolean, default=False, comment="是否已被反思消化"
     )
+    materialized: Mapped[bool] = mapped_column(
+        Boolean, default=False,
+        comment="embedding 是否已生成（异步 worker 处理）"
+    )
     source_type: Mapped[str] = mapped_column(
         String(20), default="action", comment="来源类型"
     )
@@ -62,10 +79,18 @@ class MemoryEpisode(Base):
     __table_args__ = (
         # 角色记忆时间线查询
         Index("idx_mem_char_time", "character_id", "timestamp"),
+        # 角色重要性排序
+        Index("idx_mem_char_imp", "character_id", "importance"),
         # 部分索引：仅索引未反思的记忆，加速反思触发检查
         Index(
             "idx_mem_unreflected",
             "character_id",
             postgresql_where="is_reflected = FALSE",
+        ),
+        # 部分索引：未向量化的记忆，供 embedding worker 批量拉取
+        Index(
+            "idx_mem_unmaterialized",
+            "timestamp",
+            postgresql_where="materialized = FALSE",
         ),
     )

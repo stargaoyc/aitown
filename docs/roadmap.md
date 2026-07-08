@@ -7,29 +7,43 @@
 ## 一、开发阶段概览
 
 ```text
-Phase 0: 项目初始化           ← 当前
+Phase 0: 项目初始化           ✅ 已完成
    ├─ 创建项目结构（monorepo）
    ├─ 初始化 packages（backend / frontend / mcp-servers）
    ├─ 配置依赖管理与构建脚本
    └─ 数据库 DDL 迁移脚本
         ↓
-Phase 1: 世界引擎核心
+Phase 1: 世界引擎核心          ✅ 已完成
    ├─ World Tick 演化列表（Time/Weather/Scene）
    ├─ Character Tick 五阶段闭环
    ├─ Action 系统注册与执行（事务化）
    └─ 记忆系统（MemoryEpisode + pgvector）
         ↓
-Phase 2: 角色与小镇
+Phase 2: 角色与小镇            ✅ 已完成
    ├─ 角色卡导入与状态初始化
    ├─ 小镇场景系统与移动矩阵
    ├─ 作息系统与动态耗时
-   └─ 节日与事件触发
+   └─ 角色关系图谱
+        ↓
+Phase 2.5: 性能与数据完整性优化 ← 当前
+   ├─ memory_episodes HASH 分区 + 分区级 HNSW
+   ├─ 异步 embedding worker（解耦 Tick 与 LLM）
+   ├─ world_events 差分事件表（替代高频快照）
+   ├─ reflection_sources 外键中间表
+   ├─ character_states 乐观锁
+   └─ 覆盖索引优化
         ↓
 Phase 3: 外部交互
    ├─ 消息服务（QQ/飞书/Web WebSocket）
    ├─ 主动分享链路
    ├─ MCP Server 自研（code-executor / shop-simulator）
    └─ MCP Server 社区集成（web-search / weather）
+        ↓
+Phase 3.5: 安全与可靠性
+   ├─ API 鉴权（JWT + API Key）
+   ├─ LLM 成本控制（日预算上限 + 熔断）
+   ├─ Prompt 注入防护
+   └─ Redis ↔ PG 一致性保证
         ↓
 Phase 4: 可观测性与运维
    ├─ OTel Trace 全链路埋点
@@ -46,148 +60,105 @@ Phase 5: 前端 Dashboard
 
 ---
 
-## 二、Phase 0：项目初始化（预计 1 周）
+## 二、Phase 0：项目初始化 ✅ 已完成
 
-### 2.1 任务清单
+### 任务清单
 
-| 任务 | 优先级 | 依赖 | 验收标准 |
-|------|--------|------|----------|
-| 创建 monorepo 结构（pnpm workspace） | P0 | — | `pnpm ls` 能列出所有包 |
-| 初始化 `packages/backend`（Python 3.13 + uv） | P0 | monorepo | `uv sync` 成功，`uvicorn` 可启动 |
-| 初始化 `packages/frontend`（React 19 + Vite 8） | P0 | monorepo | `pnpm dev` 启动 Vite |
-| 初始化 `packages/mcp-servers/code-executor` | P1 | monorepo | `uv run server.py` 可监听 |
-| 数据库 DDL（pgvector + pg_uuidv7 + HNSW） | P0 | backend | `alembic upgrade head` 成功 |
-| Docker Compose（postgres/redis/minio） | P0 | — | `docker compose up` 启动基础设施 |
-| 环境变量示例 `.env.example` | P0 | — | 包含所有必填变量 |
-
-### 2.2 目录结构
-
-```text
-e:\projects\aitown/
-├── packages/
-│   ├── backend/                   # Python 后端
-│   │   ├── src/
-│   │   │   ├── core/              # 世界引擎核心
-│   │   │   ├── db/                # 数据库模型与迁移
-│   │   │   ├── api/               # FastAPI 路由
-│   │   │   ├── memory/            # 记忆服务
-│   │   │   ├── modules/           # MCP 模块管理
-│   │   │   ├── messaging/         # 消息服务
-│   │   │   ├── tools/             # MCP 工具层
-│   │   │   ├── observability/     # OTel 配置
-│   │   │   └── config.py
-│   │   ├── tests/
-│   │   ├── pyproject.toml
-│   │   ├── alembic.ini
-│   │   └── Dockerfile
-│   ├── frontend/                  # React 前端
-│   │   ├── src/
-│   │   ├── public/
-│   │   ├── package.json
-│   │   ├── vite.config.ts
-│   │   ├── tailwind.config.ts
-│   │   ├── oxlint.json
-│   │   └── Dockerfile
-│   └── mcp-servers/
-│       ├── code-executor/         # 自研 MCP
-│       ├── shop-simulator/
-│       └── character-social/
-├── configs/
-│   ├── characters/                # 角色卡 YAML
-│   ├── prompts/                   # Prompt 模板
-│   ├── scenes.yaml                # 小镇场景
-│   ├── events.yaml                # 节日配置
-│   └── world-map.yaml             # 世界地图
-├── docker/
-│   ├── postgres/                  # 自定义镜像（pgvector + pg_uuidv7）
-│   └── grafana/
-├── docs/                          # 设计文档（已完成）
-├── .env.example
-├── docker-compose.yml
-├── docker-compose.infra.yml       # 仅基础设施
-├── pnpm-workspace.yaml
-├── README.md
-└── ROADMAP.md                     # 本文档
-```
+| 任务 | 状态 | 验收 |
+|------|------|------|
+| 创建 monorepo 结构 | ✅ | pnpm workspace 正常 |
+| 初始化 backend（Python 3.13 + uv） | ✅ | `uv sync` + `uvicorn` 启动 |
+| 初始化 frontend（React 19 + Vite 8） | ✅ | `pnpm dev` 启动 |
+| 数据库 DDL（pgvector + pg_uuidv7 + HNSW） | ✅ | `alembic upgrade head` 成功 |
+| Docker Compose 基础设施 | ✅ | postgres/redis/minio 可启动 |
+| 环境变量 `.env.example` | ✅ | 含所有必填变量 |
 
 ---
 
-## 三、Phase 1：世界引擎核心（预计 2 周）
+## 三、Phase 1：世界引擎核心 ✅ 已完成
 
-### 3.1 World Tick（演化列表）
+### 任务清单
 
-| 任务 | 说明 | 验收 |
+| 任务 | 状态 | 验收 |
 |------|------|------|
-| `TimeEvolution` | 虚拟时钟推进，每 Tick +10 分钟 | 单元测试：10 Tick 后时间正确 |
-| `WeatherEvolution` | 天气状态变化，每 60 Tick 更新 | 天气符合配置的概率分布 |
-| `SceneEvolution` | 场景开放/拥挤度更新 | 拥挤度与 `visitors` 数量一致 |
-| `EventEvolution` | 节日/事件触发 | 樱花祭日期触发 `active_events` |
-| Redis 状态读写 | `world:state` 结构持久化 | 断电恢复后状态一致 |
-
-### 3.2 Character Tick（五阶段闭环）
-
-| 任务 | 说明 | 验收 |
-|------|------|------|
-| 感知环境 | 读取角色/世界/记忆状态 | 返回完整 context |
-| 候选 Action 过滤 | `precondition` 检查 | 候选列表非空（至少有"等待"） |
-| LLM 决策 | 结构化输出（action/reason/planChanges） | 输出解析成功，非法决策回退 |
-| Action 执行 | 事务化（PG + Redis） | 单一事务，失败回滚 |
-| 记忆沉淀 | 写入 `memory_episodes` + embedding | pgvector 可检索 |
-
-### 3.3 Action 系统
-
-| 任务 | 说明 | 验收 |
-|------|------|------|
-| ActionRegistry | 注册/注销/候选过滤 | 注册后可列出 |
-| 核心 Action | 移动/生活/工作/社交 10+ 个 | precondition 过滤正确 |
-| Action executor | 状态变化 + 行为记录 | 事务内多表写入成功 |
-| 完成事件广播 | Redis Streams `ActionCompleted` | 消费组可订阅 |
-
-### 3.4 记忆系统
-
-| 任务 | 说明 | 验收 |
-|------|------|------|
-| MemoryEpisode 模型 | 含向量字段 + HNSW 索引 | 插入后可检索 Top-K |
-| 混合检索排序 | 语义 + 重要性 + 时间衰减 | 排序得分计算正确 |
-| 人物记忆沉淀 | 对话窗口触发 | 写入 `person_memory` |
-| 反思触发器 | 累计阈值触发 LLM 反思 | 生成 Reflection 写入 |
+| `TimeEvolution` 虚拟时钟 | ✅ | Tick 推进 10 虚拟分钟 |
+| `WeatherEvolution` 天气演化 | ✅ | 60 Tick 更新一次 |
+| `SceneEvolution` 场景演化 | ✅ | 拥挤度更新 |
+| `EventEvolution` 事件触发 | ✅ | 樱花祭触发 |
+| Character Tick 五阶段闭环 | ✅ | 感知→过滤→决策→执行→记忆 |
+| ActionRegistry + 10+ Action | ✅ | move/life/work/social |
+| 记忆系统 + pgvector | ✅ | HNSW 检索可用 |
+| LangChain 1.3 + LangGraph 1.2 集成 | ✅ | LLM 决策可用 |
 
 ---
 
-## 四、Phase 2：角色与小镇（预计 1 周）
+## 四、Phase 2：角色与小镇 ✅ 已完成
 
-### 4.1 角色系统
+### 任务清单
 
-| 任务 | 说明 | 验收 |
+| 任务 | 状态 | 验收 |
 |------|------|------|
-| 角色卡导入 CLI | YAML → PG `characters` 表 | 导入后角色可参与 Tick |
-| 实时状态初始化 | Redis `char:{id}:state` | 状态字段完整 |
-| 作息系统 | `traits.schedule` 影响 | 夜猫子夜间活跃 |
-| 计划系统 | PG `plans` 表 + planChanges | 计划推进/完成 |
-
-### 4.2 小镇系统
-
-| 任务 | 说明 | 验收 |
-|------|------|------|
-| 场景配置加载 | `world-map.yaml` → Redis | 场景开放时间正确 |
-| 移动矩阵 | 场景间耗时查表 | 移动 Action 时耗正确 |
-| 动态耗时 | 天气/拥挤度调整 | 雨天移动耗时 ×1.5 |
-| 资源循环 | World Tick 资源增减 | 资源过低触发物价上涨 |
+| 角色卡 Pydantic v2 校验 + YAML 导入 | ✅ | 4 个角色卡导入成功 |
+| 小镇场景加载器 + 世界地图 | ✅ | 12 场景 + 移动矩阵 |
+| 作息系统（early_bird/normal/night_owl） | ✅ | 活动水平判定正确 |
+| 动态耗时系统（天气/拥挤度/体力/情绪） | ✅ | 四因子修正 |
+| 移动系统（路径计算 + Dijkstra） | ✅ | 路径规划可用 |
+| 角色关系图谱（双向同步 + 自动升级） | ✅ | stranger→best_friend |
+| 11 个 API 端点集成 | ✅ | 全部测试通过 |
 
 ---
 
-## 五、Phase 3：外部交互（预计 2 周）
+## 五、Phase 2.5：性能与数据完整性优化 🔄 当前
 
-### 5.1 消息服务
+> 基于 11 项数据库审查意见的系统性优化。已创建 [0002_optimize.py](../packages/backend/alembic/versions/0002_optimize.py) 迁移脚本。
+
+### 任务清单
+
+| # | 问题 | 严重度 | 解决方案 | 状态 |
+|---|------|--------|----------|------|
+| 1 | 全局 HNSW + character_id 过滤 → 召回率崩塌 | 致命 | HASH 分区（10 分区）+ 分区级 HNSW | ✅ |
+| 2 | Action:Memory 1:1 写放大 → Tick 阻塞 | 高 | materialized 标志 + 异步 embedding worker | ✅ |
+| 3 | DEFAULT 分区兜底 → 慢查询定时炸弹 | 中 | 保留 DEFAULT + 触发器告警 | ✅ |
+| 4 | world_snapshots 全量 JSONB → IO 灾难 | 高 | 降频 10 分钟 + world_events 差分表 | ✅ |
+| 5 | personality TEXT[] 与 traits JSONB 冗余 | 中 | 统一到 traits.personality | ✅ |
+| 6 | reflections.source_memory_ids 无外键 | 中 | reflection_sources 中间表 | ✅ |
+| 7 | messages 分区键缺陷 | 中 | conversation_id 覆盖索引 | ✅ |
+| 8 | character_states 缺少乐观锁 | 中 | version 字段 | ✅ |
+| 9 | pg_uuidv7 扩展可用性风险 | 低 | 应用层 uuid6 库兜底（已有） | ✅ |
+| 10 | messages.user_id 索引覆盖 | 低 | INCLUDE 覆盖索引 | ✅ |
+| 11 | HNSW ef_construction=64 偏低 | 中 | 提升至 128 | ✅ |
+
+### 新增文件
+
+| 文件 | 说明 |
+|------|------|
+| `alembic/versions/0002_optimize.py` | 数据库优化迁移脚本 |
+| `src/db/models/world_event.py` | 世界变更事件模型 |
+| `src/db/models/reflection_source.py` | 反思来源中间表模型 |
+| `src/memory/embedding_worker.py` | 异步 embedding 生成 worker |
+
+### 容量估算修正
+
+| 项目 | 原估算 | 修正后 | 说明 |
+|------|--------|--------|------|
+| memory_episodes 存储 | 80 GB/年 | 108 GB/年（向量）+ 50 GB（HNSW 索引） | 1536 维 float32 = 6KB/条 |
+| world_snapshots | 1.2 TB/年（30s 落盘） | ~50 MB/年（10 分钟落盘） | 差分事件表分担 |
+| 建议冷热分离 | — | 3 个月前 action_records.params 迁移至对象存储 | PG 仅存轻量索引字段 |
+
+---
+
+## 六、Phase 3：外部交互（预计 2 周）
+
+### 6.1 消息服务
 
 | 任务 | 说明 | 验收 |
 |------|------|------|
-| Satori 网关 | OneBot v12 adapter | 收到 QQ 消息能标准化 |
+| OneBot v12 adapter | QQ WebSocket 接入 | 收到 QQ 消息能标准化 |
 | 飞书 adapter | Lark API 接入 | 飞书消息能标准化 |
 | Web WebSocket | 浏览器接入 | 客户端能收发消息 |
 | 回复生成 | LLM 生成自然语言回复 | 回复引用真实经历 |
 
-### 5.2 主动分享
+### 6.2 主动分享
 
 | 任务 | 说明 | 验收 |
 |------|------|------|
@@ -195,7 +166,7 @@ e:\projects\aitown/
 | 分享文案生成 | 自然语言，不暴露工程概念 | 文案符合角色性格 |
 | 发送调度 | 群聊/私聊选择 | 不刷屏 |
 
-### 5.3 MCP Servers
+### 6.3 MCP Servers
 
 | 任务 | 说明 | 验收 |
 |------|------|------|
@@ -206,9 +177,40 @@ e:\projects\aitown/
 
 ---
 
-## 六、Phase 4：可观测性与运维（预计 1 周）
+## 七、Phase 3.5：安全与可靠性（预计 1 周）
 
-### 6.1 Trace
+> 基于[项目全面分析](#九项目全面问题分析)发现的安全与一致性问题。
+
+### 7.1 安全加固
+
+| 任务 | 说明 | 验收 |
+|------|------|------|
+| API 鉴权 | JWT + API Key，管理 API 强制鉴权 | 未授权请求被拒绝 |
+| Prompt 注入防护 | 用户消息过滤 + 系统提示隔离 | 注入测试不泄露系统信息 |
+| MCP Server 通信加密 | mTLS 或共享密钥 | 抓包看不到明文 |
+| 用户消息加密存储 | 敏感字段 AES 加密 | DB 直接查询看不到明文 |
+
+### 7.2 LLM 成本控制
+
+| 任务 | 说明 | 验收 |
+|------|------|------|
+| 日预算上限 | 超预算自动降级到 flash 模型 | 超预算触发降级 |
+| 熔断机制 | LLM 失败率 > 10% 触发熔断 | 熔断后回退到默认 Action |
+| Token 计数 | 每次 LLM 调用记录 token 消耗 | Langfuse 可查看成本 |
+
+### 7.3 数据一致性
+
+| 任务 | 说明 | 验收 |
+|------|------|------|
+| Redis ↔ PG 同步 | character_states 乐观锁 + 定期校验 | 不一致可检测 |
+| Action 执行原子性 | PG 事务 + Redis 写入失败补偿 | Redis 写失败自动重试 |
+| WebSocket 重连 | 指数退避 + 状态恢复 | 断线 30s 内恢复 |
+
+---
+
+## 八、Phase 4：可观测性与运维（预计 1 周）
+
+### 8.1 Trace
 
 | 任务 | 说明 | 验收 |
 |------|------|------|
@@ -216,14 +218,14 @@ e:\projects\aitown/
 | Trace 采样 | 0.5 采样率 | 采样后仍可追踪关键路径 |
 | Langfuse 集成 | LLM Prompt/Token 审计 | Langfuse 可查看对话记录 |
 
-### 6.2 Metrics
+### 8.2 Metrics
 
 | 任务 | 说明 | 验收 |
 |------|------|------|
 | Prometheus 指标 | Tick 耗时 / Action 成败 / LLM 调用 | Grafana 可查询 |
 | 告警规则 | 5xx / Tick 延迟 / LLM 失败率 | 告警触发飞书通知 |
 
-### 6.3 Logs
+### 8.3 Logs
 
 | 任务 | 说明 | 验收 |
 |------|------|------|
@@ -233,9 +235,9 @@ e:\projects\aitown/
 
 ---
 
-## 七、Phase 5：前端 Dashboard（预计 2 周）
+## 九、Phase 5：前端 Dashboard（预计 2 周）
 
-### 7.1 页面清单
+### 9.1 页面清单
 
 | 页面 | 说明 |
 |------|------|
@@ -246,7 +248,7 @@ e:\projects\aitown/
 | `/traces` | Trace 调试：按 trace_id 查链路 |
 | `/admin` | 管理入口：暂停/恢复/快照回放/强制 Tick |
 
-### 7.2 技术验收
+### 9.2 技术验收
 
 | 任务 | 验收 |
 |------|------|
@@ -258,45 +260,109 @@ e:\projects\aitown/
 
 ---
 
-## 八、里程碑与交付物
+## 十、项目全面问题分析
 
-| 里程碑 | 预计周期 | 交付物 |
-|--------|----------|--------|
-| **M0: 项目骨架** | 1 周 | monorepo + packages + 数据库 DDL + Docker Compose 基础设施 |
-| **M1: 世界可运行** | 2 周 | World Tick + Character Tick + Action 10+ + 记忆检索 |
-| **M2: 角色有生活** | 1 周 | 角色卡导入 + 小镇场景 + 作息 + 动态耗时 |
-| **M3: 可外部交互** | 2 周 | QQ/飞书/Web 消息 + 主动分享 + MCP 4 个 Server |
-| **M4: 可观测完整** | 1 周 | Trace/Metrics/Logs 三支柱 + Grafana 统一面板 |
-| **M5: 前端可用** | 2 周 | Dashboard 6 页面 + 实时数据 + 管理入口 |
+> 除数据库审查外，对整个项目架构的全面分析。
 
-**总预计周期**：9 周（约 2 个月）
+### 10.1 架构层面
+
+| 问题 | 严重度 | 影响 | 解决方案 | 阶段 |
+|------|--------|------|----------|------|
+| World Tick 双主风险 | 高 | 锁过期 + 网络分区导致双实例推进 | Redis Redlock + fencing token | Phase 3.5 |
+| Character Tick 无优先级 | 中 | 重要角色可能被低优先级角色阻塞 | 优先级队列调度 | Phase 4 |
+| 消息服务单点 | 中 | QQ/飞书 WebSocket 连接无故障转移 | 多实例 + 共享会话状态 | Phase 3.5 |
+| Embedding worker 单点 | 低 | worker 宕机导致记忆不向量化 | 多 worker + SKIP LOCKED（已实现） | ✅ 已解决 |
+
+### 10.2 LLM 调用层面
+
+| 问题 | 严重度 | 影响 | 解决方案 | 阶段 |
+|------|--------|------|----------|------|
+| LLM 超时无 fallback | 高 | Tick 阻塞，角色"卡住" | 强制超时 10s + 默认"等待"回退 | Phase 3.5 |
+| Token 成本失控 | 高 | 异常循环烧光预算 | 日预算上限 + 熔断降级 | Phase 3.5 |
+| Prompt 注入风险 | 高 | 用户消息操纵角色行为 | 输入过滤 + 系统提示隔离 | Phase 3.5 |
+| LLM 决策非法输出 | 中 | Action 执行失败 | 结构化校验 + 回退（已实现） | ✅ 已解决 |
+
+### 10.3 数据一致性
+
+| 问题 | 严重度 | 影响 | 解决方案 | 阶段 |
+|------|--------|------|----------|------|
+| Redis ↔ PG 双写无事务 | 高 | 状态不一致 | 乐观锁 + 定期校验任务 | Phase 3.5 |
+| Action 执行非原子 | 高 | PG 成功 Redis 失败 | Redis 写入失败补偿队列 | Phase 3.5 |
+| 分区表无 FK 约束 | 中 | memory_episodes 引用悬空 | 应用层 ORM 保证（已实现） | ✅ 已解决 |
+| DEFAULT 分区静默写入 | 中 | 查询性能崩塌 | 触发器告警（已实现） | ✅ 已解决 |
+
+### 10.4 安全性
+
+| 问题 | 严重度 | 影响 | 解决方案 | 阶段 |
+|------|--------|------|----------|------|
+| 管理 API 无鉴权 | 高 | 任何人可调用 /admin/* | JWT + API Key | Phase 3.5 |
+| MCP 通信未加密 | 中 | 内网抓包可篡改 | mTLS | Phase 3.5 |
+| 用户消息明文存储 | 中 | DB 泄露暴露隐私 | 敏感字段 AES 加密 | Phase 3.5 |
+| CORS 配置过宽 | 低 | 跨站请求伪造 | 限制 origin 白名单 | Phase 3.5 |
+
+### 10.5 前端
+
+| 问题 | 严重度 | 影响 | 解决方案 | 阶段 |
+|------|--------|------|----------|------|
+| WebSocket 无重连 | 高 | 断线后数据不更新 | 指数退避重连 | Phase 5 |
+| 无全局错误边界 | 中 | 组件崩溃白屏 | ErrorBoundary 组件 | Phase 5 |
+| 无 loading 骨架屏 | 低 | 用户体验差 | Skeleton 组件 | Phase 5 |
+
+### 10.6 运维
+
+| 问题 | 严重度 | 影响 | 解决方案 | 阶段 |
+|------|--------|------|----------|------|
+| 数据库迁移非零停机 | 高 | 0002_optimize 表重建需维护窗口 | pg_repack 或蓝绿部署 | Phase 4 |
+| Docker 日志未轮转 | 中 | 磁盘撑满 | json-file + max-size | Phase 4 |
+| 备份未自动化 | 中 | 人工备份易遗忘 | pg_cron + WAL 归档 | Phase 4 |
+| 分区预创建未自动化 | 中 | 月底插入失败 | pg_cron 定时建分区 | Phase 4 |
 
 ---
 
-## 九、风险与依赖
+## 十一、里程碑与交付物
 
-| 风险 | 影响 | 缓解措施 |
-|------|------|----------|
-| pg_uuidv7 扩展未安装 | UUID v4 索引碎片化 | 应用层 `uuid6` 库兜底 |
-| LLM 调用超时/失败 | Tick 阻塞 | 强制超时 + 重试 + 默认"等待"回退 |
-| PgBouncer prepared statements | 与事务模式冲突 | `DB_PREPARED_STATEMENT_CACHE_SIZE=0` |
-| MCP Server 不稳定 | 工具调用失败 | 超时 + fallback + 告警 |
-| 角色 Tick 并发过多 | 资源耗尽 | 信号量限制 + 优先级调度 |
+| 里程碑 | 预计周期 | 交付物 | 状态 |
+|--------|----------|--------|------|
+| **M0: 项目骨架** | 1 周 | monorepo + packages + DDL + Docker | ✅ |
+| **M1: 世界可运行** | 2 周 | World Tick + Character Tick + Action 10+ | ✅ |
+| **M2: 角色有生活** | 1 周 | 角色卡 + 小镇 + 作息 + 关系 | ✅ |
+| **M2.5: 性能优化** | 1 周 | 分区 + 异步 embedding + 差分快照 | 🔄 |
+| **M3: 可外部交互** | 2 周 | QQ/飞书/Web + MCP 4 Server | ⏳ |
+| **M3.5: 安全可靠** | 1 周 | 鉴权 + 成本控制 + 一致性 | ⏳ |
+| **M4: 可观测完整** | 1 周 | Trace/Metrics/Logs + Grafana | ⏳ |
+| **M5: 前端可用** | 2 周 | Dashboard 6 页面 + 实时数据 | ⏳ |
 
----
-
-## 十、下一步行动（Phase 0）
-
-1. **创建 monorepo 结构**（pnpm-workspace.yaml + packages 目录）
-2. **初始化 backend**（`pyproject.toml` + `src/` 目录 + `alembic.ini`）
-3. **初始化 frontend**（`package.json` + `vite.config.ts` + `oxlint.json`）
-4. **编写数据库 DDL**（`alembic/versions/` 迁移脚本）
-5. **创建 `.env.example`**（所有必填变量）
-6. **编写 `docker-compose.infra.yml`**（postgres/redis/minio）
+**总预计周期**：11 周（约 2.5 个月）
 
 ---
 
-## 十一、相关文档
+## 十二、风险与依赖
+
+| 风险 | 影响 | 缓解措施 | 状态 |
+|------|------|----------|------|
+| pg_uuidv7 扩展未安装 | UUID v4 索引碎片化 | 应用层 `uuid6` 库兜底 | ✅ 已缓解 |
+| LLM 调用超时/失败 | Tick 阻塞 | 强制超时 + 重试 + 默认"等待"回退 | ⏳ Phase 3.5 |
+| PgBouncer prepared statements | 与事务模式冲突 | `DB_PREPARED_STATEMENT_CACHE_SIZE=0` | ✅ 已缓解 |
+| MCP Server 不稳定 | 工具调用失败 | 超时 + fallback + 告警 | ⏳ Phase 3 |
+| 角色 Tick 并发过多 | 资源耗尽 | 信号量限制 + 优先级调度 | ✅ 部分（信号量已有） |
+| HNSW 召回率崩塌 | 记忆检索空结果 | HASH 分区 + 分区级 HNSW | ✅ 已解决 |
+| Embedding 阻塞 Tick | 角色卡顿 | 异步 worker + materialized 标志 | ✅ 已解决 |
+| world_snapshots IO 灾难 | WAL 膨胀 | 差分事件表 + 降频 | ✅ 已解决 |
+| Redis ↔ PG 不一致 | 状态漂移 | 乐观锁 + 校验任务 | ⏳ Phase 3.5 |
+| LLM 成本失控 | 预算超支 | 日预算 + 熔断降级 | ⏳ Phase 3.5 |
+
+---
+
+## 十三、下一步行动（Phase 2.5 → Phase 3）
+
+1. **执行 0002_optimize 迁移**（需维护窗口，涉及表重建）
+2. **集成 EmbeddingWorker 到 lifespan**（后台任务自动启动）
+3. **编写 Phase 2.5 单元测试**（分区裁剪验证 + worker 并发测试）
+4. **进入 Phase 3**（消息服务 + MCP Server）
+
+---
+
+## 十四、相关文档
 
 | 主题 | 文档 |
 |------|------|
