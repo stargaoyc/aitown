@@ -7,7 +7,8 @@
 - last_message_at 维护会话活跃度，用于排序与清理
 """
 from datetime import datetime, timezone
-from uuid import UUID, uuid7
+from uuid import UUID
+from uuid6 import uuid7
 
 from sqlalchemy import select, update, func
 from sqlalchemy.dialects.postgresql import insert
@@ -32,10 +33,10 @@ class ConversationRepository(BaseRepository[Conversation]):
         user_id: str,
         platform: str,
     ) -> Conversation:
-        """获取或创建会话（同一用户对同一角色仅一个会话）
+        """获取或创建会话（同一用户在同一平台对同一角色仅一个会话）
 
         使用 ON CONFLICT DO NOTHING 保证幂等，避免并发创建重复会话。
-        创建后通过 (user_id, character_id) 反查获取既有记录。
+        v4: 唯一键扩展为 (user_id, platform, character_id)，支持跨平台独立会话。
 
         Args:
             character_id: 角色 ID
@@ -52,18 +53,19 @@ class ConversationRepository(BaseRepository[Conversation]):
             user_id=user_id,
             platform=platform,
         ).on_conflict_do_nothing(
-            index_elements=["user_id", "character_id"],
+            index_elements=["user_id", "platform", "character_id"],
         ).returning(Conversation)
 
         result = await self.session.execute(stmt)
         record = result.scalar_one_or_none()
 
         if record is None:
-            # 已存在，反查
+            # 已存在，反查（含 platform 维度）
             select_stmt = (
                 select(Conversation)
                 .where(
                     Conversation.user_id == user_id,
+                    Conversation.platform == platform,
                     Conversation.character_id == character_id,
                 )
             )
@@ -89,12 +91,17 @@ class ConversationRepository(BaseRepository[Conversation]):
         self,
         user_id: str,
         character_id: UUID,
+        platform: str | None = None,
     ) -> Conversation | None:
         """按 (user_id, character_id) 精确查询会话（仅查询不创建）
+
+        v4: 增加 platform 可选参数，支持跨平台独立会话查询。
+        若不指定 platform，返回该用户与角色的任一会话（按 last_message_at 倒序取首条）。
 
         Args:
             user_id: 用户标识
             character_id: 角色 ID
+            platform: 可选，来源平台
 
         Returns:
             会话对象，不存在返回 None
@@ -106,6 +113,12 @@ class ConversationRepository(BaseRepository[Conversation]):
                 Conversation.character_id == character_id,
             )
         )
+        if platform is not None:
+            stmt = stmt.where(Conversation.platform == platform)
+        else:
+            # 不指定平台时取最近活跃的会话
+            stmt = stmt.order_by(Conversation.last_message_at.desc().nullslast()).limit(1)
+
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 

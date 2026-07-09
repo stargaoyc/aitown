@@ -9,7 +9,7 @@ from datetime import datetime
 from uuid import UUID
 from uuid6 import uuid7
 
-from sqlalchemy import ForeignKey, Index, Integer, Numeric, String, Text
+from sqlalchemy import CheckConstraint, ForeignKey, Index, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -19,8 +19,9 @@ from src.db.base import Base
 class Conversation(Base):
     """对话会话表 - 一个用户与一个角色的对话线程
 
-    platform: 消息来源平台（qq/lark/web/internal）
+    platform: 消息来源平台（web/qq/lark/internal）
     context: 对话上下文（最近 N 条消息摘要，用于 LLM 回复）
+    updated_at: 触发器自动维护（v4 新增）
     """
     __tablename__ = "conversations"
 
@@ -29,7 +30,10 @@ class Conversation(Base):
         ForeignKey("characters.id", ondelete="CASCADE"), comment="角色 ID"
     )
     user_id: Mapped[str] = mapped_column(String(100), comment="用户标识")
-    platform: Mapped[str] = mapped_column(String(20), comment="来源平台")
+    platform: Mapped[str] = mapped_column(
+        String(20),
+        comment="来源平台（web/qq/lark/internal）",
+    )
     context: Mapped[dict | None] = mapped_column(JSONB, comment="对话上下文")
     last_message_at: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True), comment="最后消息时间"
@@ -37,8 +41,30 @@ class Conversation(Base):
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default="now()", comment="创建时间"
     )
+    # v4 新增：触发器自动维护
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default="now()", comment="更新时间（触发器自动维护）"
+    )
 
     messages: Mapped[list["Message"]] = relationship(back_populates="conversation")
+
+    __table_args__ = (
+        # v4: 唯一键扩展为 (user_id, platform, character_id)，支持跨平台
+        Index(
+            "idx_conv_user_platform_char",
+            "user_id",
+            "platform",
+            "character_id",
+            unique=True,
+        ),
+        Index("idx_conv_last_msg", "last_message_at"),
+        Index("idx_conv_char", "character_id"),
+        # v4: 枚举字段 CHECK 约束
+        CheckConstraint(
+            "platform IN ('web', 'qq', 'lark', 'internal')",
+            name="ck_conv_platform",
+        ),
+    )
 
 
 class Message(Base):
@@ -70,4 +96,9 @@ class Message(Base):
     __table_args__ = (
         Index("idx_msg_conv_time", "conversation_id", "created_at"),
         Index("idx_msg_created", "created_at"),
+        # v4: 枚举字段 CHECK 约束
+        CheckConstraint(
+            "sender IN ('user', 'character', 'system')",
+            name="ck_msg_sender",
+        ),
     )

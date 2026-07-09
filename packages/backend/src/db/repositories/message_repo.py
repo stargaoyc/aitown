@@ -6,7 +6,8 @@
 - 支持 token/cost 聚合统计，供 Phase 3.5 LLM 成本控制使用
 """
 from datetime import datetime
-from uuid import UUID, uuid7
+from uuid import UUID
+from uuid6 import uuid7
 
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession

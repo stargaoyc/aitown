@@ -80,6 +80,10 @@ class MemoryEpisode(Base):
     last_error: Mapped[str | None] = mapped_column(
         Text, comment="最近一次失败错误信息（截断 1000 字）"
     )
+    # v4 迁移新增：下次可重试时间（指数退避），NULL 表示可立即重试或已成功
+    next_retry_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), comment="下次可重试时间（指数退避），NULL 表示可立即重试"
+    )
     source_type: Mapped[str] = mapped_column(
         String(20), default="action", comment="来源类型"
     )
@@ -96,10 +100,10 @@ class MemoryEpisode(Base):
             postgresql_where="is_reflected = FALSE",
         ),
         # 部分索引：未向量化的记忆，供 embedding worker 批量拉取
-        # v3: 排除 fail_count >= 5 的熔断记忆，避免反复拉取
+        # v4: 排除熔断记忆 + 按 next_retry_at 排序（指数退避）
         Index(
             "idx_mem_unmaterialized",
-            "timestamp",
+            "next_retry_at",
             postgresql_where="materialized = FALSE AND fail_count < 5",
         ),
     )

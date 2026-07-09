@@ -44,7 +44,8 @@ from src.db.session import db
 from src.llm import LLMClient, PromptTemplates
 from src.memory import EpisodeService, ReflectionService, RetrievalService
 from src.memory.embedding_worker import EmbeddingWorker
-from src.messaging import MessageService
+from src.messaging import MessageService, WebSocketManager
+from src.messaging.websocket import router as ws_router
 from src.modules import (
     CharacterImporter,
     DurationCalculator,
@@ -75,6 +76,9 @@ llm: LLMClient | None = None
 prompts: PromptTemplates | None = None
 embedding_worker: EmbeddingWorker | None = None
 partition_scheduler: PartitionScheduler | None = None
+
+# WebSocket 连接管理器（单例）- 用于 Web 客户端实时聊天
+ws_manager = WebSocketManager()
 
 
 @asynccontextmanager
@@ -217,6 +221,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error("phase2_init_failed", error=str(e), exc_info=True)
 
+    # 7. WebSocket 管理器就绪（单例已实例化，记录日志）
+    logger.info(
+        "ws_manager_ready",
+        endpoint="/ws/chat/{character_id}",
+        manager=type(ws_manager).__name__,
+    )
+
     yield
 
     # === Shutdown ===
@@ -328,6 +339,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 注册 WebSocket 路由（/ws/chat/{character_id}）
+app.include_router(ws_router)
 
 
 # === API 路由 ===

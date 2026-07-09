@@ -66,7 +66,7 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;      -- 文本模糊检索
 
 ┌──────────────────────┐         ┌──────────────────────┐
 │  messages            │         │  module_configs      │
-│  (对话历史, 分区)    │         │  (模块配置)          │
+│  (对话历史, 非分区)  │         │  (模块配置)          │
 └──────────────────────┘         └──────────────────────┘
 
 ┌──────────────────────┐         ┌──────────────────────┐
@@ -197,6 +197,7 @@ CREATE TABLE memory_episodes (
     materialized       BOOLEAN NOT NULL DEFAULT FALSE,      -- embedding 是否已生成（异步 worker）
     fail_count         INT  NOT NULL DEFAULT 0,             -- v3 新增：向量化失败次数，达 5 后熔断
     last_error         TEXT,                                -- v3 新增：最近失败错误信息（截断 1000 字）
+    next_retry_at      TIMESTAMPTZ,                         -- v4 新增：下次重试时间，按指数退避（fail_count 越大间隔越长），NULL 表示未调度
     source_type        TEXT NOT NULL DEFAULT 'action'
                        CHECK (source_type IN ('action','conversation','reflection','event')),
     PRIMARY KEY (id, character_id)                          -- 分区表主键必须含分区键
@@ -220,7 +221,8 @@ CREATE INDEX idx_mem_char_imp  ON memory_episodes (character_id, importance DESC
 CREATE INDEX idx_mem_related   ON memory_episodes USING gin (related_characters);
 CREATE INDEX idx_mem_unreflected ON memory_episodes (character_id) WHERE is_reflected = FALSE;
 -- v3: 排除 fail_count >= 5 的熔断记忆，避免 worker 反复拉取
-CREATE INDEX idx_mem_unmaterialized ON memory_episodes (timestamp)
+-- v4: 排序键改为 next_retry_at NULLS FIRST，worker 直接拉取到期的待重试记忆
+CREATE INDEX idx_mem_unmaterialized ON memory_episodes (next_retry_at NULLS FIRST)
     WHERE materialized = FALSE AND fail_count < 5;
 
 -- 查询时调优（分区后可适当提高，单分区数据量小）
@@ -329,7 +331,8 @@ CREATE TABLE relations (
 CREATE TABLE messages (
     id              UUID PRIMARY KEY DEFAULT uuidv7(),
     conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
-    sender          VARCHAR(20) NOT NULL,                 -- user/character/system
+    sender          VARCHAR(20) NOT NULL
+                    CHECK (sender IN ('user','character','system')),  -- v4 新增：发送方枚举
     content         TEXT NOT NULL,
     tokens          INT,                                  -- LLM token 消耗（成本追踪）
     cost            NUMERIC(10, 6),                       -- 调用费用 USD（Phase 3.5 熔断依赖）
@@ -353,14 +356,16 @@ CREATE TABLE conversations (
     id              UUID PRIMARY KEY DEFAULT uuidv7(),
     character_id    UUID NOT NULL REFERENCES characters(id) ON DELETE CASCADE,
     user_id         VARCHAR(100) NOT NULL,
-    platform        VARCHAR(20) NOT NULL,                 -- web/qq/lark/internal
+    platform        VARCHAR(20) NOT NULL
+                    CHECK (platform IN ('web','qq','lark','internal')),  -- v4 新增：接入平台枚举
     context         JSONB,                                -- LLM 上下文压缩摘要
     last_message_at TIMESTAMPTZ,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()    -- v4 新增，触发器自动维护
 );
 
--- 同一用户对同一角色仅一个会话（ON CONFLICT 依赖此唯一约束）
-CREATE UNIQUE INDEX idx_conv_user_char ON conversations (user_id, character_id);
+-- v4 变更：唯一约束改为 (user_id, platform, character_id)，允许同一用户在不同平台对同一角色各持一会话
+CREATE UNIQUE INDEX idx_conv_user_char ON conversations (user_id, platform, character_id);
 -- 按最后消息时间排序活跃会话
 CREATE INDEX idx_conv_last_msg         ON conversations (last_message_at DESC);
 -- 按 character 查询所有相关会话（角色侧主动分享时使用）
@@ -456,7 +461,7 @@ CREATE INDEX idx_world_tick ON world_snapshots (tick_id);
 | 关联角色反查 | `gin (related_characters)` | 数组成员查询 |
 | 关系图遍历 | `(character_id)` PK + `(target_id)` 查询 | 双向查询（双向关系需两条记录） |
 | 消息会话拉取 | `(conversation_id, created_at)` | 多轮对话上下文 |
-| 消息时间扫描 | `btree (created_at)` | 按月分区裁剪后 B-tree 足够（不使用 BRIN） |
+| 消息时间扫描 | `btree (created_at)` | 非分区单表，B-tree 足够支撑时间范围扫描（不使用 BRIN） |
 
 ### 4.2 索引设计原则
 
@@ -542,14 +547,11 @@ SELECT ... FROM memory_episodes ORDER BY embedding <=> :q_vec LIMIT 10;
 
 ### 6.1 滚动新建分区
 
-`action_records` 与 `messages` 按月分区，需预创建未来 12 个月分区：
+`action_records` 按月分区，需预创建未来 12 个月分区（`messages` 已改为非分区表，无需滚动新建分区）：
 
 ```sql
 -- 示例: 预创建 2026-08 分区
 CREATE TABLE action_records_2026_08 PARTITION OF action_records
-    FOR VALUES FROM ('2026-08-01') TO ('2026-09-01');
-
-CREATE TABLE messages_2026_08 PARTITION OF messages
     FOR VALUES FROM ('2026-08-01') TO ('2026-09-01');
 ```
 
@@ -581,7 +583,7 @@ DROP TABLE action_records_2025_07;
 |----|---------------|---------------|------|
 | `action_records` | ~3 万 | ~1800 万 | 按 30s/Tick, 每角色每 Tick 1 条 |
 | `memory_episodes` | ~3 万 | ~1800 万 | 与 action_records 1:1 |
-| `messages` | 视用户量 | — | 分区表承载 |
+| `messages` | 视用户量 | — | 单表承载（非分区，长期由 Phase 4 冷热分离处理） |
 | `reflections` | ~50 | ~3 万 | 反思稀疏 |
 | `relations` | 稳定 | ~2500 行 | 50 角色两两组合 |
 

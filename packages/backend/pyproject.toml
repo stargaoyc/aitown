@@ -7,6 +7,8 @@ dependencies = [
     # Web 框架
     "fastapi>=0.115",
     "uvicorn[standard]>=0.34",
+    # WebSocket（FastAPI/Starlette 底层实现之一，显式声明避免被移除）
+    "websockets>=13.0",
     # 数据库
     "sqlalchemy[asyncio]>=2.0",
     "alembic>=1.14",
