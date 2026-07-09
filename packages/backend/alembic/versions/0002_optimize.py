@@ -1,6 +1,6 @@
-"""数据库性能与完整性优化（v4）
+"""数据库性能与完整性优化（v6）
 
-基于四轮生产环境审查反馈的系统性改进。
+基于六轮生产环境审查反馈的系统性改进。
 
 致命问题修复：
 1. personality 迁移使用 COALESCE 防御 NULL（原代码 NULL || jsonb = NULL）
@@ -27,6 +27,18 @@
 15. COMMENT ON TABLE/COLUMN 元数据注释
 16. pre_create_partitions() 分区自动预创建函数（收紧异常捕获范围）
 17. downgrade 简化为 raise exception（只升级不降级原则）
+
+v5 修复：
+18. 删除 reflections.related_episodes 废弃字段（已被 reflection_sources 替代）
+
+v6 修复（P0 阻塞性 + P1 健壮性）：
+19. ⚠️ P0: 移除 messages 表覆盖索引创建（0001_init 未建 messages 表，
+    直接 CREATE INDEX 会触发 "relation messages does not exist" 错误，
+    导致整个迁移中断。messages 表+索引+分区统一推迟到 Phase 3）
+20. P1: 添加 statement_timeout=10min + lock_timeout=60s 显式超时保护
+    （防止 memory_episodes 大表 INSERT...SELECT 卡死，超时后事务回滚）
+21. P1: pre_create_partitions() 为 action_records 增加 undefined_table 异常捕获
+    （与 messages 逻辑一致，提升鲁棒性）
 
 Revision ID: 0002_optimize
 Revises: 0001_init
@@ -58,7 +70,22 @@ def upgrade() -> None:
 
     3. 建议在低峰期维护窗口执行，并设置锁超时：
        SET lock_wait_timeout = '30s';
+
+    4. ⚠️ v6 新增：显式超时保护（防止大表 INSERT...SELECT 卡死）
+       - statement_timeout: 防止单条 SQL 执行过久（10 分钟）
+       - lock_timeout: 防止锁等待无限期（60 秒）
+       超时后事务回滚，旧表名自动恢复（Alembic 事务保护）。
     """
+
+    # ============================================================
+    # v6: 显式超时保护（防止 memory_episodes 重建卡死）
+    # ============================================================
+    # Alembic 在单一事务内执行 op.execute()，DDL + INSERT 失败会整体回滚，
+    # 旧表名 memory_episodes 自动恢复。但大表 INSERT...SELECT 可能触发
+    # statement_timeout 或 lock_timeout，回滚本身也需逆向重放 WAL。
+    # 设置合理上限可在故障时快速失败，避免服务长时间不可用。
+    op.execute("SET statement_timeout = '10min';")
+    op.execute("SET lock_timeout = '60s';")
 
     # ============================================================
     # 改进 1+2+5+6: memory_episodes 重建为 HASH 分区（16 分区）
@@ -365,17 +392,14 @@ def upgrade() -> None:
     #
     # 注意：不使用 BRIN 索引。按月范围分区已通过分区裁剪限制扫描范围，
     #       BRIN 在单月千万级以内数据无收益，反而增加写入维护开销。
-    op.execute("""
-        -- messages.user_id 覆盖索引（仅轻量字段）
-        CREATE INDEX idx_msg_user_time_cover
-        ON messages (user_id, created_at DESC)
-        INCLUDE (role, platform);
-
-        -- messages.conversation_id 覆盖索引（仅轻量字段）
-        CREATE INDEX idx_msg_conv_time_cover
-        ON messages (conversation_id, created_at)
-        INCLUDE (role, character_id, platform);
-    """)
+    #
+    # ⚠️ P0 修复（v6）：messages 表的覆盖索引创建已移除。
+    #    0001_init 未创建 messages 表，在此创建索引会触发
+    #    "relation messages does not exist" 错误，导致整个迁移中断。
+    #    messages 表 + 索引 + 分区统一推迟到 Phase 3 消息服务阶段，
+    #    在同一次迁移中完成表与索引的创建，避免表与索引不同步。
+    #    pre_create_partitions() 中的 messages 分区创建已有
+    #    undefined_table 异常捕获，表不存在时安全跳过。
 
     # ============================================================
     # 改进 13: COMMENT ON 元数据注释
@@ -461,11 +485,19 @@ def upgrade() -> None:
                 partition_name := 'action_records_' || to_char(target_month, 'YYYY_MM');
 
                 IF NOT EXISTS (SELECT 1 FROM pg_class WHERE relname = partition_name) THEN
-                    EXECUTE format(
-                        'CREATE TABLE %I PARTITION OF action_records FOR VALUES FROM (%L) TO (%L)',
-                        partition_name, start_date, end_date
-                    );
-                    RAISE NOTICE 'Created partition: %', partition_name;
+                    BEGIN
+                        EXECUTE format(
+                            'CREATE TABLE %I PARTITION OF action_records FOR VALUES FROM (%L) TO (%L)',
+                            partition_name, start_date, end_date
+                        );
+                        RAISE NOTICE 'Created partition: %', partition_name;
+                    EXCEPTION
+                        WHEN undefined_table THEN
+                            RAISE NOTICE 'Table action_records does not exist, skipping partition %', partition_name;
+                        WHEN duplicate_table THEN
+                            RAISE NOTICE 'Partition already exists: %', partition_name;
+                        -- 其他异常直接抛出，不吞掉
+                    END;
                 END IF;
             END LOOP;
 

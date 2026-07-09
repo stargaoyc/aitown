@@ -110,7 +110,7 @@ Phase 5: 前端 Dashboard
 
 ## 五、Phase 2.5：性能与数据完整性优化 🔄 当前
 
-> 基于五轮数据库审查意见的系统性优化。已创建 [0002_optimize.py](../packages/backend/alembic/versions/0002_optimize.py) v4 迁移脚本。
+> 基于六轮数据库审查意见的系统性优化。已创建 [0002_optimize.py](../packages/backend/alembic/versions/0002_optimize.py) v6 迁移脚本。
 
 ### 第一轮审查（v1 → v2）
 
@@ -186,11 +186,26 @@ Phase 5: 前端 Dashboard
 
 > **v5 核心结论**：经核查，ORM 模型与迁移脚本**实际一致**（无运行时风险），不一致主要发生在设计文档与代码之间。采用方案 B（文档对齐代码）而非方案 A（改迁移对齐文档），避免破坏已通过测试的业务逻辑。
 
+### 第六轮审查（v5 → v6）
+
+| # | 问题 | 严重度 | 解决方案 | 状态 |
+|---|------|--------|----------|------|
+| 48 | ⚠️ P0: 0002_optimize 创建 messages 表覆盖索引，但 0001_init 未建 messages 表 → 迁移中断 | P0 | 移除 messages 索引创建，表+索引+分区统一推迟到 Phase 3 | ✅ |
+| 49 | memory_episodes 重建大表 INSERT...SELECT 可能卡死（无超时保护） | P1 | 添加 statement_timeout=10min + lock_timeout=60s 显式超时 | ✅ |
+| 50 | pre_create_partitions() action_records 无 undefined_table 异常捕获（与 messages 不一致） | P1 | 增加 undefined_table + duplicate_table 异常捕获 | ✅ |
+| 51 | world_events 幂等约束 UNIQUE(tick_id, event_type) 粒度过粗？ | — | **非问题**：当前实现每 Tick 每类型仅写 1 条全量事件，约束正确。已在模型 docstring 文档化前提假设 | ✅ |
+| 52 | personality 全表 UPDATE 持有长锁 | — | **过度优化**：仅 50 行角色数据，瞬时完成，无需分批 | ✅ |
+| 53 | 迁移粒度过大（单迁移含 20+ 变更），故障定位困难 | P2 | 标记技术债，未来按职责拆分（当前不拆分，拆分风险高于收益） | ⏳ 技术债 |
+| 54 | 角色删除级联扫描 16 分区开销 | P2 | 16 分区下可接受；64+ 分区需改应用层并行删除 | ⏳ Phase 4+ |
+| 55 | reflection_sources 复合外键在分区表删除时扫描所有子分区 | P2 | 16 分区下可接受；64+ 分区需评估改为软删除+后台清理 | ⏳ Phase 4+ |
+
+> **v6 核心结论**：P0 阻塞性 Bug（messages 表索引）已修复，迁移可正常执行。world_events 幂等约束经核查**非真实问题**（当前实现聚合写入，非逐实体写入），但已文档化前提假设以防未来误改。personality 分批更新在 50 行规模下属过度优化。
+
 ### 新增/修改文件
 
 | 文件 | 说明 |
 |------|------|
-| `alembic/versions/0002_optimize.py` | 数据库优化迁移脚本 v4（v5 增加 reflections.related_episodes 清理） |
+| `alembic/versions/0002_optimize.py` | 数据库优化迁移脚本 v6（v5 增加 related_episodes 清理，v6 修复 messages P0 + 超时保护 + 异常捕获） |
 | `src/db/models/world_event.py` | 世界变更事件模型 |
 | `src/db/models/world_snapshot.py` | 世界快照模型（v3 恢复） |
 | `src/db/models/reflection_source.py` | 反思来源中间表模型（v3 增加复合外键） |
@@ -423,6 +438,8 @@ Phase 5: 前端 Dashboard
 | DEFAULT 分区静默丢数据 | 数据丢失 | 删除前检查数据量（v4 修复） | ✅ 已解决 |
 | 文档与代码脱节导致开发误用 | 业务代码报错 | 方案 B 全文对齐 data-model.md（v5 修复） | ✅ 已解决 |
 | reflections.related_episodes 双写不一致 | 数据脏写 | 删除废弃字段，统一走 reflection_sources（v5 修复） | ✅ 已解决 |
+| messages 表索引在表不存在时创建 → 迁移中断 | 上线即失败 | 移除索引创建，表+索引推迟到 Phase 3（v6 修复） | ✅ 已解决 |
+| memory_episodes 大表重建卡死 | 服务长时间不可用 | 显式 statement_timeout + lock_timeout（v6 修复） | ✅ 已解决 |
 | Redis ↔ PG 不一致 | 状态漂移 | 乐观锁 + 校验任务 | ⏳ Phase 3.5 |
 | LLM 成本失控 | 预算超支 | 日预算 + 熔断降级 | ⏳ Phase 3.5 |
 | 跨角色全局向量检索性能崩塌 | 全局搜索慢 | 额外维护全局非分区向量索引（未来需求） | ⏳ Phase 4+ |
@@ -437,11 +454,11 @@ Phase 5: 前端 Dashboard
 
 ## 十三、下一步行动（Phase 2.5 → Phase 3）
 
-1. **执行 0002_optimize v4 迁移**（需维护窗口，涉及表重建；遵循只升级不降级原则，通过备份兜底）
+1. **执行 0002_optimize v6 迁移**（需维护窗口，涉及表重建；遵循只升级不降级原则，通过备份兜底；已含超时保护）
 2. **集成 EmbeddingWorker 到 lifespan**（后台任务自动启动）
 3. **应用启动时调用 pre_create_partitions()**（预创建未来 3 个月分区）
 4. **编写 Phase 2.5 单元测试**（分区裁剪验证 + worker 并发测试 + 快照恢复测试 + 事件去重测试）
-5. **进入 Phase 3**（消息服务 + MCP Server，含 conversations/messages 表迁移补建）
+5. **进入 Phase 3**（消息服务 + MCP Server，含 conversations/messages 表+索引+分区迁移补建）
 
 ---
 

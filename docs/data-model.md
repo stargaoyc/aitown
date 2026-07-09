@@ -331,8 +331,10 @@ CREATE INDEX idx_msg_conv_time ON messages (conversation_id, created_at);
 CREATE INDEX idx_msg_char_time ON messages (character_id, created_at DESC);
 CREATE INDEX idx_msg_user_time ON messages (user_id, created_at DESC);
 
--- ⚠️ 覆盖索引（0002_optimize）：仅包含轻量字段，content 走主键回表
+-- ⚠️ 覆盖索引：仅包含轻量字段，content 走主键回表
 --    原 INCLUDE(content) 会导致索引膨胀（content 可能 2000 字）
+-- ⚠️ v6: messages 表及索引创建统一推迟到 Phase 3 消息服务阶段
+--    （0001_init 未建 messages 表，0002_optimize 不再创建其索引）
 CREATE INDEX idx_msg_user_time_cover
     ON messages (user_id, created_at DESC) INCLUDE (role, platform);
 CREATE INDEX idx_msg_conv_time_cover

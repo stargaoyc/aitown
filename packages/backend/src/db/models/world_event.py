@@ -7,6 +7,13 @@
 
 幂等性保证：UNIQUE(tick_id, event_type) 约束防止重复写入，
 服务重启 / Tick 重试时自动跳过已存在的事件。
+
+⚠️ 幂等约束适用前提（v6 文档化）：
+当前实现（world_engine.py）每 Tick 每类型仅写入 1 条事件，
+payload 包含该类型的全量状态（如 scene 事件含所有场景状态），
+并非按实体逐条写入。因此 UNIQUE(tick_id, event_type) 粒度正确。
+若未来改为按实体拆分事件（如每个场景单独一条），需新增 event_key
+字段并将约束调整为 UNIQUE(tick_id, event_type, event_key)。
 """
 from datetime import datetime
 from uuid import UUID
