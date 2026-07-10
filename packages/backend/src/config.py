@@ -52,6 +52,11 @@ class Settings(BaseSettings):
     jwt_expire_hours: int = 24
     api_key: str | None = None
 
+    # Cost Control
+    llm_daily_budget_usd: float = 10.0
+    llm_circuit_breaker_threshold: int = 5
+    llm_circuit_breaker_recovery_timeout: int = 60
+
     # World Engine
     world_tick_seconds: int = 30
     world_tick_minutes: int = 10

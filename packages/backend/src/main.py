@@ -24,14 +24,17 @@ from datetime import datetime
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import Depends, FastAPI, HTTPException, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from redis.asyncio import Redis
 from structlog import get_logger
 
 from src.actions import ActionRegistry, register_all
+from src.auth import auth_dependency
 from src.config import settings
 from src.core import WorldEngine
+from src.cost_control.budget_manager import set_budget_manager
+from src.cost_control.circuit_breaker import set_circuit_breaker
 from src.db.repositories import (
     ActionRepository,
     CharacterRepository,
@@ -55,6 +58,7 @@ from src.modules import (
     SceneLoader,
 )
 from src.scheduler import PartitionScheduler
+from src.security.rate_limiter import RateLimiter
 
 # 尝试导入 CharacterTickEngine（可能尚未创建）
 try:
@@ -76,6 +80,7 @@ llm: LLMClient | None = None
 prompts: PromptTemplates | None = None
 embedding_worker: EmbeddingWorker | None = None
 partition_scheduler: PartitionScheduler | None = None
+rate_limiter: RateLimiter | None = None
 
 # WebSocket 连接管理器（单例）- 用于 Web 客户端实时聊天
 ws_manager = WebSocketManager()
@@ -94,7 +99,7 @@ async def lifespan(app: FastAPI):
     """
     global redis, world_engine, character_engine, registry, llm, prompts
     global scene_loader, schedule_system, duration_calculator, movement_system
-    global embedding_worker, partition_scheduler
+    global embedding_worker, partition_scheduler, rate_limiter
 
     logger.info("ai_town_backend_starting")
 
@@ -107,6 +112,20 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error("redis_connection_failed", error=str(e), exc_info=True)
         raise
+
+    # 1.1 初始化成本控制 + 速率限制器（依赖 Redis）
+    set_budget_manager(redis, daily_budget_usd=settings.llm_daily_budget_usd)
+    set_circuit_breaker(
+        redis,
+        failure_threshold=settings.llm_circuit_breaker_threshold,
+        recovery_timeout=settings.llm_circuit_breaker_recovery_timeout,
+    )
+    rate_limiter = RateLimiter(redis)
+    logger.info(
+        "cost_control_initialized",
+        daily_budget=settings.llm_daily_budget_usd,
+        circuit_threshold=settings.llm_circuit_breaker_threshold,
+    )
 
     # 1.5 预创建分区（确保月初写入不报错）
     try:
@@ -324,11 +343,20 @@ async def _character_tick_loop() -> None:
 
 
 # === FastAPI 应用实例 ===
+# /health 和 /ws 端点无需鉴权，所有 /api/v1/ 路由强制鉴权
+async def _api_auth(request: Request) -> dict | None:
+    """条件鉴权：仅 /api/ 路径需要鉴权"""
+    if request.url.path.startswith("/api/"):
+        return await auth_dependency(request)
+    return None
+
+
 app = FastAPI(
     title="AI Town Backend",
     description="二次元 AI 小镇陪伴智能体 - World Engine + LangGraph",
     version="0.1.0",
     lifespan=lifespan,
+    dependencies=[Depends(_api_auth)],
 )
 
 # CORS 中间件
