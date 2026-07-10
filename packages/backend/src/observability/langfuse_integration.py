@@ -93,7 +93,7 @@ def setup_langfuse() -> Langfuse | None:
         return None
 
     try:
-        _langfuse_client = _Langfuse(
+        _langfuse_client = _Langfuse(  # type: ignore[union-attr]
             host=settings.langfuse_host,
             public_key=settings.langfuse_public_key,
             secret_key=settings.langfuse_secret_key,
@@ -232,11 +232,7 @@ def trace_llm_call(name: str) -> Callable[[Callable[..., Awaitable[T]]], Callabl
                         model=model,
                         input=_truncate(prompt),
                         output=None,
-                        usage={
-                            "prompt_tokens": 0,
-                            "completion_tokens": 0,
-                            "total_tokens": 0,
-                        },
+                        usage=None,
                         metadata={
                             "cost_usd": 0.0,
                             "duration_seconds": duration,
@@ -259,11 +255,7 @@ def trace_llm_call(name: str) -> Callable[[Callable[..., Awaitable[T]]], Callabl
                     model=model,
                     input=_truncate(prompt),
                     output=_truncate(response),
-                    usage={
-                        "prompt_tokens": 0,
-                        "completion_tokens": 0,
-                        "total_tokens": tokens,
-                    },
+                    usage=None,
                     metadata={
                         "cost_usd": cost,
                         "duration_seconds": duration,
@@ -314,11 +306,7 @@ def record_llm_trace(
                 model=model,
                 input=_truncate(prompt),
                 output=None,
-                usage={
-                    "prompt_tokens": 0,
-                    "completion_tokens": 0,
-                    "total_tokens": tokens,
-                },
+                usage=None,
                 metadata={
                     "cost_usd": cost,
                     "duration_seconds": duration,
@@ -333,11 +321,7 @@ def record_llm_trace(
                 model=model,
                 input=_truncate(prompt),
                 output=_truncate(response),
-                usage={
-                    "prompt_tokens": 0,
-                    "completion_tokens": 0,
-                    "total_tokens": tokens,
-                },
+                usage=None,
                 metadata={
                     "cost_usd": cost,
                     "duration_seconds": duration,

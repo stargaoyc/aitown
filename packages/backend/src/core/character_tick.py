@@ -14,6 +14,7 @@
 
 import asyncio
 from datetime import datetime, timezone
+from typing import Any
 from uuid import UUID
 
 from redis.asyncio import Redis
@@ -97,7 +98,9 @@ class CharacterTickEngine:
             return
 
         try:
-            async with CharacterTickEngine.SEMAPHORE:
+            semaphore = CharacterTickEngine.SEMAPHORE
+            assert semaphore is not None
+            async with semaphore:
                 await self._execute_tick(character_id)
         finally:
             await self.redis.delete(lock_key)
@@ -166,7 +169,7 @@ class CharacterTickEngine:
 
         # 从 Redis 读取实时状态（缓存优先）
         redis_state = await self.redis.hgetall(f"char:{character_id}:state")
-        state = dict(redis_state) if redis_state else {
+        state: dict[str, Any] = {str(k): v for k, v in redis_state.items()} if redis_state else {
             "location": char_state.location,
             "stamina": char_state.stamina,
             "satiety": char_state.satiety,
@@ -178,7 +181,7 @@ class CharacterTickEngine:
 
         # 确保 state 中的值是正确类型
         for key in ["stamina", "satiety", "mood", "money", "phone_battery", "social_energy"]:
-            if key in state and isinstance(state[key], bytes):
+            if key in state and isinstance(state[key], (bytes, bytearray)):
                 state[key] = int(state[key].decode())
             elif key not in state:
                 # 使用默认值

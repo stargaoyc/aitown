@@ -50,7 +50,7 @@ def add_trace_context(
     if not _OTEL_AVAILABLE:
         return event_dict
 
-    span = _otel_trace.get_current_span()
+    span = _otel_trace.get_current_span()  # type: ignore[union-attr]
     if span is None or not span.is_recording():
         return event_dict
 

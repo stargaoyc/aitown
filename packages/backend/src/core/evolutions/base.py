@@ -46,7 +46,7 @@ class WorldEvolution(ABC):
         if not mapping:
             return
         encoded = {str(k): json.dumps(v, ensure_ascii=False) for k, v in mapping.items()}
-        await redis.hset(key, mapping=encoded)
+        await redis.hset(key, mapping=encoded)  # type: ignore[arg-type]
 
     @staticmethod
     async def hgetall_json(redis: Redis, key: str) -> dict:
@@ -61,7 +61,7 @@ class WorldEvolution(ABC):
             if isinstance(v, bytes):
                 v = v.decode()
             try:
-                result[k] = json.loads(v)
+                result[str(k)] = json.loads(v)
             except (json.JSONDecodeError, TypeError):
-                result[k] = v
+                result[str(k)] = v
         return result

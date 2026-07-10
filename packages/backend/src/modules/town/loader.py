@@ -173,4 +173,4 @@ class SceneLoader:
         """获取场景内的所有角色 ID"""
         chars_key = self.SCENE_CHARACTERS_KEY.format(scene_id=scene_id)
         members = await self.redis.smembers(chars_key)
-        return list(members)
+        return [str(m) for m in members]

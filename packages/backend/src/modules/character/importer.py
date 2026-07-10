@@ -135,7 +135,7 @@ class CharacterImporter:
             "phone_battery": str(state.phone_battery),
             "social_energy": str(state.social_energy),
         }
-        await self.redis.hset(key, mapping=mapping)
+        await self.redis.hset(key, mapping=mapping)  # type: ignore[arg-type]
         logger.debug("Redis 状态缓存已更新: %s", key)
 
     async def import_directory(self, dir_path: str | Path) -> list[Character]:

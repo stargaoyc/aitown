@@ -171,7 +171,7 @@ async def lifespan(app: FastAPI):
     embedding_task: asyncio.Task | None = None
     try:
         embedding_worker = EmbeddingWorker(
-            session_factory=db.session,
+            session_factory=db.session,  # type: ignore[union-attr]
             llm_client=llm,
             batch_size=20,
             poll_interval=5.0,
@@ -887,12 +887,12 @@ async def move_character(character_id: str, to_scene: str, hour: int | None = No
 
     # 获取角色当前位置
     current_state = await redis.hgetall(f"char:{cid}:state")
-    from_scene = current_state.get("location", "home")
+    from_scene = str(current_state.get("location", "home"))
 
     # 获取当前小时（如果未提供）
     if hour is None:
         world_state = await redis.hgetall("world:state")
-        world_time = world_state.get("time", "08:00")
+        world_time = str(world_state.get("time", "08:00"))
         try:
             hour = int(world_time.split(":")[0])
         except (ValueError, IndexError):
@@ -949,7 +949,7 @@ async def get_character_schedule(character_id: str, hour: int | None = None):
 
     if hour is None:
         world_state = await redis.hgetall("world:state") if redis else {}
-        world_time = world_state.get("time", "08:00")
+        world_time = str(world_state.get("time", "08:00"))
         try:
             hour = int(world_time.split(":")[0])
         except (ValueError, IndexError):

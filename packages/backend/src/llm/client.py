@@ -37,7 +37,7 @@ class LLMClient:
         # LangChain ChatOpenAI（用于结构化输出和 Agent）
         self.chat_llm = ChatOpenAI(
             model=settings.model_chat,
-            api_key=settings.openai_api_key,
+            api_key=settings.openai_api_key,  # type: ignore[arg-type]
             base_url=settings.openai_base_url,
             timeout=settings.llm_timeout,
             max_retries=settings.llm_max_retries,
@@ -45,7 +45,7 @@ class LLMClient:
 
         self.strong_llm = ChatOpenAI(
             model=settings.model_strong,
-            api_key=settings.openai_api_key,
+            api_key=settings.openai_api_key,  # type: ignore[arg-type]
             base_url=settings.openai_base_url,
             timeout=settings.llm_timeout,
             max_retries=settings.llm_max_retries,
@@ -53,7 +53,7 @@ class LLMClient:
 
         self.flash_llm = ChatOpenAI(
             model=settings.model_flash,
-            api_key=settings.openai_api_key,
+            api_key=settings.openai_api_key,  # type: ignore[arg-type]
             base_url=settings.openai_base_url,
             timeout=settings.llm_timeout,
             max_retries=settings.llm_max_retries,
@@ -90,8 +90,9 @@ class LLMClient:
         """
         llm = self._get_llm(model)
         response = await llm.ainvoke(prompt)
-        logger.debug("chat_completed", model=model, response_length=len(response.content))
-        return response.content
+        content = response.content
+        logger.debug("chat_completed", model=model, response_length=len(content))
+        return content if isinstance(content, str) else str(content)
 
     async def multimodal_chat(
         self,
@@ -120,16 +121,17 @@ class LLMClient:
             content = [{"type": "text", "text": content}]
 
         # 构建多模态消息
-        message = HumanMessage(content=content)
+        message = HumanMessage(content=content)  # type: ignore[call-overload]
         response = await llm.ainvoke([message])
 
+        resp_content = response.content
         logger.debug(
             "multimodal_chat_completed",
             model=model,
             content_types=[c.get("type", "text") for c in content],
-            response_length=len(response.content)
+            response_length=len(resp_content)
         )
-        return response.content
+        return resp_content if isinstance(resp_content, str) else str(resp_content)
 
     async def structured_output(
         self,
@@ -194,7 +196,7 @@ class LLMClient:
             content = [{"type": "text", "text": content}]
 
         # 构建多模态消息
-        message = HumanMessage(content=content)
+        message = HumanMessage(content=content)  # type: ignore[call-overload]
         result = await structured_llm.ainvoke([message])
 
         logger.debug(

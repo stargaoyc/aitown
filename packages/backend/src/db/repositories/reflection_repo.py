@@ -27,7 +27,7 @@ class ReflectionRepository(BaseRepository[Reflection]):
         logger.info(
             "reflection_created",
             character_id=str(obj.character_id),
-            related_count=len(obj.related_episodes or []),
+            related_count=0,
         )
         return obj
 

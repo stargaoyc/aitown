@@ -25,7 +25,7 @@ class MessageRepository(BaseRepository[Message]):
     def __init__(self, session: AsyncSession):
         super().__init__(session, Message)
 
-    async def add(
+    async def add(  # type: ignore[override]
         self,
         conversation_id: UUID,
         sender: str,

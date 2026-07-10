@@ -168,13 +168,14 @@ class RelationGraph:
         )
         cached = await self.redis.hgetall(key)
         if cached:
+            notes_raw = cached.get("notes")
             return RelationSnapshot(
                 character_id=character_id,
                 target_id=target_id,
-                relationship_type=cached.get("relationship_type", "stranger"),
+                relationship_type=str(cached.get("relationship_type", "stranger")),
                 strength=int(cached.get("strength", 20)),
                 last_interaction_at=None,
-                notes=cached.get("notes"),
+                notes=str(notes_raw) if notes_raw is not None else None,
             )
 
         # Redis 未命中，查 PG

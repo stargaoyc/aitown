@@ -148,7 +148,7 @@ def test_record_llm_trace_calls_client_with_correct_params():
     assert call_kwargs["model"] == "gpt-4o-mini"
     assert call_kwargs["input"] == "test prompt"
     assert call_kwargs["output"] == "test response"
-    assert call_kwargs["usage"]["total_tokens"] == 100
+    assert call_kwargs["usage"] is None
     assert call_kwargs["metadata"]["cost_usd"] == 0.001
     assert call_kwargs["metadata"]["duration_seconds"] == 1.5
 

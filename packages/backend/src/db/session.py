@@ -19,7 +19,7 @@ class DB:
         )
 
     @asynccontextmanager
-    async def session(self) -> AsyncSession:
+    async def session(self):  # type: ignore[misc]
         async with self.session_factory() as s:
             try:
                 yield s

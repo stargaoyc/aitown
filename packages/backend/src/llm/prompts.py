@@ -128,7 +128,7 @@ class PromptTemplates:
 
         return default
 
-    def render(self, name: str, **kwargs: str | int | float) -> str:
+    def render(self, name: str, /, **kwargs: str | int | float) -> str:
         """渲染模板
 
         Args:

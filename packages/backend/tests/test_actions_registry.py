@@ -54,7 +54,7 @@ def test_register_duplicate_overrides():
     reg.register(old)
     reg.register(new)
     assert reg.get("a1") is new
-    assert reg.get("a1").energy_cost == 20
+    assert reg.get("a1").energy_cost == 20  # type: ignore[union-attr]
     # 覆盖后总数仍为 1
     assert len(reg.list_all()) == 1
 

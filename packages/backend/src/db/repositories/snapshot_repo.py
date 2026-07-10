@@ -70,7 +70,7 @@ class WorldEventRepository(BaseRepository[WorldEvent]):
         logger.info(
             "world_events_batch_created",
             count=len(events),
-            inserted=result.rowcount,
+            inserted=result.rowcount,  # type: ignore[attr-defined]
             tick_id=events[0].tick_id if events else None,
         )
 

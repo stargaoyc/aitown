@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import AsyncExitStack
-from typing import AsyncGenerator, Callable
+from typing import AsyncContextManager, Callable
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -24,7 +24,7 @@ from src.llm.client import LLMClient
 logger = structlog.get_logger(__name__)
 
 # 类型别名：异步会话工厂
-SessionFactory = Callable[[], AsyncGenerator[AsyncSession, None]]
+SessionFactory = Callable[[], AsyncContextManager[AsyncSession]]
 
 
 class EmbeddingWorker:
@@ -63,7 +63,7 @@ class EmbeddingWorker:
     async def run(self) -> None:
         """启动 worker 主循环"""
         self._running = True
-        logger.info(
+        logger.info(  # type: ignore[call-arg]
             "embedding_worker_started",
             batch_size=self.batch_size,
             poll_interval=self.poll_interval,
@@ -126,7 +126,7 @@ class EmbeddingWorker:
                     # 检测熔断（fail_count 达到 5 表示刚刚跨过阈值）
                     if episode.fail_count + 1 >= 5:
                         circuit_break_count += 1
-                    logger.error(
+                    logger.error(  # type: ignore[call-arg]
                         "embedding_failed",
                         episode_id=str(episode.id),
                         character_id=str(episode.character_id),
@@ -137,7 +137,7 @@ class EmbeddingWorker:
 
             await session.commit()
 
-            logger.info(
+            logger.info(  # type: ignore[call-arg]
                 "embedding_batch_done",
                 count=len(episodes),
                 success=success_count,
