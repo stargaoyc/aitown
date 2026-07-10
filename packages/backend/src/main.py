@@ -41,6 +41,8 @@ from src.db.repositories import (
     ConversationRepository,
     MemoryRepository,
     MessageRepository,
+    PlanRepository,
+    ReflectionRepository,
     WorldEventRepository,
 )
 from src.db.session import db
@@ -615,6 +617,118 @@ async def get_memories(character_id: str, limit: int = 20):
             for e in episodes
         ],
         "total": len(episodes),
+    }
+
+
+@app.get("/api/v1/characters/{character_id}/reflections")
+async def get_reflections(character_id: str, limit: int = 10):
+    """获取角色反思记录
+
+    Args:
+        character_id: 角色 UUID
+        limit: 返回数量限制（默认 10）
+
+    Returns:
+        角色最近的反思记录（按创建时间倒序）
+    """
+    try:
+        cid = UUID(character_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid UUID format")
+
+    async with db.session() as session:
+        repo = ReflectionRepository(session)
+        reflections = await repo.get_by_character(cid, limit)
+
+    return {
+        "data": [
+            {
+                "id": str(r.id),
+                "content": r.content,
+                "created_at": r.created_at.isoformat(),
+            }
+            for r in reflections
+        ],
+        "total": len(reflections),
+    }
+
+
+@app.get("/api/v1/characters/{character_id}/plans")
+async def get_plans(character_id: str):
+    """获取角色进行中的计划
+
+    Args:
+        character_id: 角色 UUID
+
+    Returns:
+        角色所有 active 状态的计划（按优先级降序）
+    """
+    try:
+        cid = UUID(character_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid UUID format")
+
+    async with db.session() as session:
+        repo = PlanRepository(session)
+        plans = await repo.get_active_plans(cid)
+
+    return {
+        "data": [
+            {
+                "id": str(p.id),
+                "type": p.type,
+                "title": p.title,
+                "description": p.description,
+                "status": p.status,
+                "priority": p.priority,
+                "progress": p.progress,
+                "deadline": p.deadline.isoformat() if p.deadline else None,
+                "created_at": p.created_at.isoformat(),
+                "updated_at": p.updated_at.isoformat() if p.updated_at else None,
+            }
+            for p in plans
+        ],
+        "total": len(plans),
+    }
+
+
+@app.get("/api/v1/characters/{character_id}/actions")
+async def get_action_history(character_id: str, limit: int = 50):
+    """获取角色行为历史
+
+    Args:
+        character_id: 角色 UUID
+        limit: 返回数量限制（默认 50）
+
+    Returns:
+        角色行为时间线（按时间倒序）
+    """
+    try:
+        cid = UUID(character_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid UUID format")
+
+    async with db.session() as session:
+        repo = ActionRepository(session)
+        actions = await repo.get_by_character(cid, limit)
+
+    return {
+        "data": [
+            {
+                "id": str(a.id),
+                "action_id": a.action_id,
+                "action_name": a.action_name,
+                "params": a.params,
+                "reason": a.reason,
+                "result": a.result,
+                "duration_minutes": a.duration_minutes,
+                "location": a.location,
+                "related_characters": a.related_characters,
+                "timestamp": a.timestamp.isoformat(),
+            }
+            for a in actions
+        ],
+        "total": len(actions),
     }
 
 
@@ -1301,4 +1415,232 @@ async def get_message_stats(character_id: str):
             "total_tokens": tokens,
             "total_cost_usd": cost,
         }
+    }
+
+
+# === Phase 3 API：模块与 MCP Server 管理 ===
+
+# MCP Server 配置映射（环境变量 → 服务器元数据）
+_MCP_SERVERS_CONFIG = [
+    {
+        "name": "code-executor",
+        "env_key": "MCP_CODE_SERVER",
+        "default_port": 8001,
+        "type": "self-developed",
+        "tools": ["execute_python", "list_allowed_modules"],
+        "description": "Python 代码沙箱执行（subprocess 隔离 + 模块白名单）",
+    },
+    {
+        "name": "web-search",
+        "env_key": "MCP_SEARCH_SERVER",
+        "default_port": 8002,
+        "type": "community",
+        "tools": ["search", "search_news"],
+        "description": "网络搜索（Tavily API 集成）",
+    },
+    {
+        "name": "weather",
+        "env_key": "MCP_WEATHER_SERVER",
+        "default_port": 8003,
+        "type": "community",
+        "tools": ["get_current_weather", "get_forecast", "get_weather_by_coords"],
+        "description": "天气查询（OpenWeatherMap 集成）",
+    },
+    {
+        "name": "shop-simulator",
+        "env_key": "MCP_SHOP_SERVER",
+        "default_port": 8004,
+        "type": "self-developed",
+        "tools": ["list_items", "get_item_details", "buy_item", "sell_item", "get_shop_categories"],
+        "description": "商店模拟（小镇经济系统，24 件默认商品）",
+    },
+    {
+        "name": "knowledge-base",
+        "env_key": "MCP_KB_SERVER",
+        "default_port": 8005,
+        "type": "self-developed",
+        "tools": ["query_kb", "list_categories"],
+        "description": "小镇设定库查询（世界规则/角色/场景/行动/记忆系统）",
+    },
+    {
+        "name": "character-social",
+        "env_key": "MCP_SOCIAL_SERVER",
+        "default_port": 8006,
+        "type": "self-developed",
+        "tools": ["give_gift", "invite_date", "resolve_conflict"],
+        "description": "角色社交系统（送礼/约会/冲突解决）",
+    },
+]
+
+
+@app.get("/api/v1/mcp/servers")
+async def list_mcp_servers():
+    """列出所有已配置的 MCP Server
+
+    Returns:
+        MCP Server 列表（含连接地址、工具清单、类型）
+    """
+    servers = []
+    for cfg in _MCP_SERVERS_CONFIG:
+        endpoint = getattr(settings, cfg["env_key"].lower(), None)
+        if not endpoint:
+            # 尝试从环境变量读取（settings 中可能未定义该字段）
+            import os
+            endpoint = os.environ.get(cfg["env_key"], f"http://localhost:{cfg['default_port']}")
+
+        servers.append({
+            "name": cfg["name"],
+            "endpoint": endpoint,
+            "type": cfg["type"],
+            "description": cfg["description"],
+            "tools": cfg["tools"],
+            "tool_count": len(cfg["tools"]),
+        })
+
+    return {
+        "data": servers,
+        "total": len(servers),
+    }
+
+
+@app.get("/api/v1/mcp/servers/{server_name}")
+async def get_mcp_server_detail(server_name: str):
+    """获取单个 MCP Server 详情
+
+    Args:
+        server_name: Server 名称
+
+    Returns:
+        Server 详细信息（含工具清单）
+    """
+    cfg = next((c for c in _MCP_SERVERS_CONFIG if c["name"] == server_name), None)
+    if cfg is None:
+        raise HTTPException(status_code=404, detail=f"MCP Server '{server_name}' not found")
+
+    import os
+    endpoint = os.environ.get(cfg["env_key"], f"http://localhost:{cfg['default_port']}")
+
+    return {
+        "name": cfg["name"],
+        "endpoint": endpoint,
+        "type": cfg["type"],
+        "description": cfg["description"],
+        "tools": [
+            {"name": tool_name, "server": cfg["name"]}
+            for tool_name in cfg["tools"]
+        ],
+        "tool_count": len(cfg["tools"]),
+    }
+
+
+@app.get("/api/v1/mcp/tools")
+async def list_all_mcp_tools():
+    """列出所有 MCP Server 提供的工具
+
+    Returns:
+        所有可用工具的扁平列表（含所属 Server）
+    """
+    tools = []
+    for cfg in _MCP_SERVERS_CONFIG:
+        for tool_name in cfg["tools"]:
+            tools.append({
+                "name": tool_name,
+                "server": cfg["name"],
+                "server_type": cfg["type"],
+            })
+
+    return {
+        "data": tools,
+        "total": len(tools),
+    }
+
+
+@app.get("/api/v1/modules")
+async def list_modules():
+    """列出所有系统模块及其运行状态
+
+    Returns:
+        模块列表（含类型、状态、依赖）
+    """
+    modules = [
+        {
+            "name": "world_engine",
+            "type": "core",
+            "status": "running" if world_engine else "stopped",
+            "description": "世界引擎（Tick 演化 + 事件系统）",
+        },
+        {
+            "name": "character_tick",
+            "type": "core",
+            "status": "running" if character_engine else "stopped",
+            "description": "角色 Tick 引擎（五阶段闭环）",
+        },
+        {
+            "name": "action_registry",
+            "type": "core",
+            "status": "running" if registry else "stopped",
+            "description": "Action 注册与执行系统",
+        },
+        {
+            "name": "llm_client",
+            "type": "core",
+            "status": "running" if llm else "stopped",
+            "description": "LLM 客户端（LangChain 集成）",
+        },
+        {
+            "name": "embedding_worker",
+            "type": "background",
+            "status": "running" if embedding_worker and embedding_worker._running else "stopped",
+            "description": "异步 Embedding 生成 Worker",
+        },
+        {
+            "name": "partition_scheduler",
+            "type": "background",
+            "status": "running" if partition_scheduler and partition_scheduler.running else "stopped",
+            "description": "数据库分区预创建调度器",
+        },
+        {
+            "name": "rate_limiter",
+            "type": "security",
+            "status": "running" if rate_limiter else "stopped",
+            "description": "API 速率限制器",
+        },
+        {
+            "name": "scene_loader",
+            "type": "phase2",
+            "status": "running" if scene_loader else "stopped",
+            "description": "小镇场景加载器",
+        },
+        {
+            "name": "schedule_system",
+            "type": "phase2",
+            "status": "running" if schedule_system else "stopped",
+            "description": "角色作息系统",
+        },
+        {
+            "name": "movement_system",
+            "type": "phase2",
+            "status": "running" if movement_system else "stopped",
+            "description": "移动系统（路径规划 + Dijkstra）",
+        },
+        {
+            "name": "duration_calculator",
+            "type": "phase2",
+            "status": "running" if duration_calculator else "stopped",
+            "description": "动态耗时计算器",
+        },
+    ]
+
+    # 计算 MCP Server 模块状态
+    for cfg in _MCP_SERVERS_CONFIG:
+        modules.append({
+            "name": cfg["name"],
+            "type": "mcp",
+            "status": "configured",
+            "description": cfg["description"],
+        })
+
+    return {
+        "data": modules,
+        "total": len(modules),
     }

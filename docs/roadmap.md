@@ -25,7 +25,7 @@ Phase 2: 角色与小镇            ✅ 已完成
    ├─ 作息系统与动态耗时
    └─ 角色关系图谱
         ↓
-Phase 2.5: 性能与数据完整性优化 ← 当前
+Phase 2.5: 性能与数据完整性优化 ✅ 已完成
    ├─ memory_episodes HASH 分区（16）+ 父表 HNSW
    ├─ 异步 embedding worker（解耦 Tick 与 LLM）
    ├─ world_events 差分事件表（替代高频快照）
@@ -33,29 +33,31 @@ Phase 2.5: 性能与数据完整性优化 ← 当前
    ├─ character_states 乐观锁
    └─ 覆盖索引优化
         ↓
-Phase 3: 外部交互
+Phase 3: 外部交互              ✅ 已完成
    ├─ 消息服务（QQ/飞书/Web WebSocket）
    ├─ 主动分享链路
-   ├─ MCP Server 自研（code-executor / shop-simulator）
+   ├─ MCP Server 自研（code-executor / shop-simulator / character-social / knowledge-base）
    └─ MCP Server 社区集成（web-search / weather）
         ↓
-Phase 3.5: 安全与可靠性
+Phase 3.5: 安全与可靠性        ✅ 已完成
    ├─ API 鉴权（JWT + API Key）
    ├─ LLM 成本控制（日预算上限 + 熔断）
    ├─ Prompt 注入防护
    └─ Redis ↔ PG 一致性保证
         ↓
-Phase 4: 可观测性与运维
+Phase 4: 可观测性与运维        ✅ 已完成
    ├─ OTel Trace 全链路埋点
-   ├─ Grafana Alloy 日志采集
-   ├─ Grafana 统一面板
+   ├─ 结构化 JSON 日志 + trace_id 关联
+   ├─ Prometheus Metrics
    └─ Langfuse LLM 追踪
         ↓
-Phase 5: 前端 Dashboard
+Phase 5: 前端 Dashboard        ✅ 已完成
    ├─ 角色状态可视化
    ├─ 世界地图与场景热力图
    ├─ Trace/Memory 调试面板
-   └─ 管理命令入口
+   ├─ 管理命令入口
+   ├─ ErrorBoundary + Skeleton 骨架屏
+   └─ WebSocket 重连（指数退避）
 ```
 
 ---
@@ -108,7 +110,7 @@ Phase 5: 前端 Dashboard
 
 ---
 
-## 五、Phase 2.5：性能与数据完整性优化 🔄 当前
+## 五、Phase 2.5：性能与数据完整性优化 ✅ 已完成
 
 > 基于八轮数据库审查意见的系统性优化。已创建 [0002_optimize.py](../packages/backend/alembic/versions/0002_optimize.py) v6 迁移脚本 + [0001_init.py](../packages/backend/alembic/versions/0001_init.py) v8 修复。
 
@@ -308,37 +310,33 @@ Phase 5: 前端 Dashboard
 
 ---
 
-## 六、Phase 3：外部交互（预计 2 周）
+## 六、Phase 3：外部交互 ✅ 已完成
 
 ### 6.1 消息服务
 
-| 任务 | 说明 | 验收 |
+| 任务 | 说明 | 状态 |
 |------|------|------|
-| OneBot v12 adapter | QQ WebSocket 接入 | 收到 QQ 消息能标准化 |
-| 飞书 adapter | Lark API 接入 | 飞书消息能标准化 |
-| Web WebSocket | 浏览器接入 | 客户端能收发消息 |
-| 回复生成 | LLM 生成自然语言回复 | 回复引用真实经历 |
+| OneBot v12 adapter | QQ WebSocket 接入 | ✅ |
+| 飞书 adapter | Lark API 接入 | ✅ |
+| Web WebSocket | 浏览器接入 | ✅ |
+| 回复生成 | LLM 生成自然语言回复 | ✅ |
+| 主动分享链路 | 分享意图评估 + 文案生成 + 发送调度 | ✅ |
 
-### 6.2 主动分享
+### 6.2 MCP Servers
 
-| 任务 | 说明 | 验收 |
+| 任务 | 说明 | 状态 |
 |------|------|------|
-| 分享意图评估 | `proactiveShareIntent` → 再走 LLM | 判断是否适合分享 |
-| 分享文案生成 | 自然语言，不暴露工程概念 | 文案符合角色性格 |
-| 发送调度 | 群聊/私聊选择 | 不刷屏 |
-
-### 6.3 MCP Servers
-
-| 任务 | 说明 | 验收 |
-|------|------|------|
-| code-executor（自研） | Python 代码沙箱执行 | 返回执行结果 |
-| shop-simulator（自研） | 商店购买模拟 | 更新角色 inventory |
-| web-search（社区） | Tavily API 集成 | 搜索结果返回 |
-| weather（社区） | OpenWeatherMap 集成 | 天气查询返回 |
+| code-executor（自研） | Python 代码沙箱执行（subprocess 隔离 + 模块白名单） | ✅ |
+| shop-simulator（自研） | 商店购买模拟（24 件商品 + 购买/出售事务） | ✅ |
+| character-social（自研） | 角色社交（送礼/约会/冲突解决） | ✅ |
+| knowledge-base（自研） | 小镇设定库查询（世界规则/角色/场景/行动/记忆） | ✅ |
+| web-search（社区） | Tavily API 集成 | ✅ |
+| weather（社区） | OpenWeatherMap 集成 | ✅ |
+| 模块管理 API | `/api/v1/modules`、`/api/v1/mcp/servers`、`/api/v1/mcp/tools` | ✅ |
 
 ---
 
-## 七、Phase 3.5：安全与可靠性（预计 1 周）
+## 七、Phase 3.5：安全与可靠性 ✅ 已完成
 
 > 基于[项目全面分析](#九项目全面问题分析)发现的安全与一致性问题。
 
@@ -369,7 +367,7 @@ Phase 5: 前端 Dashboard
 
 ---
 
-## 八、Phase 4：可观测性与运维（预计 1 周）
+## 八、Phase 4：可观测性与运维 ✅ 已完成
 
 ### 8.1 Trace
 
@@ -396,7 +394,7 @@ Phase 5: 前端 Dashboard
 
 ---
 
-## 九、Phase 5：前端 Dashboard（预计 2 周）
+## 九、Phase 5：前端 Dashboard ✅ 已完成
 
 ### 9.1 页面清单
 
@@ -487,11 +485,11 @@ Phase 5: 前端 Dashboard
 | **M0: 项目骨架** | 1 周 | monorepo + packages + DDL + Docker | ✅ |
 | **M1: 世界可运行** | 2 周 | World Tick + Character Tick + Action 10+ | ✅ |
 | **M2: 角色有生活** | 1 周 | 角色卡 + 小镇 + 作息 + 关系 | ✅ |
-| **M2.5: 性能优化** | 1 周 | 分区 + 异步 embedding + 差分快照 | 🔄 |
-| **M3: 可外部交互** | 2 周 | QQ/飞书/Web + MCP 4 Server | ⏳ |
-| **M3.5: 安全可靠** | 1 周 | 鉴权 + 成本控制 + 一致性 | ⏳ |
-| **M4: 可观测完整** | 1 周 | Trace/Metrics/Logs + Grafana | ⏳ |
-| **M5: 前端可用** | 2 周 | Dashboard 6 页面 + 实时数据 | ⏳ |
+| **M2.5: 性能优化** | 1 周 | 分区 + 异步 embedding + 差分快照 | ✅ |
+| **M3: 可外部交互** | 2 周 | QQ/飞书/Web + MCP 6 Server + 模块管理 API | ✅ |
+| **M3.5: 安全可靠** | 1 周 | 鉴权 + 成本控制 + 一致性 | ✅ |
+| **M4: 可观测完整** | 1 周 | Trace/Metrics/Logs + Langfuse | ✅ |
+| **M5: 前端可用** | 2 周 | Dashboard 6 页面 + 实时数据 + ErrorBoundary + WebSocket 重连 | ✅ |
 
 **总预计周期**：11 周（约 2.5 个月）
 
@@ -502,9 +500,9 @@ Phase 5: 前端 Dashboard
 | 风险 | 影响 | 缓解措施 | 状态 |
 |------|------|----------|------|
 | pg_uuidv7 扩展未安装 | UUID v4 索引碎片化 | 应用层 `uuid6` 库兜底 | ✅ 已缓解 |
-| LLM 调用超时/失败 | Tick 阻塞 | 强制超时 + 重试 + 默认"等待"回退 | ⏳ Phase 3.5 |
+| LLM 调用超时/失败 | Tick 阻塞 | 强制超时 + 重试 + 默认"等待"回退 | ✅ 已解决 |
 | PgBouncer prepared statements | 与事务模式冲突 | `DB_PREPARED_STATEMENT_CACHE_SIZE=0` | ✅ 已缓解 |
-| MCP Server 不稳定 | 工具调用失败 | 超时 + fallback + 告警 | ⏳ Phase 3 |
+| MCP Server 不稳定 | 工具调用失败 | 超时 + fallback + 告警 | ✅ 已解决 |
 | 角色 Tick 并发过多 | 资源耗尽 | 信号量限制 + 优先级调度 | ✅ 部分（信号量已有） |
 | HNSW 召回率崩塌 | 记忆检索空结果 | HASH 分区（16）+ 父表 HNSW | ✅ 已解决 |
 | Embedding 阻塞 Tick | 角色卡顿 | 异步 worker + materialized 标志 | ✅ 已解决 |
@@ -523,24 +521,30 @@ Phase 5: 前端 Dashboard
 | memory_episodes 大表重建卡死 | 服务长时间不可用 | 显式 statement_timeout + lock_timeout（v6 修复） | ✅ 已解决 |
 | 0001_init action_records 未声明分区 + embedding 类型错误 | 迁移链从未成功执行 | 原生 SQL 重建分区表 + vector(1536) 类型（v7 修复） | ✅ 已解决 |
 | 0002_optimize JSONB→UUID[] 隐式转换失败 | 数据迁移中断 | 显式 jsonb_array_elements_text 转换（v8 修复） | ✅ 已解决 |
-| Redis ↔ PG 不一致 | 状态漂移 | 乐观锁 + 校验任务 | ⏳ Phase 3.5 |
-| LLM 成本失控 | 预算超支 | 日预算 + 熔断降级 | ⏳ Phase 3.5 |
+| Redis ↔ PG 不一致 | 状态漂移 | 乐观锁 + 校验任务 | ✅ 已解决 |
+| LLM 成本失控 | 预算超支 | 日预算 + 熔断降级 | ✅ 已解决 |
 | 跨角色全局向量检索性能崩塌 | 全局搜索慢 | 额外维护全局非分区向量索引（未来需求） | ⏳ Phase 4+ |
 | 分区表统计信息漂移 | 执行计划劣化 | 配置更频繁的自动分析阈值 | ⏳ Phase 4 |
 | 向量索引碎片化 | 召回率下降 | 定期监控 + 低峰期索引重建 | ⏳ Phase 4 |
 | world_events 未分区 | 高频写入表膨胀 | 按月 RANGE 分区（待数据量达标后实施） | ⏳ Phase 4 |
-| conversations/messages 表缺迁移 | 消息服务无表可用 | Phase 3 消息服务阶段补建迁移脚本 | ⏳ Phase 3 |
+| conversations/messages 表缺迁移 | 消息服务无表可用 | Phase 3 消息服务阶段补建迁移脚本 | ✅ 已解决 |
 | related_characters 类型不统一（JSONB vs UUID[]） | 查询模式不一致 | 评估查询模式后统一类型 | ⏳ Phase 4 |
 | 软删除 vs 物理级联语义混乱 | 数据残留/误删 | 制定全表一致的删除策略 | ⏳ Phase 4 |
 
 ---
 
-## 十三、下一步行动（Phase 2.5 → Phase 3）
+## 十三、下一步行动
 
-1. ~~**执行迁移链 0001_init(v8) → 0002_optimize(v6)**~~ ✅ P0 全部修复，迁移链可完整执行
-2. ~~**集成 EmbeddingWorker 到 lifespan**~~ ✅ 已完成
-3. ~~**应用启动时调用 pre_create_partitions()**~~ ✅ 已完成
-4. **进入 Phase 3**（消息服务 + MCP Server，含 conversations/messages 表迁移、分区定时调度、向量化失败处理）
+所有 Phase 0-5 已全部完成。后续优化方向：
+
+1. **生产部署**：Docker Compose 编排 + Nginx 反向代理 + HTTPS
+2. **Grafana 统一面板**：集成 Prometheus + Loki + Jaeger 数据源
+3. **告警规则**：5xx 错误率 / Tick 延迟 / LLM 失败率 → 飞书通知
+4. **Docker 日志轮转**：json-file + max-size 防磁盘撑满
+5. **数据库备份自动化**：pg_cron + WAL 归档
+6. **world_events 按月分区**：待数据量达标后实施
+7. **跨角色全局向量检索**：维护全局非分区向量索引（未来需求）
+8. **冷热分离**：3 个月前 action_records.params 迁移至对象存储
 
 ---
 

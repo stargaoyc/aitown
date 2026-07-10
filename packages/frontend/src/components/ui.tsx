@@ -99,3 +99,34 @@ export function ProgressBar({ value, max = 100, color = 'sakura' }: { value: num
     </div>
   );
 }
+
+export function Skeleton({ className = '' }: { className?: string }) {
+  return (
+    <div className={`animate-pulse bg-white/30 rounded-lg ${className}`} />
+  );
+}
+
+export function SkeletonCard() {
+  return (
+    <div className="p-6 rounded-2xl bg-glass-bg backdrop-blur-glass-blur shadow-soft space-y-3">
+      <Skeleton className="h-6 w-1/3" />
+      <Skeleton className="h-4 w-full" />
+      <Skeleton className="h-4 w-2/3" />
+      <div className="flex gap-4 mt-4">
+        <Skeleton className="h-20 w-20 rounded-xl" />
+        <Skeleton className="h-20 w-20 rounded-xl" />
+        <Skeleton className="h-20 w-20 rounded-xl" />
+      </div>
+    </div>
+  );
+}
+
+export function SkeletonList({ count = 3 }: { count?: number }) {
+  return (
+    <div className="space-y-4">
+      {Array.from({ length: count }).map((_, i) => (
+        <SkeletonCard key={i} />
+      ))}
+    </div>
+  );
+}

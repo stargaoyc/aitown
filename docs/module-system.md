@@ -244,14 +244,14 @@ tool_node = ToolNode(tools)
 
 ### 4.2 自研 MCP Server 清单
 
-需自研的 Server 集中在 `packages/mcp-servers/`：
+已自研的 Server 集中在 `packages/mcp-servers/`：
 
-| Server | 端口 | 工具 | 说明 |
-|--------|------|------|------|
-| `code-executor` | 8001 | `run_python`, `run_javascript` | 沙箱代码执行（Docker 隔离） |
-| `shop-simulator` | 8004 | `buy_item`, `list_items`, `get_inventory` | 商店模拟（小镇经济系统） |
-| `character-social` | 8006 | `give_gift`, `invite_date`, `resolve_conflict` | 角色社交（业务专属） |
-| `knowledge-base` | 8005 | `query_kb` | 小镇设定库（若社区方案不满足） |
+| Server | 端口 | 工具 | 说明 | 状态 |
+|--------|------|------|------|------|
+| `code-executor` | 8001 | `execute_python`, `list_allowed_modules` | 沙箱代码执行（subprocess 隔离 + 模块白名单） | ✅ |
+| `shop-simulator` | 8004 | `list_items`, `get_item_details`, `buy_item`, `sell_item`, `get_shop_categories` | 商店模拟（24 件商品 + 购买/出售事务） | ✅ |
+| `character-social` | 8006 | `give_gift`, `invite_date`, `resolve_conflict` | 角色社交（送礼/约会/冲突解决） | ✅ |
+| `knowledge-base` | 8005 | `query_kb`, `list_categories` | 小镇设定库（世界规则/角色/场景/行动/记忆系统） | ✅ |
 
 ### 4.3 社区 MCP Server 接入
 
@@ -285,15 +285,14 @@ mcp:
 
 ## 五、管理 API
 
-| 端点 | 方法 | 说明 |
-|------|------|------|
-| `/api/v1/modules` | GET / POST | 模块列表 / 注册 |
-| `/api/v1/modules/{name}` | GET / PUT / DELETE | 模块详情 / 更新 / 卸载 |
-| `/api/v1/modules/{name}/enable` | POST | 启用模块 |
-| `/api/v1/modules/{name}/disable` | POST | 禁用模块 |
-| `/api/v1/modules/{name}/health` | GET | 模块健康检查 |
-| `/api/v1/mcp/servers` | GET / POST | MCP Server 管理 |
-| `/api/v1/mcp/tools` | GET | 所有可用工具列表 |
+已实现的管理 API 端点：
+
+| 端点 | 方法 | 说明 | 状态 |
+|------|------|------|------|
+| `/api/v1/modules` | GET | 模块列表（含运行状态） | ✅ |
+| `/api/v1/mcp/servers` | GET | MCP Server 列表（含工具清单） | ✅ |
+| `/api/v1/mcp/servers/{name}` | GET | 单个 MCP Server 详情 | ✅ |
+| `/api/v1/mcp/tools` | GET | 所有可用工具列表 | ✅ |
 
 详细请求/响应见 [API设计文档](api-spec.md)。
 
