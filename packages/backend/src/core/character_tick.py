@@ -64,11 +64,6 @@ class CharacterTickEngine:
         self.llm = llm
         self.prompts = prompts
 
-        # 初始化服务（延迟初始化，需要 db session）
-        self.episode_service: EpisodeService | None = None
-        self.retrieval_service: RetrievalService | None = None
-        self.reflection_service: ReflectionService | None = None
-
         # 初始化并发信号量（类级别共享）
         if CharacterTickEngine.SEMAPHORE is None:
             CharacterTickEngine.SEMAPHORE = asyncio.Semaphore(
@@ -196,11 +191,14 @@ class CharacterTickEngine:
             if isinstance(value, bytes):
                 world[key] = value.decode()
 
-        # 检索相关记忆
+        # 检索相关记忆（需要 db session 创建 RetrievalService）
         query = f"角色{character.name}当前在{state.get('location')}，最近在做什么"
-        memories = await self._get_retrieval_service().search(
-            character_id, query, top_k=10
-        )
+        async with db.session() as session:
+            mem_repo = MemoryRepository(session)
+            retrieval_service = RetrievalService(self.llm, mem_repo)
+            memories = await retrieval_service.search(
+                character_id, query, top_k=10
+            )
 
         return {
             "character": character,
@@ -209,21 +207,6 @@ class CharacterTickEngine:
             "memories": memories,
             "plans": plans,
         }
-
-    def _get_episode_service(self) -> EpisodeService:
-        """获取记忆片段服务（延迟初始化）"""
-        if self.episode_service is None:
-            # EpisodeService 需要 LLMClient 和 MemoryRepository
-            # 这里需要在 db session 中使用
-            raise RuntimeError("EpisodeService 需要 db session")
-        return self.episode_service
-
-    def _get_retrieval_service(self) -> RetrievalService:
-        """获取记忆检索服务（延迟初始化）"""
-        if self.retrieval_service is None:
-            # RetrievalService 需要 LLMClient 和 MemoryRepository
-            raise RuntimeError("RetrievalService 需要 db session")
-        return self.retrieval_service
 
     async def _decide(
         self, character_id: UUID, context: dict, candidates: list[Action]

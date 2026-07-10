@@ -117,13 +117,13 @@ def setup_tracing(app: FastAPI) -> None:
 
     # Exporter + SpanProcessor
     if settings.otel_endpoint is None:
-        # 开发环境：输出到控制台
-        exporter = ConsoleSpanExporter()  # type: ignore[union-attr]
+        # 未配置 OTLP endpoint，禁用 tracing（不使用 ConsoleSpanExporter 避免污染控制台）
         logger.info(
-            "otel_tracing_console_exporter",
-            service_name=settings.otel_service_name,
-            sampler_rate=settings.otel_traces_sampler_rate,
+            "otel_tracing_disabled",
+            message="OTEL_EXPORTER_OTLP_ENDPOINT not configured, tracing disabled",
         )
+        _initialized = True
+        return
     else:
         # 生产环境：OTLP HTTP
         exporter = OTLPSpanExporter(endpoint=settings.otel_endpoint)  # type: ignore[union-attr]

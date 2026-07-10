@@ -375,10 +375,15 @@ async def _character_tick_loop() -> None:
 # === FastAPI 应用实例 ===
 # /health 和 /ws 端点无需鉴权，所有 /api/v1/ 路由强制鉴权
 async def _api_auth(request: Request) -> dict | None:
-    """条件鉴权：仅 /api/ 路径需要鉴权（登录接口豁免）"""
-    if request.url.path.startswith("/api/"):
-        if request.url.path == "/api/v1/auth/login":
-            return None
+    """条件鉴权：仅 /api/ 路径需要鉴权（登录接口豁免）
+
+    WebSocket 路径跳过鉴权（Request 依赖在 WebSocket 上下文中不可用）。
+    """
+    path = request.url.path
+    # WebSocket 路径和登录接口跳过鉴权
+    if path.startswith("/ws/") or path == "/api/v1/auth/login":
+        return None
+    if path.startswith("/api/"):
         return await auth_dependency(request)
     return None
 
@@ -388,7 +393,6 @@ app = FastAPI(
     description="二次元 AI 小镇陪伴智能体 - World Engine + LangGraph",
     version="0.1.0",
     lifespan=lifespan,
-    dependencies=[Depends(_api_auth)],
 )
 
 # CORS 中间件
@@ -399,6 +403,73 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# 鉴权中间件（ASGI 层面，兼容 WebSocket）
+from starlette.types import ASGIApp, Receive, Scope, Send
+
+
+class AuthMiddleware:
+    """ASGI 鉴权中间件：仅 /api/ 路径需要鉴权，WebSocket 和其他路径豁免"""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            # WebSocket / lifespan 直接透传
+            await self.app(scope, receive, send)
+            return
+
+        path = scope.get("path", "")
+        # 豁免：非 /api/ 路径、登录接口
+        if not path.startswith("/api/") or path == "/api/v1/auth/login":
+            await self.app(scope, receive, send)
+            return
+
+        # 从 headers 中提取 Authorization
+        headers = dict(scope.get("headers", []))
+        auth_header = headers.get(b"authorization", b"").decode()
+        api_key_header = headers.get(b"x-api-key", b"").decode()
+
+        # 验证 JWT 或 API Key
+        from src.auth import verify_token, _validate_api_key
+
+        authenticated = False
+        if auth_header.startswith("Bearer "):
+            token = auth_header[7:]
+            try:
+                verify_token(token)
+                authenticated = True
+            except Exception:
+                pass
+        elif api_key_header and _validate_api_key(api_key_header):
+            authenticated = True
+
+        if not authenticated:
+            # 返回 401
+            await _send_401(send)
+            return
+
+        await self.app(scope, receive, send)
+
+
+async def _send_401(send: Send) -> None:
+    body = b'{"detail":"Not authenticated"}'
+    await send({
+        "type": "http.response.start",
+        "status": 401,
+        "headers": [
+            [b"content-type", b"application/json"],
+            [b"content-length", str(len(body)).encode()],
+        ],
+    })
+    await send({
+        "type": "http.response.body",
+        "body": body,
+    })
+
+
+app.add_middleware(AuthMiddleware)
 
 # 注册 WebSocket 路由（/ws/chat/{character_id}）
 app.include_router(ws_router)

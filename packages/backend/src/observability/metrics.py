@@ -21,8 +21,8 @@ import time
 
 from fastapi import FastAPI
 from prometheus_client import Counter, Gauge, Histogram, make_asgi_app
-from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
+from starlette.types import ASGIApp, Receive, Scope, Send
 from structlog import get_logger
 
 logger = get_logger(__name__)
@@ -141,23 +141,39 @@ HTTP_REQUEST_TOTAL = Counter(
 )
 
 
-class PrometheusMiddleware(BaseHTTPMiddleware):
-    """ASGI 中间件：记录 HTTP 请求耗时、状态码、路径"""
+class PrometheusMiddleware:
+    """纯 ASGI 中间件：记录 HTTP 请求耗时、状态码、路径
 
-    async def dispatch(self, request: Request, call_next):  # type: ignore[no-untyped-def]
+    使用纯 ASGI 实现（而非 BaseHTTPMiddleware），兼容 WebSocket 连接。
+    WebSocket 请求（scope["type"] == "websocket"）直接透传，不记录指标。
+    """
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            # WebSocket / lifespan 等非 HTTP 请求直接透传
+            await self.app(scope, receive, send)
+            return
+
         start_time = time.perf_counter()
         status_code = 500
+
+        async def send_with_status(message: dict) -> None:
+            nonlocal status_code
+            if message["type"] == "http.response.start":
+                status_code = message.get("status", 500)
+            await send(message)
+
         try:
-            response = await call_next(request)
-            status_code = response.status_code
-            return response
+            await self.app(scope, receive, send_with_status)
         except Exception:
-            status_code = 500
             raise
         finally:
             duration = time.perf_counter() - start_time
-            method = request.method
-            path = request.url.path
+            method = scope.get("method", "UNKNOWN")
+            path = scope.get("path", "/")
             HTTP_REQUEST_DURATION.labels(
                 method=method, path=path, status=status_code
             ).observe(duration)
