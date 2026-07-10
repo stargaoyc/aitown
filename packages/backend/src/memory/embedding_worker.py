@@ -11,17 +11,17 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 from contextlib import AsyncExitStack
 from typing import AsyncGenerator, Callable
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
+import structlog
 
 from src.db.repositories.memory_repo import MemoryRepository
 from src.llm.client import LLMClient
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # 类型别名：异步会话工厂
 SessionFactory = Callable[[], AsyncGenerator[AsyncSession, None]]

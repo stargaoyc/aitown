@@ -90,12 +90,13 @@ def setup_logging(log_level: str = "info", log_format: str = "json") -> None:
     ]
 
     # structlog 配置：完整 processor chain 含 renderer，直接输出到 stderr
+    # cache_logger_on_first_use=False 确保模块导入时的 logger 在 setup_logging 后使用最新配置
     structlog.configure(
         processors=shared_processors + [renderer],
         wrapper_class=structlog.make_filtering_bound_logger(level_num),
         logger_factory=structlog.PrintLoggerFactory(file=sys.stderr),
         context_class=dict,
-        cache_logger_on_first_use=True,
+        cache_logger_on_first_use=False,
     )
 
     # 标准库 logging handler 也使用 structlog 渲染

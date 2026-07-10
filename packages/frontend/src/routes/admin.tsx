@@ -26,8 +26,8 @@ function AdminPage() {
                 <div className="text-sm text-twilight-400">World Engine</div>
                 <div className="mt-1">
                   <StatusBadge
-                    status={status.world_engine === 'running' ? 'ok' : 'error'}
-                    label={status.world_engine}
+                    status={status.world_engine.running ? 'ok' : 'error'}
+                    label={status.world_engine.running ? '运行中' : '停止'}
                   />
                 </div>
               </div>
@@ -35,8 +35,8 @@ function AdminPage() {
                 <div className="text-sm text-twilight-400">Character Engine</div>
                 <div className="mt-1">
                   <StatusBadge
-                    status={status.character_engine === 'available' ? 'ok' : 'idle'}
-                    label={status.character_engine}
+                    status={status.character_engine.available ? 'ok' : 'idle'}
+                    label={status.character_engine.available ? '可用' : '未启动'}
                   />
                 </div>
               </div>
@@ -45,11 +45,11 @@ function AdminPage() {
                 <div className="mt-1">
                   <StatusBadge
                     status={status.redis === 'connected' ? 'ok' : 'error'}
-                    label={status.redis}
+                    label={status.redis === 'connected' ? '已连接' : '断开'}
                   />
                 </div>
               </div>
-              <StatCard title="Tick ID" value={`#${status.tick_id}`} icon="⏱️" />
+              <StatCard title="Tick ID" value={`#${status.world_engine.tick_id}`} icon="⏱️" />
             </div>
           </GlassCard>
 

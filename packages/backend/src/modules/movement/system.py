@@ -4,13 +4,13 @@
 """
 from __future__ import annotations
 
-import logging
+import structlog
 from dataclasses import dataclass
 from typing import Any
 
 from src.modules.town.loader import SceneLoader
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 @dataclass(frozen=True)

@@ -94,10 +94,11 @@ export interface Conversation {
 }
 
 export interface AdminStatus {
-  world_engine: string;
-  character_engine: string;
   redis: string;
-  tick_id: number;
+  world_engine: { running: boolean; tick_id: number; is_leader: boolean };
+  character_engine: { available: boolean; tick_interval: number };
+  action_registry: { initialized: boolean; action_count: number };
+  llm: { initialized: boolean; model: string };
 }
 
 export interface Scene {
