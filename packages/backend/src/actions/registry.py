@@ -53,6 +53,16 @@ class ActionRegistry:
         Returns:
             满足前置条件、场景匹配且资源充足的 Action 列表。
         """
+        # Redis/JSON 反序列化后数值字段可能为字符串，统一转为 int
+        _NUMERIC_FIELDS = {
+            "stamina", "satiety", "social_energy", "phone_battery", "money",
+            "energy", "hunger",
+        }
+        state = {
+            k: int(v) if k in _NUMERIC_FIELDS and isinstance(v, (str, float)) else v
+            for k, v in state.items()
+        }
+
         current_scene = scene if scene is not None else state.get("location")
         candidates: list[Action] = []
 

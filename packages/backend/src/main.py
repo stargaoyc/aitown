@@ -241,8 +241,10 @@ async def lifespan(app: FastAPI):
     try:
         scene_loader = SceneLoader(redis)
         # 尝试加载场景配置（文件可能不存在）
-        scenes_path = Path("configs/scenes.yaml")
-        map_path = Path("configs/world-map.yaml")
+        # 使用项目根目录定位配置文件（运行目录为 packages/backend/）
+        project_root = Path(__file__).resolve().parents[3]
+        scenes_path = project_root / "configs" / "scenes.yaml"
+        map_path = project_root / "configs" / "world-map.yaml"
         if scenes_path.exists() and map_path.exists():
             await scene_loader.load_from_files(scenes_path, map_path)
             logger.info("scene_loader_initialized", scenes=len(scene_loader.get_all_scenes()))
@@ -456,13 +458,14 @@ class AuthMiddleware:
         api_key_header = headers.get(b"x-api-key", b"").decode()
 
         # 验证 JWT 或 API Key
-        from src.auth import verify_token, _validate_api_key
+        from src.auth import decode_token
+        from src.auth.middleware import _validate_api_key
 
         authenticated = False
         if auth_header.startswith("Bearer "):
             token = auth_header[7:]
             try:
-                verify_token(token)
+                decode_token(token)
                 authenticated = True
             except Exception:
                 pass
