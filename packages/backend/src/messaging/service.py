@@ -424,7 +424,7 @@ class MessageService:
                 f"请将以下 {character.name} 与用户的对话历史压缩为一段简洁的摘要（200字以内），"
                 f"保留关键事件、角色情绪变化与用户偏好：\n\n{history_text}"
             )
-            summary = await self.llm.chat(compress_prompt, model="flash")
+            summary = await self.llm.chat(compress_prompt, model="chat")
 
             # 写入压缩后的 context
             existing_context = conversation.context or {}

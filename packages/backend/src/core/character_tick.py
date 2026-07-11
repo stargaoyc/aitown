@@ -298,7 +298,7 @@ class CharacterTickEngine:
         }
 
         # 调用 LLM
-        result = await self.llm.structured_output(prompt, schema, model="strong")
+        result = await self.llm.structured_output(prompt, schema, model="chat")
 
         # 验证 Action ID 合法性
         action_id = result.get("action", "wait")

@@ -100,7 +100,7 @@ class ReflectionService:
                     }
                 }
             },
-            model="strong",
+            model="chat",
         )
 
         # 构建反思内容
