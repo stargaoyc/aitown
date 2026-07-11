@@ -307,13 +307,23 @@ class CharacterTickEngine:
             logger.warn("invalid_action", action=action_id, fallback="wait")
             action_id = "wait" if "wait" in valid_action_ids else valid_action_ids[0]
 
+        # 防御性处理 LLM 返回值类型
+        raw_plan_changes = result.get("planChanges", [])
+        plan_changes = [
+            pc if isinstance(pc, dict) else {"description": str(pc)}
+            for pc in raw_plan_changes
+        ]
+
+        raw_share_intent = result.get("proactiveShareIntent", False)
+        proactive_share_intent = bool(raw_share_intent) if raw_share_intent is not None else False
+
         return DecisionResult(
             action=action_id,
             reason=result.get("reason", ""),
-            params=result.get("params", {}),
+            params=result.get("params") or {},
             duration=result.get("duration"),
-            plan_changes=result.get("planChanges", []),
-            proactive_share_intent=result.get("proactiveShareIntent", False),
+            plan_changes=plan_changes,
+            proactive_share_intent=proactive_share_intent,
         )
 
     async def _execute_action(

@@ -417,6 +417,16 @@ class OneBotAdapter:
             "params": params,
         }
 
+        # 发送前检查 WebSocket 连接是否仍然存活
+        if onebot_ws.client_state != WebSocketState.CONNECTED:
+            logger.warning(
+                "onebot_send_ws_disconnected",
+                event_type=event_type,
+                user_id=user_id,
+                group_id=group_id,
+            )
+            return
+
         try:
             await onebot_ws.send_text(json.dumps(action, ensure_ascii=False))
             logger.info(
@@ -425,6 +435,14 @@ class OneBotAdapter:
                 user_id=user_id,
                 group_id=group_id,
                 message_length=len(message),
+            )
+        except RuntimeError as e:
+            # WebSocket 已关闭（处理 LLM 回复期间连接断开）
+            logger.warning(
+                "onebot_send_ws_closed",
+                event_type=event_type,
+                user_id=user_id,
+                error=str(e),
             )
         except Exception as e:
             logger.error(
