@@ -88,7 +88,7 @@ services:
       - aitown-net
 
   jaeger:
-    image: jaegertracing/all-in-one:1.60
+    image: jaegertracing/all-in-one:latest
     container_name: aitown-jaeger
     restart: unless-stopped
     environment:
@@ -96,7 +96,7 @@ services:
       TZ: Asia/Shanghai
     ports:
       - "16686:16686"   # Jaeger UI
-      - "4318:4318"     # OTLP HTTP
+      - "14318:4318"     # OTLP HTTP
     networks:
       - aitown-net
 
