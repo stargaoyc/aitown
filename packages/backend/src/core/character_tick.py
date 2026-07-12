@@ -128,6 +128,12 @@ class CharacterTickEngine:
         # 3. LLM 决策
         decision = await self._decide(character_id, context, candidates)
 
+        # 3.5 MCP 工具调用（如果 LLM 决定使用工具）
+        if decision.action == "use_tool":
+            tool_result = await self._execute_mcp_tool(character_id, decision, context)
+            # 工具调用后，继续执行一个默认 Action（如 wait）
+            decision.action = "wait"
+
         # 4. 执行 Action
         await self._execute_action(character_id, decision, context)
 
@@ -287,6 +293,14 @@ class CharacterTickEngine:
             for a in candidates
         ])
 
+        # 构建 MCP 工具列表文本（角色可调用外部工具获取信息）
+        try:
+            from src.mcp import MCPClient
+            mcp_client = MCPClient()
+            mcp_tools_text = mcp_client.format_tools_for_prompt()
+        except Exception:
+            mcp_tools_text = "（MCP 工具不可用）"
+
         # 构建记忆文本
         memories_text = "\n".join([
             m.get("content", str(m)) if isinstance(m, dict) else str(m)
@@ -315,6 +329,15 @@ class CharacterTickEngine:
             memories=memories_text,
             plans=plans_text,
             candidates=candidates_text,
+        )
+
+        # 追加 MCP 工具信息到 Prompt
+        prompt += (
+            f"\n\n[可用工具（MCP）]\n"
+            f"你可以在行动中使用以下工具获取信息或执行操作：\n"
+            f"{mcp_tools_text}\n"
+            f"如需使用工具，在 action 字段填写 \"use_tool\"，"
+            f"在 params 中填写 tool_name（如 \"weather.get_current_weather\"）和 tool_args（参数字典）。"
         )
 
         # 定义决策结果 schema
@@ -370,6 +393,83 @@ class CharacterTickEngine:
             plan_changes=plan_changes,
             proactive_share_intent=proactive_share_intent,
         )
+
+    async def _execute_mcp_tool(
+        self, character_id: UUID, decision: DecisionResult, context: dict
+    ) -> dict | None:
+        """执行 MCP 工具调用
+
+        当 LLM 决定使用工具时，通过 MCPClient 调用对应 MCP Server，
+        将工具结果存入角色记忆，供后续决策使用。
+
+        Args:
+            character_id: 角色 ID
+            decision: 决策结果（params 中包含 tool_name 和 tool_args）
+            context: 感知环境结果
+
+        Returns:
+            工具返回结果字典，失败时返回 None
+        """
+        from src.mcp import MCPClient
+
+        tool_name = decision.params.get("tool_name", "")
+        tool_args = decision.params.get("tool_args", {})
+
+        if not tool_name:
+            logger.warning("mcp_tool_call_no_tool_name", character_id=str(character_id))
+            return None
+
+        character = context["character"]
+        logger.info(
+            "mcp_tool_call_start",
+            character_id=str(character_id),
+            character_name=character.name,
+            tool_name=tool_name,
+            tool_args=tool_args,
+        )
+
+        client = MCPClient()
+        result = await client.call_tool_by_full_name(tool_name, tool_args)
+
+        if result.get("success"):
+            logger.info(
+                "mcp_tool_call_success",
+                character_id=str(character_id),
+                tool_name=tool_name,
+                result_preview=str(result.get("result", ""))[:200],
+            )
+
+            # 将工具结果存入角色记忆
+            try:
+                async with db.session() as session:
+                    mem_repo = MemoryRepository(session)
+                    episode_service = EpisodeService(self.llm, mem_repo)
+                    await episode_service.create_episode(
+                        character_id,
+                        f"[工具调用] {tool_name}({tool_args}) → {str(result.get('result', ''))[:500]}",
+                        action_id="use_tool",
+                        location=context["state"].get("location"),
+                        importance=7,
+                        character_name=character.name,
+                        reason=f"使用工具 {tool_name}",
+                        mood=context["state"].get("mood"),
+                    )
+                    await session.commit()
+            except Exception as e:
+                logger.warning(
+                    "mcp_tool_memory_save_failed",
+                    character_id=str(character_id),
+                    error=str(e),
+                )
+        else:
+            logger.warning(
+                "mcp_tool_call_failed",
+                character_id=str(character_id),
+                tool_name=tool_name,
+                error=result.get("error"),
+            )
+
+        return result
 
     async def _execute_action(
         self, character_id: UUID, decision: DecisionResult, context: dict

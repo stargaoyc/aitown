@@ -126,6 +126,8 @@ function VectorSearchPage() {
           title="向量检索测试"
           subtitle="测试角色的记忆检索能力，基于语义相似度匹配"
           icon="🔍"
+          backTo="/admin"
+          backLabel="返回管理"
         />
 
         {/* 检索控制面板 */}

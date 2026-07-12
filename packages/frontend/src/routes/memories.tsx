@@ -118,6 +118,8 @@ function MemoriesPage() {
           title="记忆时间线"
           subtitle="浏览角色记忆，按重要性与内容筛选"
           icon="🧠"
+          backTo="/admin"
+          backLabel="返回管理"
         />
 
         {/* 顶部统计 */}

@@ -147,6 +147,8 @@ function MetricsPage() {
           title="Prometheus 指标面板"
           subtitle="实时监控小镇运行指标（每 5 秒刷新）"
           icon="📈"
+          backTo="/admin"
+          backLabel="返回管理"
         />
 
         {/* 最后更新时间 */}

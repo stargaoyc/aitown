@@ -134,6 +134,8 @@ function PlansPage() {
           title="规划系统"
           subtitle="角色的目标规划与执行进度"
           icon="📋"
+          backTo="/admin"
+          backLabel="返回管理"
         />
 
         {/* 顶部统计 */}

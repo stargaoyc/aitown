@@ -110,6 +110,8 @@ function RelationshipsPage() {
           title="关系图谱"
           subtitle="角色社交网络与亲密度可视化"
           icon="🔗"
+          backTo="/admin"
+          backLabel="返回管理"
         />
 
         {/* 顶部统计 */}

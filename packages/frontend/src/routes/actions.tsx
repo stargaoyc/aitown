@@ -185,6 +185,8 @@ function ActionsPage() {
           title="角色行为日志"
           subtitle="角色执行的行为记录与结果详情"
           icon="📝"
+          backTo="/admin"
+          backLabel="返回管理"
         />
 
         {/* 顶部统计 */}

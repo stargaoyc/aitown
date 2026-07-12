@@ -106,6 +106,8 @@ function ReflectionsPage() {
           title="反思查看器"
           subtitle="角色的自我反思与认知沉淀记录"
           icon="💭"
+          backTo="/admin"
+          backLabel="返回管理"
         />
 
         {/* 顶部统计 */}

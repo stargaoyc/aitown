@@ -359,10 +359,14 @@ export function PageHeader({
   title,
   subtitle,
   icon,
+  backTo,
+  backLabel,
 }: {
   title: string;
   subtitle?: string;
   icon?: string;
+  backTo?: string;
+  backLabel?: string;
 }) {
   return (
     <motion.div
@@ -371,6 +375,20 @@ export function PageHeader({
       transition={{ duration: 0.5 }}
       className="mb-6"
     >
+      {backTo && (
+        <Link
+          to={backTo}
+          className="inline-flex items-center gap-1.5 text-sm text-twilight-400 hover:text-sakura-600 transition-colors mb-3 group"
+        >
+          <motion.span
+            whileHover={{ x: -3 }}
+            className="inline-block"
+          >
+            ←
+          </motion.span>
+          {backLabel || "返回"}
+        </Link>
+      )}
       <h1 className="text-2xl md:text-3xl font-bold gradient-text flex items-center gap-3">
         {icon && (
           <motion.span

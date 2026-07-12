@@ -155,6 +155,8 @@ function SnapshotsPage() {
           title="世界快照管理"
           subtitle="世界状态的完整快照记录，每 1000 Tick 自动创建一次"
           icon="📸"
+          backTo="/admin"
+          backLabel="返回管理"
         />
 
         {/* 顶部统计 */}

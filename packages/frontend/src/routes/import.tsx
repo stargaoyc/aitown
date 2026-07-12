@@ -129,6 +129,8 @@ function ImportPage() {
           title="角色导入"
           subtitle="通过 YAML 角色卡导入新角色到小镇"
           icon="📥"
+          backTo="/admin"
+          backLabel="返回管理"
         />
 
         {/* 操作按钮区 */}

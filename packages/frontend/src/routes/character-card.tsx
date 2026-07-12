@@ -180,6 +180,8 @@ function CharacterCardPage() {
           title="角色卡预览"
           subtitle="查看角色卡 YAML 格式与可视化卡片"
           icon="🎴"
+          backTo="/admin"
+          backLabel="返回管理"
         />
 
         {/* 角色选择器 */}

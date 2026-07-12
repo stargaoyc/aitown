@@ -67,6 +67,8 @@ function SharesPage() {
           title="主动分享历史"
           subtitle="角色在 Tick 中自主决定分享的内容记录"
           icon="📤"
+          backTo="/admin"
+          backLabel="返回管理"
         />
 
         {/* 顶部统计 */}

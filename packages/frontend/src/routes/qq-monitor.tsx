@@ -73,6 +73,8 @@ function QqMonitorPage() {
           title="QQ 消息监控"
           subtitle="实时查看 OneBot 通道消息流（每 10 秒自动刷新）"
           icon="💬"
+          backTo="/admin"
+          backLabel="返回管理"
         />
 
         {/* 顶部统计栏 */}

@@ -132,6 +132,8 @@ function ConversationsPage() {
           title="会话管理"
           subtitle="查看所有角色与用户的对话会话"
           icon="🗨️"
+          backTo="/admin"
+          backLabel="返回管理"
         />
 
         {/* 顶部统计 */}

@@ -120,6 +120,8 @@ function ComparePage() {
           title="多角色对比"
           subtitle="并排对比多个角色的基本信息、状态与行为"
           icon="🔄"
+          backTo="/admin"
+          backLabel="返回管理"
         />
 
         {/* 顶部统计 */}

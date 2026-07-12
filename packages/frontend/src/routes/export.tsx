@@ -157,6 +157,8 @@ function ExportPage() {
           title="聊天记录导出"
           subtitle="导出角色对话记录为 JSON 或 Markdown 文件"
           icon="📦"
+          backTo="/admin"
+          backLabel="返回管理"
         />
 
         {/* 角色选择与格式选择 */}

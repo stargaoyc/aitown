@@ -212,6 +212,8 @@ function EventsPage() {
           title="世界事件时间线"
           subtitle="按 Tick 聚合的世界事件流"
           icon="⏱️"
+          backTo="/admin"
+          backLabel="返回管理"
         />
 
         {/* 顶部统计 */}

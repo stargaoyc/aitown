@@ -139,6 +139,8 @@ function StateChartsPage() {
           title="角色状态图表"
           subtitle="实时可视化角色精力、饱腹、社交精力与手机电量的变化趋势"
           icon="📊"
+          backTo="/admin"
+          backLabel="返回管理"
         />
 
         {/* 角色选择器 */}

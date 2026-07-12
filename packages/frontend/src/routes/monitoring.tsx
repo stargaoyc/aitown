@@ -146,6 +146,8 @@ function MonitoringPage() {
         title="系统监控"
         subtitle="集成 Prometheus 指标与系统日志（每 5 秒自动刷新）"
         icon="📡"
+        backTo="/admin"
+        backLabel="返回管理"
       />
 
       {/* 状态总览条 */}

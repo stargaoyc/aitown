@@ -76,8 +76,21 @@ class WorldEngine:
         创建两个并发任务：
         1. Leader Election 循环：竞争锁、续租
         2. World Tick 循环：推进世界状态
+
+        启动时从 Redis 恢复上次的 tick_id，避免重启后归零。
         """
-        logger.info("world_engine_starting")
+        # 从 Redis 恢复上次的 tick_id
+        try:
+            last_tick = await self.redis.hget("world:state", "tick_id")
+            if last_tick:
+                self.tick_id = int(last_tick)
+                logger.info("world_engine_tick_id_restored", tick_id=self.tick_id)
+            else:
+                logger.info("world_engine_starting_no_previous_tick")
+        except Exception as e:
+            logger.warning("world_engine_tick_id_restore_failed", error=str(e))
+
+        logger.info("world_engine_starting", tick_id=self.tick_id)
         self._leader_task = asyncio.create_task(self._leader_loop())
         self._tick_task = asyncio.create_task(self._tick_loop())
 

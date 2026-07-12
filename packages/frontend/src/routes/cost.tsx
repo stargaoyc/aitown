@@ -89,6 +89,8 @@ function CostPage() {
           title="LLM 成本仪表盘"
           subtitle="消息量、Token 消耗与成本分析"
           icon="💰"
+          backTo="/admin"
+          backLabel="返回管理"
         />
 
         {isLoading && <LoadingSpinner text="正在加载统计数据..." />}
