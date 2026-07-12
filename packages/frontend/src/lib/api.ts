@@ -284,6 +284,30 @@ export const api = {
   // MCP 服务器
   getMcpServers: () => request<{ data: McpServerEntry[] }>("/mcp/servers"),
   getMcpTools: () => request<{ data: McpToolEntry[] }>("/mcp/tools"),
+  getMcpServersHealth: () =>
+    request<{
+      data: Array<{
+        name: string;
+        endpoint: string;
+        status: "online" | "offline";
+        latency_ms: number;
+        http_status: number | null;
+      }>;
+      total: number;
+      online: number;
+      offline: number;
+    }>("/mcp/servers/health"),
+  invokeMcpTool: (toolName: string, serverName: string, args: Record<string, unknown>) =>
+    request<{
+      success: boolean;
+      status_code?: number;
+      result?: unknown;
+      error?: string;
+      endpoint: string;
+    }>(`/mcp/tools/${toolName}/invoke?server_name=${serverName}`, {
+      method: "POST",
+      body: JSON.stringify(args),
+    }),
 
   // 系统日志
   getLogs: (lines = 100, level?: string) => {
@@ -299,6 +323,63 @@ export const api = {
   // 详细指标
   getDetailedMetrics: () =>
     request<{ data: DetailedMetrics }>("/admin/metrics-detail"),
+
+  // 运行时配置
+  getConfig: () =>
+    request<{
+      data: Array<{
+        key: string;
+        label: string;
+        type: string;
+        default: unknown;
+        current: unknown;
+        overridden: boolean;
+      }>;
+      total: number;
+    }>("/admin/config"),
+  updateConfig: (updates: Record<string, unknown>) =>
+    request<{ success: boolean; updated: number; data: unknown[] }>(
+      "/admin/config",
+      { method: "PUT", body: JSON.stringify(updates) },
+    ),
+  resetConfig: (key: string) =>
+    request<{ success: boolean; key: string; reset_to: unknown }>(
+      `/admin/config/${key}`,
+      { method: "DELETE" },
+    ),
+
+  // 通知中心
+  getNotifications: (limit = 50, unreadOnly = false) => {
+    const qs = new URLSearchParams({
+      limit: String(limit),
+      unread_only: String(unreadOnly),
+    }).toString();
+    return request<{
+      data: AppNotification[];
+      total: number;
+      unread: number;
+    }>(`/notifications?${qs}`);
+  },
+  createNotification: (type: string, title: string, content: string) =>
+    request<{ data: AppNotification }>("/notifications", {
+      method: "POST",
+      body: JSON.stringify({ type, title, content }),
+    }),
+  markNotificationRead: (id: string) =>
+    request<{ success: boolean; id: string }>(`/notifications/${id}/read`, {
+      method: "PUT",
+    }),
+  markAllNotificationsRead: () =>
+    request<{ success: boolean; updated: number }>(
+      "/notifications/read-all",
+      { method: "PUT" },
+    ),
+  deleteNotification: (id: string) =>
+    request<{ success: boolean; id: string }>(`/notifications/${id}`, {
+      method: "DELETE",
+    }),
+  clearAllNotifications: () =>
+    request<{ success: boolean }>("/notifications", { method: "DELETE" }),
 };
 
 // ===== 扩展类型定义 =====
@@ -387,6 +468,9 @@ export interface OnebotMessageEntry {
 export interface ShareEntry {
   message_id: string;
   conversation_id: string;
+  character_id?: string;
+  character_name?: string;
+  share_id?: string;
   sender: string;
   content: string;
   tokens?: number;
@@ -446,6 +530,15 @@ export interface LogEntry {
   level?: string;
   event?: string;
   [key: string]: unknown;
+}
+
+export interface AppNotification {
+  id: string;
+  type: string;
+  title: string;
+  content: string;
+  created_at: string;
+  read: boolean;
 }
 
 export interface DetailedMetrics {

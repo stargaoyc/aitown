@@ -26,6 +26,7 @@ from uuid import UUID
 
 from structlog import get_logger
 
+from src.config import settings
 from src.db.models import ActionRecord, Character, CharacterState
 from sqlalchemy import select, desc, func
 from src.db.repositories import (
@@ -37,12 +38,6 @@ from src.llm import LLMClient, PromptTemplates
 
 logger = get_logger(__name__)
 
-
-# 分享冷却时间（秒）：同一角色对同一用户的最小分享间隔
-SHARE_COOLDOWN_SECONDS = 1800  # 30 分钟
-
-# 单角色每日最大主动分享次数（防刷屏）
-DAILY_SHARE_LIMIT = 8
 
 # 触发分享的 Action 类型白名单（仅这些 action 完成后评估分享意图)
 SHAREABLE_ACTION_IDS = {
@@ -146,7 +141,7 @@ class ProactiveSharingService:
             return {"shared": False, "reason": "cooldown_active", "content": None, "recipients": 0}
 
         daily_count = await self._get_today_share_count(character_id)
-        if daily_count >= DAILY_SHARE_LIMIT:
+        if daily_count >= settings.share_daily_limit:
             return {"shared": False, "reason": "daily_limit_reached", "content": None, "recipients": 0}
 
         # 4. 生成分享文案
@@ -198,7 +193,7 @@ class ProactiveSharingService:
 
         # 日常分享也检查日限额（但不检查 action 触发冷却）
         daily_count = await self._get_today_share_count(character_id)
-        if daily_count >= DAILY_SHARE_LIMIT:
+        if daily_count >= settings.share_daily_limit:
             return {"shared": False, "reason": "daily_limit_reached", "content": None, "recipients": 0}
 
         content = await self._generate_routine_content(character, state, routine_type)
@@ -230,34 +225,34 @@ class ProactiveSharingService:
         """评估分享意图（本地规则 + 概率控制）
 
         基于 action 类型、情绪状态、随机概率的综合判断。
-        不是每次 shareable action 都分享，加入随机性使行为更自然。
+        概率值从配置读取，可通过环境变量或前端动态调整。
 
         Returns:
             (should_share, reason)
         """
         import random
 
-        # 规则 1：特定 Action 完成时分享（60% 概率，避免每次都分享）
+        # 规则 1：特定 Action 完成时分享（概率从配置读取）
         if action and action.action_id in SHAREABLE_ACTION_IDS:
-            if random.random() < 0.6:
+            if random.random() < settings.share_probability_action:
                 return True, f"action_{action.action_id}"
             return False, f"action_{action.action_id}_skip"
 
-        # 规则 2：强烈情绪时分享（50% 概率）
+        # 规则 2：强烈情绪时分享（概率从配置读取）
         if state.mood and state.mood in SHAREABLE_MOODS:
-            if random.random() < 0.5:
+            if random.random() < settings.share_probability_mood:
                 return True, f"mood_{state.mood}"
             return False, f"mood_{state.mood}_skip"
 
-        # 规则 3：位置变化时偶尔分享（20% 概率）
+        # 规则 3：位置变化时偶尔分享（概率从配置读取）
         if action and action.action_id == "move":
-            if random.random() < 0.2:
+            if random.random() < settings.share_probability_location:
                 return True, "location_change"
             return False, "location_change_skip"
 
-        # 规则 4：日常行为偶尔分享（15% 概率）
+        # 规则 4：日常行为偶尔分享（概率从配置读取）
         if action and action.action_id in ("read_book", "play_game", "relax", "use_phone"):
-            if random.random() < 0.15:
+            if random.random() < settings.share_probability_routine:
                 return True, f"routine_{action.action_id}"
             return False, f"routine_{action.action_id}_skip"
 
@@ -265,22 +260,21 @@ class ProactiveSharingService:
         return False, "no_trigger"
 
     async def _check_cooldown(self, character_id: UUID) -> bool:
-        """检查分享冷却（基于最近一条 character 消息时间）
+        """检查分享冷却（基于最近一次分享的 share_id 时间）
 
-        简化实现：查询该角色最近一次主动分享消息的时间，
+        按 share_id 去重，避免一次分享投递给多个用户导致冷却误判。
         若距现在不足 SHARE_COOLDOWN_SECONDS 则冷却中。
-
-        完整实现应使用 Redis 缓存冷却状态，此处用 DB 查询近似。
         """
         from datetime import timedelta
+        from sqlalchemy import text as sql_text
 
         from src.db.models import Message, Conversation
 
-        cutoff = datetime.now(timezone.utc) - timedelta(seconds=SHARE_COOLDOWN_SECONDS)
+        cutoff = datetime.now(timezone.utc) - timedelta(seconds=settings.share_cooldown_seconds)
 
-        # 查询该角色最近一次主动分享消息（sender=character 且 extra_data 含 share 标记）
+        # 按 share_id 去重查询最近一次分享时间
         stmt = (
-            select(Message.created_at)
+            select(func.max(Message.created_at))
             .join(Conversation, Conversation.id == Message.conversation_id)
             .where(
                 Conversation.character_id == character_id,
@@ -288,8 +282,6 @@ class ProactiveSharingService:
                 Message.created_at >= cutoff,
                 Message.extra_data["share_type"].astext.isnot(None),
             )
-            .order_by(desc(Message.created_at))
-            .limit(1)
         )
         result = await self.session.execute(stmt)
         last_share = result.scalar_one_or_none()
@@ -298,7 +290,7 @@ class ProactiveSharingService:
         return last_share is None
 
     async def _get_today_share_count(self, character_id: UUID) -> int:
-        """获取今日该角色的主动分享次数"""
+        """获取今日该角色的主动分享次数（按 share_id 去重）"""
         from datetime import datetime, timezone
 
         from src.db.models import Message, Conversation
@@ -308,8 +300,9 @@ class ProactiveSharingService:
             hour=0, minute=0, second=0, microsecond=0
         )
 
+        # 按 share_id 去重计数（一次分享投递给多个用户只算一次）
         stmt = (
-            select(func.count())
+            select(func.count(func.distinct(Message.extra_data["share_id"].astext)))
             .select_from(Message)
             .join(Conversation, Conversation.id == Message.conversation_id)
             .where(
@@ -449,6 +442,7 @@ class ProactiveSharingService:
 
         - 写入 messages 表（sender=character, extra_data.share_type 标记）
         - 通过 WebSocketManager 实时推送（若可用）
+        - 同一次分享的所有投递共享同一个 share_id，便于去重展示
 
         Returns:
             推送的用户数
@@ -462,18 +456,22 @@ class ProactiveSharingService:
         if not conversations:
             return 0
 
+        from uuid import uuid4
+        share_id = str(uuid4())  # 同一次分享的唯一 ID，所有投递共享
         now = datetime.now(timezone.utc)
         delivered = 0
 
         for conv in conversations:
             try:
-                # 写入消息（标记为主动分享）
+                # 写入消息（标记为主动分享，带 share_id 便于去重）
                 await self.message_repo.add(
                     conversation_id=conv.id,
                     sender="character",
                     content=content,
                     extra_data={
                         "share_type": "proactive",
+                        "share_id": share_id,
+                        "character_id": str(character_id),
                         "character_name": character.name,
                         "sent_at": now.isoformat(),
                     },
@@ -499,6 +497,22 @@ class ProactiveSharingService:
                             user_id=conv.user_id,
                             error=str(ws_err),
                         )
+
+                # 创建通知中心记录
+                try:
+                    from src.main import _create_notification
+                    await _create_notification(
+                        user_id=conv.user_id,
+                        notif_type="share",
+                        title=f"{character.name} 向你分享了动态",
+                        content=content[:200],
+                    )
+                except Exception as notif_err:
+                    logger.debug(
+                        "notification_create_failed",
+                        user_id=conv.user_id,
+                        error=str(notif_err),
+                    )
 
                 delivered += 1
             except Exception as e:

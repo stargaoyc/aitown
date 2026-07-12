@@ -138,11 +138,11 @@ function SharesPage() {
                       {/* 头部信息 */}
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-xs font-semibold text-sakura-600">
-                          角色分享
+                          {share.character_name || "角色分享"}
                         </span>
-                        {share.conversation_id && (
+                        {share.character_id && (
                           <span className="text-xs text-twilight-400 px-1.5 py-0.5 rounded-lg bg-white/50">
-                            {share.conversation_id}
+                            {share.character_id.slice(0, 8)}
                           </span>
                         )}
                       </div>

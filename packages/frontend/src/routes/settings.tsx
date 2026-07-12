@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { motion } from "framer-motion";
+import { useState, useEffect } from "react";
 import {
   Settings as SettingsIcon,
   Cpu,
@@ -11,6 +12,9 @@ import {
   Lock,
   Activity,
   Boxes,
+  Sliders,
+  RotateCcw,
+  Save,
 } from "lucide-react";
 import {
   GlassCard,
@@ -26,7 +30,11 @@ import {
   useModules,
   useMcpServers,
   useMcpTools,
+  useMcpServersHealth,
   useHealth,
+  useConfig,
+  useUpdateConfig,
+  useResetConfig,
 } from "@/lib/queries";
 
 export const Route = createFileRoute("/settings")({
@@ -65,10 +73,56 @@ function SettingsPage() {
   const { data: modulesData, isLoading: modulesLoading, error: modulesError } = useModules();
   const { data: mcpServersData, isLoading: serversLoading, error: serversError } = useMcpServers();
   const { data: mcpToolsData, isLoading: toolsLoading, error: toolsError } = useMcpTools();
+  const { data: healthData } = useMcpServersHealth();
+  const { data: configData } = useConfig();
+  const updateConfig = useUpdateConfig();
+  const resetConfig = useResetConfig();
+
+  const configItems = configData?.data ?? [];
+  const [editValues, setEditValues] = useState<Record<string, unknown>>({});
+  const [hasEdits, setHasEdits] = useState(false);
+
+  // 同步配置项到编辑状态
+  useEffect(() => {
+    if (configItems.length > 0 && !hasEdits) {
+      const vals: Record<string, unknown> = {};
+      configItems.forEach((item) => {
+        vals[item.key] = item.current;
+      });
+      setEditValues(vals);
+    }
+  }, [configItems, hasEdits]);
+
+  const handleSaveConfig = () => {
+    // 只提交有变化的项
+    const updates: Record<string, unknown> = {};
+    configItems.forEach((item) => {
+      if (editValues[item.key] !== item.current) {
+        updates[item.key] = editValues[item.key];
+      }
+    });
+    if (Object.keys(updates).length === 0) return;
+    updateConfig.mutate(updates, {
+      onSuccess: () => {
+        setHasEdits(false);
+      },
+    });
+  };
+
+  const handleResetConfig = (key: string) => {
+    resetConfig.mutate(key, {
+      onSuccess: () => {
+        setHasEdits(false);
+      },
+    });
+  };
 
   const modules = modulesData?.data ?? [];
   const mcpServers = mcpServersData?.data ?? [];
   const mcpTools = mcpToolsData?.data ?? [];
+  const healthMap = new Map(
+    (healthData?.data ?? []).map((h) => [h.name, h]),
+  );
 
   return (
       <div className="space-y-6 animate-fade-in-up">
@@ -341,10 +395,24 @@ function SettingsPage() {
         <motion.div variants={container} initial="hidden" animate="show">
           <motion.div variants={item}>
             <GlassCard hover={false}>
-              <h3 className="font-semibold text-sakura-600 mb-4 flex items-center gap-2 text-lg">
-                <Server className="w-5 h-5" />
-                MCP 服务器
-              </h3>
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <h3 className="font-semibold text-sakura-600 flex items-center gap-2 text-lg">
+                  <Server className="w-5 h-5" />
+                  MCP 服务器
+                </h3>
+                {healthData && (
+                  <div className="flex items-center gap-3 text-xs">
+                    <span className="flex items-center gap-1 text-emerald-600">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                      在线 {healthData.online}
+                    </span>
+                    <span className="flex items-center gap-1 text-red-500">
+                      <span className="w-2 h-2 rounded-full bg-red-500" />
+                      离线 {healthData.offline}
+                    </span>
+                  </div>
+                )}
+              </div>
               {serversError && <ErrorDisplay error={serversError} />}
               {serversLoading && !serversError && (
                 <LoadingSpinner text="正在加载 MCP 服务器..." />
@@ -358,13 +426,16 @@ function SettingsPage() {
               )}
               {mcpServers.length > 0 && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {mcpServers.map((srv, idx) => (
+                  {mcpServers.map((srv, idx) => {
+                    const health = healthMap.get(srv.name);
+                    const isOnline = health?.status === "online";
+                    return (
                     <div
                       key={`${srv.name}-${idx}`}
                       className="p-3 rounded-xl bg-white/40 border border-white/30 flex items-start gap-3"
                     >
-                      <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-soft-100 to-twilight-100 flex items-center justify-center shrink-0">
-                        <Server className="w-4 h-4 text-sky-soft-500" />
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${isOnline ? "bg-gradient-to-br from-emerald-100 to-sky-soft-100" : "bg-gradient-to-br from-gray-100 to-gray-200"}`}>
+                        <Server className={`w-4 h-4 ${isOnline ? "text-emerald-500" : "text-gray-400"}`} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -374,19 +445,21 @@ function SettingsPage() {
                           <span className="text-xs text-twilight-300 px-1.5 py-0.5 rounded bg-white/50">
                             {srv.type}
                           </span>
-                          {srv.status && (
-                            <StatusBadge
-                              status={mapModuleStatus(srv.status)}
-                              label={srv.status}
-                            />
-                          )}
+                          <StatusBadge
+                            status={isOnline ? "ok" : "error"}
+                            label={isOnline ? `在线 ${health?.latency_ms ?? 0}ms` : "离线"}
+                          />
                         </div>
                         <p className="text-xs text-twilight-400 mt-1 break-words">
                           {srv.description || "无描述"}
                         </p>
+                        <p className="text-xs text-twilight-300 mt-1 font-mono truncate">
+                          {health?.endpoint ?? "—"}
+                        </p>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </GlassCard>
@@ -438,6 +511,149 @@ function SettingsPage() {
                     </div>
                   ))}
                 </div>
+              )}
+            </GlassCard>
+          </motion.div>
+        </motion.div>
+
+        {/* 运行时配置编辑器 */}
+        <motion.div variants={container} initial="hidden" animate="show">
+          <motion.div variants={item}>
+            <GlassCard hover={false}>
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <h3 className="font-semibold text-sakura-600 flex items-center gap-2 text-lg">
+                  <Sliders className="w-5 h-5" />
+                  运行时配置
+                </h3>
+                <div className="flex items-center gap-2">
+                  {hasEdits && (
+                    <span className="text-xs text-amber-600 flex items-center gap-1">
+                      <Activity className="w-3 h-3" />
+                      有未保存的修改
+                    </span>
+                  )}
+                  <button
+                    onClick={handleSaveConfig}
+                    disabled={!hasEdits || updateConfig.isPending}
+                    className={`px-4 py-1.5 rounded-xl text-xs font-medium flex items-center gap-1.5 transition-all ${
+                      hasEdits && !updateConfig.isPending
+                        ? "bg-sakura-100 text-sakura-600 hover:bg-sakura-200 shadow-sm"
+                        : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                    }`}
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    {updateConfig.isPending ? "保存中..." : "保存配置"}
+                  </button>
+                </div>
+              </div>
+              <p className="text-xs text-twilight-400 mb-4">
+                修改后点击保存即可生效，无需重启服务。环境变量值为默认值，Redis 覆盖值为当前运行值。
+              </p>
+              {configItems.length > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {configItems.map((item) => {
+                    const isOverridden = item.overridden;
+                    const isChanged = editValues[item.key] !== item.current;
+                    return (
+                      <div
+                        key={item.key}
+                        className={`p-3 rounded-xl border transition-all ${
+                          isChanged
+                            ? "bg-amber-50/60 border-amber-200/50"
+                            : "bg-white/40 border-white/30"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-twilight-600">
+                              {item.label}
+                            </span>
+                            {isOverridden && (
+                              <span className="text-xs text-sakura-500 px-1.5 py-0.5 rounded bg-sakura-50">
+                                已覆盖
+                              </span>
+                            )}
+                          </div>
+                          {isOverridden && (
+                            <button
+                              onClick={() => handleResetConfig(item.key)}
+                              disabled={resetConfig.isPending}
+                              className="text-xs text-twilight-400 hover:text-sakura-500 flex items-center gap-1 transition-colors"
+                              title="重置为默认值"
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                              重置
+                            </button>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {item.type === "bool" ? (
+                            <button
+                              onClick={() => {
+                                setEditValues((prev) => ({
+                                  ...prev,
+                                  [item.key]: !prev[item.key],
+                                }));
+                                setHasEdits(true);
+                              }}
+                              className={`relative w-12 h-6 rounded-full transition-colors ${
+                                editValues[item.key] ? "bg-sakura-400" : "bg-gray-300"
+                              }`}
+                            >
+                              <span
+                                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${
+                                  editValues[item.key] ? "translate-x-6" : ""
+                                }`}
+                              />
+                            </button>
+                          ) : item.type === "float" || item.type === "int" ? (
+                            <input
+                              type="number"
+                              step={item.type === "float" ? "0.01" : "1"}
+                              value={String(editValues[item.key] ?? "")}
+                              onChange={(e) => {
+                                const val = item.type === "float"
+                                  ? parseFloat(e.target.value)
+                                  : parseInt(e.target.value, 10);
+                                setEditValues((prev) => ({
+                                  ...prev,
+                                  [item.key]: isNaN(val) ? 0 : val,
+                                }));
+                                setHasEdits(true);
+                              }}
+                              className="flex-1 px-3 py-1.5 rounded-lg bg-white/60 border border-sakura-200/40 text-twilight-600 text-sm focus:outline-none focus:ring-2 focus:ring-sakura-400/30"
+                            />
+                          ) : (
+                            <input
+                              type="text"
+                              value={String(editValues[item.key] ?? "")}
+                              onChange={(e) => {
+                                setEditValues((prev) => ({
+                                  ...prev,
+                                  [item.key]: e.target.value,
+                                }));
+                                setHasEdits(true);
+                              }}
+                              className="flex-1 px-3 py-1.5 rounded-lg bg-white/60 border border-sakura-200/40 text-twilight-600 text-sm focus:outline-none focus:ring-2 focus:ring-sakura-400/30"
+                            />
+                          )}
+                          <span className="text-xs text-twilight-300 font-mono shrink-0">
+                            默认: {String(item.default)}
+                          </span>
+                        </div>
+                        <div className="text-xs text-twilight-300 mt-1 font-mono">
+                          {item.key}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {configItems.length === 0 && (
+                <LoadingSpinner text="正在加载配置..." />
+              )}
+              {updateConfig.isError && (
+                <ErrorDisplay error={updateConfig.error as Error} />
               )}
             </GlassCard>
           </motion.div>

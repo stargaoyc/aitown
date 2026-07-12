@@ -20,7 +20,7 @@ API 路由：
 
 import asyncio
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID
 
@@ -30,8 +30,8 @@ from redis.asyncio import Redis
 from structlog import get_logger
 
 from src.actions import ActionRegistry, register_all
-from src.auth import auth_dependency, create_token
-from src.config import settings
+from src.auth import auth_dependency, create_token, get_current_user
+from src.config import settings, Settings
 from src.core import WorldEngine
 from src.cost_control.budget_manager import set_budget_manager
 from src.cost_control.circuit_breaker import set_circuit_breaker
@@ -133,6 +133,22 @@ async def lifespan(app: FastAPI):
         from src.observability.metrics import REDIS_CONNECTED
         REDIS_CONNECTED.set(0)
         raise
+
+    # 1.2 加载运行时配置覆盖（从 Redis 读取，覆盖 settings 对象）
+    try:
+        import json
+        raw_overrides = await redis.get("config:overrides")
+        if raw_overrides:
+            overrides = json.loads(raw_overrides) if isinstance(raw_overrides, str) else json.loads(raw_overrides.decode())
+            applied = 0
+            for key, value in overrides.items():
+                if hasattr(settings, key):
+                    setattr(settings, key, value)
+                    applied += 1
+            if applied > 0:
+                logger.info("runtime_config_overrides_loaded", count=applied, keys=list(overrides.keys()))
+    except Exception as e:
+        logger.warning("runtime_config_override_load_failed", error=str(e))
 
     # 1.1 初始化成本控制 + 速率限制器（依赖 Redis）
     set_budget_manager(redis, daily_budget_usd=settings.llm_daily_budget_usd)
@@ -1846,6 +1862,9 @@ async def get_mcp_server_detail(server_name: str):
     Returns:
         Server 详细信息（含工具清单）
     """
+    # 健康检查特殊路由（避免被 {server_name} 捕获）
+    if server_name == "health":
+        return await check_mcp_servers_health_impl()
     cfg = next((c for c in _MCP_SERVERS_CONFIG if c["name"] == server_name), None)
     if cfg is None:
         raise HTTPException(status_code=404, detail=f"MCP Server '{server_name}' not found")
@@ -1886,6 +1905,132 @@ async def list_all_mcp_tools():
         "data": tools,
         "total": len(tools),
     }
+
+
+@app.get("/api/v1/mcp/servers/health")
+async def check_mcp_servers_health():
+    """检查所有 MCP Server 的健康状态（路由入口）"""
+    return await check_mcp_servers_health_impl()
+
+
+async def check_mcp_servers_health_impl():
+    """检查所有 MCP Server 的健康状态（实现）
+
+    对每个配置的 MCP Server 发起 HTTP 连接检测，
+    返回在线/离线状态及响应延迟。
+
+    Returns:
+        各 Server 的健康状态列表
+    """
+    import os
+    import asyncio
+    import httpx
+
+    async def check_one(cfg: dict) -> dict:
+        endpoint = os.environ.get(cfg["env_key"], f"http://localhost:{cfg['default_port']}")
+        start = asyncio.get_event_loop().time()
+        try:
+            async with httpx.AsyncClient(timeout=3.0) as client:
+                # 尝试连接 SSE 端点（FastMCP 默认 SSE 路径 /sse）
+                resp = await client.get(f"{endpoint}/sse", follow_redirects=False)
+                latency_ms = int((asyncio.get_event_loop().time() - start) * 1000)
+                return {
+                    "name": cfg["name"],
+                    "endpoint": endpoint,
+                    "status": "online",
+                    "latency_ms": latency_ms,
+                    "http_status": resp.status_code,
+                }
+        except Exception:
+            latency_ms = int((asyncio.get_event_loop().time() - start) * 1000)
+            return {
+                "name": cfg["name"],
+                "endpoint": endpoint,
+                "status": "offline",
+                "latency_ms": latency_ms,
+                "http_status": None,
+            }
+
+    results = await asyncio.gather(*[check_one(cfg) for cfg in _MCP_SERVERS_CONFIG])
+    return {
+        "data": results,
+        "total": len(results),
+        "online": sum(1 for r in results if r["status"] == "online"),
+        "offline": sum(1 for r in results if r["status"] == "offline"),
+    }
+
+
+@app.post("/api/v1/mcp/tools/{tool_name}/invoke")
+async def invoke_mcp_tool(
+    tool_name: str,
+    server_name: str,
+    args: dict = Body(...),
+):
+    """调用 MCP Server 的工具（测试用）
+
+    Args:
+        tool_name: 工具名称
+        server_name: 服务器名称
+        args: 工具参数（JSON body）
+
+    Returns:
+        工具执行结果
+    """
+    import os
+    import httpx
+
+    cfg = next((c for c in _MCP_SERVERS_CONFIG if c["name"] == server_name), None)
+    if cfg is None:
+        raise HTTPException(status_code=404, detail=f"MCP Server '{server_name}' not found")
+
+    if tool_name not in cfg["tools"]:
+        raise HTTPException(status_code=404, detail=f"Tool '{tool_name}' not found in server '{server_name}'")
+
+    endpoint = os.environ.get(cfg["env_key"], f"http://localhost:{cfg['default_port']}")
+
+    try:
+        # 通过 MCP SSE 协议调用工具
+        # FastMCP 2.0+ SSE 端点：POST /messages/ 调用工具
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            # 先连接 SSE 获取 session
+            sse_resp = await client.get(f"{endpoint}/sse", follow_redirects=False)
+            if sse_resp.status_code != 200:
+                return {
+                    "success": False,
+                    "error": f"MCP Server offline or SSE endpoint not available (HTTP {sse_resp.status_code})",
+                    "endpoint": endpoint,
+                }
+
+            # 调用工具
+            invoke_resp = await client.post(
+                f"{endpoint}/messages/",
+                json={
+                    "method": "tools/call",
+                    "params": {
+                        "name": tool_name,
+                        "arguments": args,
+                    },
+                },
+                timeout=30.0,
+            )
+            return {
+                "success": True,
+                "status_code": invoke_resp.status_code,
+                "result": invoke_resp.json() if invoke_resp.headers.get("content-type", "").startswith("application/json") else invoke_resp.text,
+                "endpoint": endpoint,
+            }
+    except httpx.ConnectError:
+        return {
+            "success": False,
+            "error": f"Cannot connect to MCP Server at {endpoint}. Is it running?",
+            "endpoint": endpoint,
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "endpoint": endpoint,
+        }
 
 
 @app.get("/api/v1/modules")
@@ -2215,43 +2360,54 @@ async def get_proactive_shares(limit: int = 50):
     """获取主动分享历史记录
 
     仅查询 extra_data.share_type='proactive' 的消息，
-    过滤掉普通用户回复（sender=character 但非主动分享）。
+    按 share_id 去重（同一次分享投递给多个用户只显示一条）。
 
     Returns:
         分享记录列表
     """
-    from sqlalchemy import desc, select, text
+    from sqlalchemy import desc, select, text, func
 
-    from src.db.models import Message
+    from src.db.models import Message, Conversation
 
     async with db.session() as session:
-        # 仅查询 extra_data 中 share_type=proactive 的消息
+        # 使用 DISTINCT ON 按 share_id 去重，每个 share_id 只取第一条
         stmt = (
-            select(Message)
+            select(
+                Message,
+                Conversation.character_id,
+            )
+            .join(Conversation, Conversation.id == Message.conversation_id)
             .where(
                 Message.sender == "character",
                 text("extra_data->>'share_type' = 'proactive'"),
             )
-            .order_by(desc(Message.created_at))
+            .order_by(
+                text("extra_data->>'share_id'"),
+                desc(Message.created_at),
+            )
+            .distinct(text("extra_data->>'share_id'"))
             .limit(limit)
         )
         result = await session.execute(stmt)
-        messages = list(result.scalars())
+        rows = list(result.all())
 
     return {
         "data": [
             {
                 "message_id": str(m.id),
                 "conversation_id": str(m.conversation_id),
+                "character_id": str(char_id) if char_id else None,
+                "character_name": (m.extra_data or {}).get("character_name", ""),
+                "share_id": (m.extra_data or {}).get("share_id", ""),
                 "sender": m.sender,
                 "content": m.content,
                 "tokens": m.tokens,
                 "cost": m.cost,
                 "created_at": m.created_at.isoformat() if m.created_at else None,
             }
-            for m in messages
+            for m, char_id in rows
         ],
-        "total": len(messages),
+        "total": len(rows),
     }
 
 
@@ -2554,3 +2710,337 @@ async def get_detailed_metrics():
         return {"data": result}
     except Exception as e:
         raise HTTPException(500, f"Failed to parse metrics: {e}")
+
+
+# === 运行时配置管理 ===
+
+# 可通过前端动态调整的配置项白名单（键名 → 类型）
+_RUNTIME_CONFIG_KEYS = {
+    "share_cooldown_seconds": int,
+    "share_daily_limit": int,
+    "share_probability_action": float,
+    "share_probability_mood": float,
+    "share_probability_location": float,
+    "share_probability_routine": float,
+    "memory_llm_scoring_enabled": bool,
+    "world_tick_seconds": int,
+    "character_tick_seconds": int,
+    "character_max_concurrent": int,
+    "llm_daily_budget_usd": float,
+    "log_level": str,
+}
+
+# 配置项中文说明
+_CONFIG_LABELS = {
+    "share_cooldown_seconds": "分享冷却时间（秒）",
+    "share_daily_limit": "每日分享上限",
+    "share_probability_action": "Action 分享概率",
+    "share_probability_mood": "情绪分享概率",
+    "share_probability_location": "位置变化分享概率",
+    "share_probability_routine": "日常行为分享概率",
+    "memory_llm_scoring_enabled": "LLM 记忆评分",
+    "world_tick_seconds": "世界 Tick 间隔（秒）",
+    "character_tick_seconds": "角色 Tick 间隔（秒）",
+    "character_max_concurrent": "角色并发上限",
+    "llm_daily_budget_usd": "LLM 日预算（美元）",
+    "log_level": "日志级别",
+}
+
+
+@app.get("/api/v1/admin/config")
+async def get_runtime_config():
+    """获取运行时配置（环境变量默认值 + Redis 覆盖值）
+
+    Returns:
+        各配置项的当前值、默认值、类型和说明
+    """
+    import json
+
+    # 从 Redis 读取运行时覆盖
+    overrides = {}
+    if redis:
+        raw = await redis.get("config:overrides")
+        if raw:
+            try:
+                overrides = json.loads(raw) if isinstance(raw, str) else json.loads(raw.decode())
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+    result = []
+    for key, typ in _RUNTIME_CONFIG_KEYS.items():
+        default_val = getattr(settings, key, None)
+        current_val = overrides.get(key, default_val)
+        result.append({
+            "key": key,
+            "label": _CONFIG_LABELS.get(key, key),
+            "type": typ.__name__,
+            "default": default_val,
+            "current": current_val,
+            "overridden": key in overrides,
+        })
+
+    return {"data": result, "total": len(result)}
+
+
+@app.put("/api/v1/admin/config")
+async def update_runtime_config(updates: dict = Body(...)):
+    """更新运行时配置（写入 Redis 覆盖值，无需重启）
+
+    仅允许更新白名单中的配置项。
+    更新后立即生效（后续读取会优先使用 Redis 覆盖值）。
+
+    Args:
+        updates: {key: value} 配置更新字典
+
+    Returns:
+        更新结果
+    """
+    import json
+
+    if not redis:
+        raise HTTPException(500, "Redis not available for config override")
+
+    # 读取现有覆盖
+    raw = await redis.get("config:overrides")
+    overrides = {}
+    if raw:
+        try:
+            overrides = json.loads(raw) if isinstance(raw, str) else json.loads(raw.decode())
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    # 应用更新（仅白名单中的键）
+    updated = []
+    for key, value in updates.items():
+        if key not in _RUNTIME_CONFIG_KEYS:
+            continue
+        typ = _RUNTIME_CONFIG_KEYS[key]
+        try:
+            if typ is bool:
+                value = bool(value) if not isinstance(value, str) else value.lower() in ("true", "1", "yes")
+            elif typ is int:
+                value = int(value)
+            elif typ is float:
+                value = float(value)
+            else:
+                value = str(value)
+            overrides[key] = value
+            updated.append({"key": key, "value": value, "label": _CONFIG_LABELS.get(key, key)})
+        except (ValueError, TypeError) as e:
+            raise HTTPException(400, f"Invalid value for '{key}': {e}")
+
+    # 写回 Redis
+    await redis.set("config:overrides", json.dumps(overrides))
+
+    # 同时更新 settings 对象（内存中立即生效）
+    for item in updated:
+        setattr(settings, item["key"], item["value"])
+
+    return {
+        "success": True,
+        "updated": len(updated),
+        "data": updated,
+    }
+
+
+@app.delete("/api/v1/admin/config/{key}")
+async def reset_config_item(key: str):
+    """重置单个配置项为默认值（删除 Redis 覆盖）
+
+    Args:
+        key: 配置项键名
+    """
+    import json
+
+    if not redis:
+        raise HTTPException(500, "Redis not available")
+
+    if key not in _RUNTIME_CONFIG_KEYS:
+        raise HTTPException(400, f"Unknown config key: {key}")
+
+    raw = await redis.get("config:overrides")
+    if raw:
+        try:
+            overrides = json.loads(raw) if isinstance(raw, str) else json.loads(raw.decode())
+        except (json.JSONDecodeError, TypeError):
+            overrides = {}
+
+        if key in overrides:
+            del overrides[key]
+            await redis.set("config:overrides", json.dumps(overrides))
+
+    # 恢复默认值到 settings 对象
+    default_val = getattr(Settings(), key, None)
+    setattr(settings, key, default_val)
+
+    return {"success": True, "key": key, "reset_to": default_val}
+
+
+# === 通知中心 API ===
+
+def _notif_key(user_id: str) -> str:
+    """Redis 通知列表键"""
+    return f"notifications:{user_id}"
+
+
+async def _create_notification(
+    user_id: str,
+    notif_type: str,
+    title: str,
+    content: str,
+) -> dict:
+    """创建通知并写入 Redis（内部函数，可被其他模块调用）"""
+    import json
+    from uuid6 import uuid7
+
+    notif = {
+        "id": str(uuid7()),
+        "type": notif_type,
+        "title": title,
+        "content": content,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "read": False,
+    }
+    await redis.lpush(_notif_key(user_id), json.dumps(notif))
+    # 保留最近 200 条
+    await redis.ltrim(_notif_key(user_id), 0, 199)
+    return notif
+
+
+@app.get("/api/v1/notifications")
+async def list_notifications(
+    limit: int = 50,
+    unread_only: bool = False,
+    user: dict = Depends(get_current_user),
+):
+    """获取通知列表
+
+    Args:
+        limit: 返回数量（最大 200）
+        unread_only: 仅返回未读通知
+
+    Returns:
+        通知列表（按时间倒序，最新的在前）
+    """
+    import json
+
+    user_id = user["user_id"]
+    limit = min(max(limit, 1), 200)
+    raw_list = await redis.lrange(_notif_key(user_id), 0, limit - 1)
+
+    notifications = []
+    for raw in raw_list:
+        try:
+            notif = json.loads(raw) if isinstance(raw, str) else json.loads(raw.decode())
+            if unread_only and notif.get("read"):
+                continue
+            notifications.append(notif)
+        except (json.JSONDecodeError, TypeError):
+            continue
+
+    unread_count = sum(1 for n in notifications if not n.get("read"))
+    return {
+        "data": notifications,
+        "total": len(notifications),
+        "unread": unread_count,
+    }
+
+
+@app.post("/api/v1/notifications")
+async def create_notification(
+    payload: dict = Body(...),
+    user: dict = Depends(get_current_user),
+):
+    """手动创建通知（前端"模拟通知"按钮调用）
+
+    Body:
+        type: 通知类型 (share/system/character/qq)
+        title: 标题
+        content: 内容
+    """
+    user_id = user["user_id"]
+    notif_type = payload.get("type", "system")
+    title = payload.get("title", "通知")
+    content = payload.get("content", "")
+
+    notif = await _create_notification(user_id, notif_type, title, content)
+    return {"data": notif}
+
+
+@app.put("/api/v1/notifications/{notif_id}/read")
+async def mark_notification_read(
+    notif_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """标记单条通知为已读"""
+    import json
+
+    user_id = user["user_id"]
+    raw_list = await redis.lrange(_notif_key(user_id), 0, -1)
+    for i, raw in enumerate(raw_list):
+        try:
+            notif = json.loads(raw) if isinstance(raw, str) else json.loads(raw.decode())
+            if notif.get("id") == notif_id:
+                notif["read"] = True
+                await redis.lset(_notif_key(user_id), i, json.dumps(notif))
+                return {"success": True, "id": notif_id}
+        except (json.JSONDecodeError, TypeError):
+            continue
+
+    raise HTTPException(404, f"Notification {notif_id} not found")
+
+
+@app.put("/api/v1/notifications/read-all")
+async def mark_all_notifications_read(
+    user: dict = Depends(get_current_user),
+):
+    """标记所有通知为已读"""
+    import json
+
+    user_id = user["user_id"]
+    raw_list = await redis.lrange(_notif_key(user_id), 0, -1)
+    updated = 0
+    for i, raw in enumerate(raw_list):
+        try:
+            notif = json.loads(raw) if isinstance(raw, str) else json.loads(raw.decode())
+            if not notif.get("read"):
+                notif["read"] = True
+                await redis.lset(_notif_key(user_id), i, json.dumps(notif))
+                updated += 1
+        except (json.JSONDecodeError, TypeError):
+            continue
+
+    return {"success": True, "updated": updated}
+
+
+@app.delete("/api/v1/notifications/{notif_id}")
+async def delete_notification(
+    notif_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """删除单条通知"""
+    import json
+
+    user_id = user["user_id"]
+    raw_list = await redis.lrange(_notif_key(user_id), 0, -1)
+    for raw in raw_list:
+        try:
+            notif = json.loads(raw) if isinstance(raw, str) else json.loads(raw.decode())
+            if notif.get("id") == notif_id:
+                # LREM 按 value 删除（需要精确匹配原始 JSON 字符串）
+                await redis.lrem(_notif_key(user_id), 1, raw)
+                return {"success": True, "id": notif_id}
+        except (json.JSONDecodeError, TypeError):
+            continue
+
+    raise HTTPException(404, f"Notification {notif_id} not found")
+
+
+@app.delete("/api/v1/notifications")
+async def clear_all_notifications(
+    user: dict = Depends(get_current_user),
+):
+    """清除所有通知"""
+    user_id = user["user_id"]
+    await redis.delete(_notif_key(user_id))
+    return {"success": True}

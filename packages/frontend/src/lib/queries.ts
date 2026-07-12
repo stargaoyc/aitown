@@ -208,6 +208,28 @@ export function useMcpTools() {
   });
 }
 
+export function useMcpServersHealth(refetchInterval = 10000) {
+  return useQuery({
+    queryKey: ["mcpServersHealth"],
+    queryFn: () => api.getMcpServersHealth(),
+    refetchInterval,
+  });
+}
+
+export function useInvokeMcpTool() {
+  return useMutation({
+    mutationFn: ({
+      toolName,
+      serverName,
+      args,
+    }: {
+      toolName: string;
+      serverName: string;
+      args: Record<string, unknown>;
+    }) => api.invokeMcpTool(toolName, serverName, args),
+  });
+}
+
 export function useImportCharacter() {
   const qc = useQueryClient();
   return useMutation({
@@ -255,5 +277,100 @@ export function useDetailedMetrics(refetchInterval = 5000) {
     queryKey: ["detailedMetrics"],
     queryFn: () => api.getDetailedMetrics(),
     refetchInterval,
+  });
+}
+
+export function useConfig() {
+  return useQuery({
+    queryKey: ["config"],
+    queryFn: () => api.getConfig(),
+  });
+}
+
+export function useUpdateConfig() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (updates: Record<string, unknown>) => api.updateConfig(updates),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["config"] });
+    },
+  });
+}
+
+export function useResetConfig() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (key: string) => api.resetConfig(key),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["config"] });
+    },
+  });
+}
+
+// ===== 通知中心 =====
+
+export function useNotifications(limit = 50, refetchInterval = 10000) {
+  return useQuery({
+    queryKey: ["notifications", limit],
+    queryFn: () => api.getNotifications(limit),
+    refetchInterval,
+  });
+}
+
+export function useCreateNotification() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      type,
+      title,
+      content,
+    }: {
+      type: string;
+      title: string;
+      content: string;
+    }) => api.createNotification(type, title, content),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
+}
+
+export function useMarkNotificationRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.markNotificationRead(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
+}
+
+export function useMarkAllNotificationsRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.markAllNotificationsRead(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
+}
+
+export function useDeleteNotification() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteNotification(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["notifications"] });
+    },
+  });
+}
+
+export function useClearAllNotifications() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.clearAllNotifications(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["notifications"] });
+    },
   });
 }

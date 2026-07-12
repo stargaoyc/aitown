@@ -74,6 +74,14 @@ class Settings(BaseSettings):
     character_max_concurrent: int = 10
     character_lock_ttl_seconds: int = 30
 
+    # 主动分享配置
+    share_cooldown_seconds: int = 1800       # 分享冷却时间（秒），同一角色两次分享的最小间隔
+    share_daily_limit: int = 8               # 单角色每日最大主动分享次数（防刷屏）
+    share_probability_action: float = 0.6    # 特定 Action 完成时的分享概率（0.0-1.0）
+    share_probability_mood: float = 0.5      # 强烈情绪时的分享概率（0.0-1.0）
+    share_probability_location: float = 0.2  # 位置变化时的分享概率（0.0-1.0）
+    share_probability_routine: float = 0.15  # 日常行为的分享概率（0.0-1.0）
+
     # OneBot 适配器
     onebot_default_character_id: str | None = None
     # 机器人自身 QQ 号（用于群聊 @ 检测，从 OneBot 事件的 self_id 也能获取）

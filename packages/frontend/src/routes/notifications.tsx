@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   Bell,
@@ -11,6 +10,7 @@ import {
   CheckCheck,
   Sparkles,
   Clock,
+  RefreshCw,
 } from "lucide-react";
 import {
   GlassCard,
@@ -19,7 +19,17 @@ import {
   EmptyState,
   AnimeButton,
   StatusBadge,
+  LoadingSpinner,
+  ErrorDisplay,
 } from "@/components/ui";
+import {
+  useNotifications,
+  useCreateNotification,
+  useMarkNotificationRead,
+  useMarkAllNotificationsRead,
+  useDeleteNotification,
+  useClearAllNotifications,
+} from "@/lib/queries";
 
 export const Route = createFileRoute("/notifications")({
   component: NotificationsPage,
@@ -27,19 +37,6 @@ export const Route = createFileRoute("/notifications")({
 
 // 通知类型
 type NotificationType = "share" | "system" | "character" | "qq";
-
-// 通知数据结构
-interface AppNotification {
-  id: string;
-  type: NotificationType;
-  title: string;
-  content: string;
-  created_at: string;
-  read: boolean;
-}
-
-// localStorage 存储键
-const STORAGE_KEY = "aitown_notifications";
 
 // 通知类型配置：图标、颜色、标签
 const typeConfig: Record<
@@ -83,7 +80,7 @@ const typeConfig: Record<
 };
 
 // 模拟通知模板（用于测试）
-const mockTemplates: Omit<AppNotification, "id" | "created_at" | "read">[] = [
+const mockTemplates: { type: NotificationType; title: string; content: string }[] = [
   {
     type: "share",
     title: "角色主动分享了动态",
@@ -115,27 +112,6 @@ const mockTemplates: Omit<AppNotification, "id" | "created_at" | "read">[] = [
     content: "角色「月野兔」连续 3 个 Tick 情绪为「沮丧」，建议触发社交互动",
   },
 ];
-
-// 从 localStorage 读取通知
-function loadNotifications(): AppNotification[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as AppNotification[];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-// 保存通知到 localStorage
-function saveNotifications(notifications: AppNotification[]) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications));
-  } catch {
-    // 存储失败时静默忽略
-  }
-}
 
 // 格式化为相对时间
 function formatRelativeTime(dateStr: string): string {
@@ -170,240 +146,218 @@ const item = {
 };
 
 function NotificationsPage() {
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [mounted, setMounted] = useState(false);
+  const { data, isLoading, error, refetch, isFetching } = useNotifications(100);
+  const createNotif = useCreateNotification();
+  const markRead = useMarkNotificationRead();
+  const markAllRead = useMarkAllNotificationsRead();
+  const deleteNotif = useDeleteNotification();
+  const clearAll = useClearAllNotifications();
 
-  // 初始化：从 localStorage 加载
-  useEffect(() => {
-    setNotifications(loadNotifications());
-    setMounted(true);
-  }, []);
-
-  // 通知变更时同步到 localStorage
-  useEffect(() => {
-    if (mounted) {
-      saveNotifications(notifications);
-    }
-  }, [notifications, mounted]);
-
-  // 添加模拟通知（用于测试）
-  const handleAddMock = useCallback(() => {
-    const template =
-      mockTemplates[Math.floor(Math.random() * mockTemplates.length)];
-    if (!template) return;
-    const newNotif: AppNotification = {
-      type: template.type,
-      title: template.title,
-      content: template.content,
-      id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      created_at: new Date().toISOString(),
-      read: false,
-    };
-    setNotifications((prev) => [newNotif, ...prev]);
-  }, []);
-
-  // 清除全部通知
-  const handleClearAll = useCallback(() => {
-    setNotifications([]);
-  }, []);
-
-  // 标记单条为已读
-  const handleMarkRead = useCallback((id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
-    );
-  }, []);
-
-  // 标记全部为已读
-  const handleMarkAllRead = useCallback(() => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  }, []);
-
-  // 删除单条通知
-  const handleDelete = useCallback((id: string) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
-  }, []);
-
-  // 统计
-  const unreadCount = notifications.filter((n) => !n.read).length;
-  const totalCount = notifications.length;
+  const notifications = data?.data ?? [];
+  const unreadCount = data?.unread ?? 0;
+  const totalCount = data?.total ?? 0;
   const byType = (type: NotificationType) =>
     notifications.filter((n) => n.type === type).length;
 
+  // 添加模拟通知（通过后端 API 创建）
+  const handleAddMock = () => {
+    const template =
+      mockTemplates[Math.floor(Math.random() * mockTemplates.length)];
+    if (!template) return;
+    createNotif.mutate({
+      type: template.type,
+      title: template.title,
+      content: template.content,
+    });
+  };
+
   return (
-      <div className="space-y-6 animate-fade-in-up">
-        <PageHeader
-          title="通知中心"
-          subtitle="查看主动分享、系统告警、角色状态与 QQ 连接通知"
+    <div className="space-y-6 animate-fade-in-up">
+      <PageHeader
+        title="通知中心"
+        subtitle="查看主动分享、系统告警、角色状态与 QQ 连接通知"
+        icon="🔔"
+      />
+
+      {/* 顶部统计卡片 */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard
+          title="通知总数"
+          value={totalCount}
           icon="🔔"
+          color="sakura"
         />
+        <StatCard
+          title="未读通知"
+          value={unreadCount}
+          icon="📬"
+          color="twilight"
+        />
+        <StatCard
+          title="系统告警"
+          value={byType("system")}
+          icon="⚠️"
+          color="sky"
+        />
+        <StatCard
+          title="角色异常"
+          value={byType("character")}
+          icon="💔"
+          color="sakura"
+        />
+      </div>
 
-        {/* 顶部统计卡片 */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard
-            title="通知总数"
-            value={totalCount}
-            icon="🔔"
-            color="sakura"
-          />
-          <StatCard
-            title="未读通知"
-            value={unreadCount}
-            icon="📬"
-            color="twilight"
-          />
-          <StatCard
-            title="系统告警"
-            value={byType("system")}
-            icon="⚠️"
-            color="sky"
-          />
-          <StatCard
-            title="角色异常"
-            value={byType("character")}
-            icon="💔"
-            color="sakura"
-          />
-        </div>
-
-        {/* 操作工具栏 */}
-        <GlassCard hover={false}>
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <div className="flex items-center gap-2">
-              <Bell className="w-5 h-5 text-sakura-500" />
-              <span className="font-semibold text-twilight-500">通知列表</span>
-              {unreadCount > 0 && (
-                <StatusBadge status="warning" label={`${unreadCount} 条未读`} />
-              )}
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <AnimeButton
-                onClick={handleAddMock}
-                variant="secondary"
-                className="!px-3 !py-2 !text-sm"
-              >
-                <span className="flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  模拟通知
-                </span>
-              </AnimeButton>
-              <AnimeButton
-                onClick={handleMarkAllRead}
-                variant="secondary"
-                className="!px-3 !py-2 !text-sm"
-                disabled={unreadCount === 0}
-              >
-                <span className="flex items-center gap-1.5">
-                  <CheckCheck className="w-3.5 h-3.5" />
-                  全部已读
-                </span>
-              </AnimeButton>
-              <AnimeButton
-                onClick={handleClearAll}
-                variant="danger"
-                className="!px-3 !py-2 !text-sm"
-                disabled={totalCount === 0}
-              >
-                <span className="flex items-center gap-1.5">
-                  <Trash2 className="w-3.5 h-3.5" />
-                  清除全部
-                </span>
-              </AnimeButton>
-            </div>
+      {/* 操作工具栏 */}
+      <GlassCard hover={false}>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-2">
+            <Bell className="w-5 h-5 text-sakura-500" />
+            <span className="font-semibold text-twilight-500">通知列表</span>
+            {unreadCount > 0 && (
+              <StatusBadge status="warning" label={`${unreadCount} 条未读`} />
+            )}
+            <button
+              onClick={() => refetch()}
+              disabled={isFetching}
+              className="ml-1 p-1 rounded-lg text-twilight-400 hover:bg-sakura-100/60 hover:text-sakura-600 transition-colors"
+              title="刷新"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? "animate-spin" : ""}`} />
+            </button>
           </div>
-        </GlassCard>
+          <div className="flex items-center gap-2 flex-wrap">
+            <AnimeButton
+              onClick={handleAddMock}
+              variant="secondary"
+              className="!px-3 !py-2 !text-sm"
+              disabled={createNotif.isPending}
+            >
+              <span className="flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5" />
+                {createNotif.isPending ? "发送中..." : "模拟通知"}
+              </span>
+            </AnimeButton>
+            <AnimeButton
+              onClick={() => markAllRead.mutate()}
+              variant="secondary"
+              className="!px-3 !py-2 !text-sm"
+              disabled={unreadCount === 0 || markAllRead.isPending}
+            >
+              <span className="flex items-center gap-1.5">
+                <CheckCheck className="w-3.5 h-3.5" />
+                全部已读
+              </span>
+            </AnimeButton>
+            <AnimeButton
+              onClick={() => clearAll.mutate()}
+              variant="danger"
+              className="!px-3 !py-2 !text-sm"
+              disabled={totalCount === 0 || clearAll.isPending}
+            >
+              <span className="flex items-center gap-1.5">
+                <Trash2 className="w-3.5 h-3.5" />
+                清除全部
+              </span>
+            </AnimeButton>
+          </div>
+        </div>
+      </GlassCard>
 
-        {/* 空状态 */}
-        {totalCount === 0 && (
-          <EmptyState
-            icon="🔔"
-            title="暂无通知"
-            subtitle="后端暂无专门的通知 API，可点击「模拟通知」按钮生成测试通知"
-          />
-        )}
+      {/* 加载状态 */}
+      {isLoading && <LoadingSpinner text="正在加载通知..." />}
+      {error && <ErrorDisplay error={error} />}
 
-        {/* 通知列表 */}
-        {totalCount > 0 && (
-          <motion.div
-            variants={container}
-            initial="hidden"
-            animate="show"
-            className="space-y-3"
-          >
-            {notifications.map((notif) => {
-              const cfg = typeConfig[notif.type];
-              const Icon = cfg.icon;
-              return (
-                <motion.div key={notif.id} variants={item}>
-                  <GlassCard
-                    hover
-                    className={`space-y-2 ${
-                      !notif.read ? "ring-2 ring-sakura-300/40" : ""
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      {/* 类型图标 */}
-                      <div
-                        className={`w-10 h-10 rounded-2xl ${cfg.iconBg} flex items-center justify-center text-white shrink-0 shadow-md`}
-                      >
-                        <Icon className="w-5 h-5" />
-                      </div>
+      {/* 空状态 */}
+      {!isLoading && !error && totalCount === 0 && (
+        <EmptyState
+          icon="🔔"
+          title="暂无通知"
+          subtitle="角色主动分享、系统告警等事件会自动出现在这里。可点击「模拟通知」按钮测试"
+        />
+      )}
 
-                      {/* 通知内容 */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h4
-                            className={`font-semibold ${cfg.color} text-sm md:text-base`}
-                          >
-                            {notif.title}
-                          </h4>
-                          <StatusBadge
-                            status={cfg.badge.status}
-                            label={cfg.badge.label}
-                          />
-                          {!notif.read && (
-                            <span className="w-2 h-2 rounded-full bg-sakura-500 animate-pulse" />
-                          )}
-                        </div>
-                        <p className="text-sm text-twilight-500 mt-1 leading-relaxed">
-                          {notif.content}
-                        </p>
-                        <div className="flex items-center gap-1 mt-2 text-xs text-twilight-300">
-                          <Clock className="w-3 h-3" />
-                          <span>{formatRelativeTime(notif.created_at)}</span>
-                        </div>
-                      </div>
+      {/* 通知列表 */}
+      {totalCount > 0 && (
+        <motion.div
+          variants={container}
+          initial="hidden"
+          animate="show"
+          className="space-y-3"
+        >
+          {notifications.map((notif) => {
+            const cfg = typeConfig[notif.type as NotificationType] ?? typeConfig.system;
+            const Icon = cfg.icon;
+            return (
+              <motion.div key={notif.id} variants={item}>
+                <GlassCard
+                  hover
+                  className={`space-y-2 ${
+                    !notif.read ? "ring-2 ring-sakura-300/40" : ""
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    {/* 类型图标 */}
+                    <div
+                      className={`w-10 h-10 rounded-2xl ${cfg.iconBg} flex items-center justify-center text-white shrink-0 shadow-md`}
+                    >
+                      <Icon className="w-5 h-5" />
+                    </div>
 
-                      {/* 操作按钮 */}
-                      <div className="flex flex-col gap-1.5 shrink-0">
+                    {/* 通知内容 */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4
+                          className={`font-semibold ${cfg.color} text-sm md:text-base`}
+                        >
+                          {notif.title}
+                        </h4>
+                        <StatusBadge
+                          status={cfg.badge.status}
+                          label={cfg.badge.label}
+                        />
                         {!notif.read && (
-                          <motion.button
-                            whileHover={{ scale: 1.1 }}
-                            whileTap={{ scale: 0.9 }}
-                            onClick={() => handleMarkRead(notif.id)}
-                            title="标记已读"
-                            className="w-8 h-8 rounded-xl flex items-center justify-center text-twilight-400 hover:bg-sakura-100/60 hover:text-sakura-600 transition-colors"
-                          >
-                            <CheckCheck className="w-4 h-4" />
-                          </motion.button>
+                          <span className="w-2 h-2 rounded-full bg-sakura-500 animate-pulse" />
                         )}
+                      </div>
+                      <p className="text-sm text-twilight-500 mt-1 leading-relaxed">
+                        {notif.content}
+                      </p>
+                      <div className="flex items-center gap-1 mt-2 text-xs text-twilight-300">
+                        <Clock className="w-3 h-3" />
+                        <span>{formatRelativeTime(notif.created_at)}</span>
+                      </div>
+                    </div>
+
+                    {/* 操作按钮 */}
+                    <div className="flex flex-col gap-1.5 shrink-0">
+                      {!notif.read && (
                         <motion.button
                           whileHover={{ scale: 1.1 }}
                           whileTap={{ scale: 0.9 }}
-                          onClick={() => handleDelete(notif.id)}
-                          title="删除通知"
-                          className="w-8 h-8 rounded-xl flex items-center justify-center text-twilight-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+                          onClick={() => markRead.mutate(notif.id)}
+                          title="标记已读"
+                          className="w-8 h-8 rounded-xl flex items-center justify-center text-twilight-400 hover:bg-sakura-100/60 hover:text-sakura-600 transition-colors"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <CheckCheck className="w-4 h-4" />
                         </motion.button>
-                      </div>
+                      )}
+                      <motion.button
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => deleteNotif.mutate(notif.id)}
+                        title="删除通知"
+                        className="w-8 h-8 rounded-xl flex items-center justify-center text-twilight-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </motion.button>
                     </div>
-                  </GlassCard>
-                </motion.div>
-              );
-            })}
-          </motion.div>
-        )}
-      </div>
+                  </div>
+                </GlassCard>
+              </motion.div>
+            );
+          })}
+        </motion.div>
+      )}
+    </div>
   );
 }
