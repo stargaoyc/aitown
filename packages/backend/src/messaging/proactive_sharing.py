@@ -39,10 +39,10 @@ logger = get_logger(__name__)
 
 
 # 分享冷却时间（秒）：同一角色对同一用户的最小分享间隔
-SHARE_COOLDOWN_SECONDS = 3600  # 1 小时
+SHARE_COOLDOWN_SECONDS = 1800  # 30 分钟
 
 # 单角色每日最大主动分享次数（防刷屏）
-DAILY_SHARE_LIMIT = 5
+DAILY_SHARE_LIMIT = 8
 
 # 触发分享的 Action 类型白名单（仅这些 action 完成后评估分享意图)
 SHAREABLE_ACTION_IDS = {
@@ -74,6 +74,7 @@ class ProactiveSharingService:
         llm: LLMClient,
         prompts: PromptTemplates,
         ws_manager=None,
+        redis=None,
     ):
         """
         Args:
@@ -81,11 +82,13 @@ class ProactiveSharingService:
             llm: LLM 客户端
             prompts: Prompt 模板管理器
             ws_manager: WebSocket 管理器（可选，无则不推送实时消息）
+            redis: Redis 客户端（可选，用于读取世界状态）
         """
         self.session = session
         self.llm = llm
         self.prompts = prompts
         self.ws_manager = ws_manager
+        self.redis = redis
 
         self.character_repo = CharacterRepository(session)
         self.conversation_repo = ConversationRepository(session)
@@ -224,23 +227,41 @@ class ProactiveSharingService:
         action: ActionRecord | None,
         state: CharacterState,
     ) -> tuple[bool, str]:
-        """评估分享意图（本地规则，不调用 LLM）
+        """评估分享意图（本地规则 + 概率控制）
 
-        基于 action 类型与情绪状态的简单规则判断。
-        复杂场景的 LLM 二次评估留给 Phase 3.5。
+        基于 action 类型、情绪状态、随机概率的综合判断。
+        不是每次 shareable action 都分享，加入随机性使行为更自然。
 
         Returns:
             (should_share, reason)
         """
-        # 规则 1：特定 Action 完成时分享
+        import random
+
+        # 规则 1：特定 Action 完成时分享（60% 概率，避免每次都分享）
         if action and action.action_id in SHAREABLE_ACTION_IDS:
-            return True, f"action_{action.action_id}"
+            if random.random() < 0.6:
+                return True, f"action_{action.action_id}"
+            return False, f"action_{action.action_id}_skip"
 
-        # 规则 2：强烈情绪时分享
+        # 规则 2：强烈情绪时分享（50% 概率）
         if state.mood and state.mood in SHAREABLE_MOODS:
-            return True, f"mood_{state.mood}"
+            if random.random() < 0.5:
+                return True, f"mood_{state.mood}"
+            return False, f"mood_{state.mood}_skip"
 
-        # 规则 3：无触发条件
+        # 规则 3：位置变化时偶尔分享（20% 概率）
+        if action and action.action_id == "move":
+            if random.random() < 0.2:
+                return True, "location_change"
+            return False, "location_change_skip"
+
+        # 规则 4：日常行为偶尔分享（15% 概率）
+        if action and action.action_id in ("read_book", "play_game", "relax", "use_phone"):
+            if random.random() < 0.15:
+                return True, f"routine_{action.action_id}"
+            return False, f"routine_{action.action_id}_skip"
+
+        # 规则 5：无触发条件
         return False, "no_trigger"
 
     async def _check_cooldown(self, character_id: UUID) -> bool:
@@ -313,6 +334,7 @@ class ProactiveSharingService:
         - 以角色第一人称
         - 自然口语化，不暴露"系统消息"特征
         - 结合 action 结果与当前情绪
+        - 注入世界状态约束时间/天气
         - 控制长度（50-100 字）
         """
         personality = (character.traits or {}).get("personality", [])
@@ -326,12 +348,34 @@ class ProactiveSharingService:
 
         mood_desc = state.mood or "calm"
 
+        # 读取世界状态
+        world_section = ""
+        if self.redis:
+            try:
+                world_state = await self.redis.hgetall("world:state")
+                if world_state:
+                    import json
+                    world_time_raw = world_state.get("world_time", "")
+                    try:
+                        world_time = json.loads(world_time_raw)
+                        if not isinstance(world_time, str):
+                            world_time = world_time_raw
+                    except (json.JSONDecodeError, TypeError):
+                        world_time = world_time_raw
+                    weather = world_state.get("weather", "sunny")
+                    world_section = f"当前虚拟时间: {world_time}，天气: {weather}\n"
+            except Exception:
+                pass
+
         prompt = (
             f"你是 {character.name}，性格特点：{personality_text}。\n"
+            f"{world_section}"
             f"你刚刚的经历：{action_desc}。\n"
             f"你现在的情绪：{mood_desc}。\n"
             f"请以 {character.name} 的身份，用自然口语向关心你的朋友分享此刻的心情，"
             f"50-100 字，不要提及'系统'或'AI'，要符合角色性格。\n"
+            f"严格约束：不得编造与上述虚拟时间/天气不符的信息。\n"
+            f"不要每句话都带emoji，可以使用颜文字如 (｡･ω･｡) (*≧▽≦)。\n"
             f"直接输出分享内容，不要加引号或前缀。"
         )
 

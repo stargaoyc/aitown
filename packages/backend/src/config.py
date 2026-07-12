@@ -61,6 +61,9 @@ class Settings(BaseSettings):
     llm_circuit_breaker_threshold: int = 5
     llm_circuit_breaker_recovery_timeout: int = 60
 
+    # Memory LLM Scoring
+    memory_llm_scoring_enabled: bool = False
+
     # World Engine
     world_tick_seconds: int = 30
     world_tick_minutes: int = 10

@@ -52,11 +52,11 @@ function CharacterDetailPage() {
   const [optimisticMessages, setOptimisticMessages] = useState<Message[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // 合并服务端消息和乐观更新的消息
+  // 合并服务端消息和乐观更新的消息，按时间排序
   const allMessages = [
-    ...optimisticMessages,
     ...(messagesData?.data ?? []),
-  ];
+    ...optimisticMessages,
+  ].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -110,6 +110,7 @@ function CharacterDetailPage() {
         money: character.state.money ?? 0,
         phone_battery: character.state.phone_battery ?? 0,
         social_energy: character.state.social_energy ?? 0,
+        current_action: character.state.current_action,
         version: character.state.version ?? 0,
       }
     : undefined;
@@ -182,7 +183,12 @@ function CharacterDetailPage() {
                 icon="💰"
                 color="sky"
               />
-              <StatCard title="版本" value={`v${state.version}`} icon="🔄" />
+              <StatCard
+                title="当前行为"
+                value={state.current_action?.action_name ?? state.current_action?.action_id ?? "无"}
+                icon="🎯"
+                color="sakura"
+              />
             </div>
             <div className="space-y-4">
               <div>

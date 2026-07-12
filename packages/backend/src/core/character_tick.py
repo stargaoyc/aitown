@@ -417,6 +417,17 @@ class CharacterTickEngine:
             cur_se = int(new_state.get("social_energy", 0) or 0)
             new_state["social_energy"] = min(100, cur_se + 10)
 
+        # 设置当前动作（供前端展示"当前行为"）
+        from datetime import timedelta
+        action_end = datetime.now(timezone.utc) + timedelta(minutes=duration)
+        new_state["current_action"] = {
+            "action_id": decision.action,
+            "action_name": action_def.name,
+            "params": decision.params,
+            "reason": decision.reason,
+            "end_time": action_end.isoformat(),
+        }
+
         # 事务化执行
         try:
             async with db.session() as session:
@@ -447,6 +458,7 @@ class CharacterTickEngine:
                     phone_battery=int(new_state["phone_battery"]) if new_state.get("phone_battery") is not None else None,
                     social_energy=int(new_state["social_energy"]) if new_state.get("social_energy") is not None else None,
                     location=new_state.get("location"),
+                    current_action=new_state.get("current_action"),
                 )
 
                 # 写入状态历史快照（支持前端状态趋势图表）
@@ -543,6 +555,9 @@ class CharacterTickEngine:
                 action_id=decision.action,
                 location=state.get("location"),
                 importance=importance,
+                character_name=character.name,
+                reason=decision.reason,
+                mood=state.get("mood"),
             )
 
             # 检查反思
@@ -606,6 +621,7 @@ class CharacterTickEngine:
                 llm=self.llm,
                 prompts=self.prompts,
                 ws_manager=ws_manager,
+                redis=self.redis,
             )
 
             result = await sharing_svc.evaluate_and_share(

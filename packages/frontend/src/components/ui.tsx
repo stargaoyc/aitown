@@ -81,6 +81,7 @@ export function NavLayout({ children }: { children: ReactNode }) {
     { to: "/plans", label: "规划系统", icon: "📋" },
     { to: "/relationships", label: "关系图谱", icon: "🔗" },
     { to: "/metrics", label: "指标面板", icon: "📈" },
+    { to: "/monitoring", label: "系统监控", icon: "📡" },
     { to: "/cost", label: "成本仪表", icon: "💰" },
     { to: "/events", label: "事件时间线", icon: "⏱️" },
     { to: "/actions", label: "行为日志", icon: "📝" },

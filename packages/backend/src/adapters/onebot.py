@@ -109,15 +109,15 @@ def _get_configured_self_id() -> str | None:
     return settings.onebot_self_id
 
 
-def _get_llm_globals() -> tuple[object | None, object | None]:
+def _get_llm_globals() -> tuple[object | None, object | None, object | None]:
     """延迟获取全局 LLM 客户端与 Prompt 模板（避免循环导入）
 
     Returns:
-        (llm, prompts) 元组，启动期可能为 (None, None)
+        (llm, prompts, redis) 元组，启动期可能为 (None, None, None)
     """
-    from src.main import llm, prompts  # type: ignore
+    from src.main import llm, prompts, redis  # type: ignore
 
-    return llm, prompts
+    return llm, prompts, redis
 
 
 def _extract_text(event: dict) -> str:
@@ -544,7 +544,7 @@ class OneBotAdapter:
             return
 
         # 获取 LLM 全局实例
-        llm_client, prompts_obj = _get_llm_globals()
+        llm_client, prompts_obj, redis_client = _get_llm_globals()
         if llm_client is None or prompts_obj is None:
             logger.warning("onebot_llm_not_ready")
             try:
@@ -569,6 +569,7 @@ class OneBotAdapter:
                     session=session,
                     llm=llm_client,  # type: ignore[arg-type]
                     prompts=prompts_obj,  # type: ignore[arg-type]
+                    redis=redis_client,
                 )
                 result = await svc.handle_user_message(
                     character_id=character_id,
@@ -693,6 +694,7 @@ class OneBotAdapter:
                     session=session,
                     llm=llm_client,  # type: ignore[arg-type]
                     prompts=prompts_obj,  # type: ignore[arg-type]
+                    redis=redis_client,
                 )
                 internal_user_id = f"qq_{sender_user_id}" if sender_user_id is not None else "qq_unknown"
                 return await svc.should_reply_in_group(

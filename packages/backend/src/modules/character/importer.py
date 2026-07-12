@@ -76,6 +76,7 @@ class CharacterImporter:
             name=card.name,
             age=card.age,
             occupation=card.occupation,
+            is_active=card.is_active,
             traits=traits,
             backstory=card.backstory,
             avatar_url=card.avatar_url,

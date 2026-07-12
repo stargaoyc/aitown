@@ -668,6 +668,7 @@ async def get_character(character_id: str):
             "money": state.money,
             "phone_battery": state.phone_battery,
             "social_energy": state.social_energy,
+            "current_action": state.current_action,
             "version": state.version,
         },
     }
@@ -2354,3 +2355,202 @@ async def get_world_snapshots(limit: int = 20):
         ],
         "total": len(snapshots),
     }
+
+
+@app.get("/api/v1/admin/logs")
+async def get_recent_logs(
+    lines: int = 100,
+    level: str | None = None,
+):
+    """获取最近的系统日志（从 data/logs/backend.log 读取）
+
+    Args:
+        lines: 返回的日志行数（最大 500）
+        level: 日志级别过滤（debug/info/warning/error），不传则返回所有
+
+    Returns:
+        日志条目列表（按时间倒序，每条为 JSON 解析后的 dict）
+    """
+    import json
+    from pathlib import Path
+
+    from src.observability.logging import _ensure_log_dir
+
+    lines = min(max(lines, 1), 500)
+
+    try:
+        log_dir = _ensure_log_dir()
+        log_file = log_dir / "backend.log"
+        if not log_file.exists():
+            return {"data": [], "total": 0, "source": str(log_file)}
+
+        # 读取最后 N 行（高效方式：从文件末尾向前读取）
+        with open(str(log_file), "r", encoding="utf-8") as f:
+            # 读取所有行并取最后 N 行（文件不大时足够）
+            all_lines = f.readlines()
+            recent_lines = all_lines[-lines:] if len(all_lines) > lines else all_lines
+
+        # 解析 JSON 日志行
+        logs = []
+        for line in reversed(recent_lines):  # 倒序：最新的在前
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+                # 日志级别过滤
+                if level:
+                    entry_level = entry.get("level", "").lower()
+                    if entry_level != level.lower():
+                        continue
+                logs.append(entry)
+            except json.JSONDecodeError:
+                # 非 JSON 行（如 ConsoleRenderer 输出），作为纯文本保留
+                logs.append({"event": line, "level": "info", "timestamp": ""})
+
+        return {
+            "data": logs[:lines],
+            "total": len(logs),
+            "source": str(log_file),
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Failed to read logs: {e}")
+
+
+@app.get("/api/v1/admin/metrics-detail")
+async def get_detailed_metrics():
+    """获取详细的系统指标（解析 Prometheus 格式，返回结构化数据）
+
+    返回比 /metrics/ 端点更易消费的 JSON 结构，包含：
+    - 世界引擎指标（Tick 总数/耗时/错误/当前 ID）
+    - 角色引擎指标（Tick 总数/耗时/错误，按角色分组）
+    - Action 指标（执行次数/耗时，按 action_id 分组）
+    - LLM 指标（调用次数/Token/费用，按 model 分组）
+    - 消息指标（处理次数/耗时）
+    - 数据库指标（查询耗时分布）
+    - 系统状态（活跃角色数/Redis 状态）
+    - HTTP 请求指标（请求数/耗时，按 path 分组）
+    """
+    import re
+    from collections import defaultdict
+
+    from prometheus_client.parser import text_string_to_metric_families
+
+    try:
+        # 从 /metrics 端点获取原始文本
+        from prometheus_client import REGISTRY
+        from prometheus_client.exposition import generate_latest
+
+        raw_text = generate_latest(REGISTRY).decode("utf-8")
+
+        # 解析所有指标族
+        families = list(text_string_to_metric_families(raw_text))
+
+        result = {
+            "world": {},
+            "characters": {},
+            "actions": {},
+            "llm": {},
+            "messages": {},
+            "database": {},
+            "system": {},
+            "http": {},
+        }
+
+        for family in families:
+            name = family.name
+            for sample in family.samples:
+                labels = sample.labels or {}
+                value = sample.value
+
+                # 世界引擎
+                if name == "ai_town_world_tick_total":
+                    result["world"]["tick_total"] = int(value)
+                elif name == "ai_town_world_tick_errors_total":
+                    result["world"]["errors_total"] = int(value)
+                elif name == "ai_town_world_tick_id":
+                    result["world"]["current_tick_id"] = int(value)
+                elif name == "ai_town_world_tick_duration_seconds" and sample.name.endswith("_sum"):
+                    result["world"]["duration_sum"] = value
+                elif name == "ai_town_world_tick_duration_seconds" and sample.name.endswith("_count"):
+                    result["world"]["duration_count"] = int(value)
+
+                # 角色引擎
+                elif name == "ai_town_character_tick_total":
+                    char_id = labels.get("character_id", "unknown")
+                    result["characters"].setdefault("by_character", defaultdict(int))
+                    result["characters"]["by_character"][char_id] += int(value)
+                elif name == "ai_town_character_tick_errors_total":
+                    char_id = labels.get("character_id", "unknown")
+                    result["characters"].setdefault("errors_by_character", defaultdict(int))
+                    result["characters"]["errors_by_character"][char_id] += int(value)
+
+                # Action
+                elif name == "ai_town_action_execution_total":
+                    action_id = labels.get("action_id", "unknown")
+                    status = labels.get("status", "unknown")
+                    result["actions"].setdefault("by_action", {})
+                    result["actions"]["by_action"].setdefault(action_id, {"success": 0, "failed": 0})
+                    result["actions"]["by_action"][action_id][status] += int(value)
+
+                # LLM
+                elif name == "ai_town_llm_call_total":
+                    model = labels.get("model", "unknown")
+                    status = labels.get("status", "unknown")
+                    result["llm"].setdefault("calls", {})
+                    result["llm"]["calls"].setdefault(model, {"success": 0, "failed": 0})
+                    result["llm"]["calls"][model][status] += int(value)
+                elif name == "ai_town_llm_tokens_total":
+                    model = labels.get("model", "unknown")
+                    token_type = labels.get("type", "unknown")
+                    result["llm"].setdefault("tokens", {})
+                    result["llm"]["tokens"].setdefault(model, {"prompt": 0, "completion": 0})
+                    result["llm"]["tokens"][model][token_type] += int(value)
+                elif name == "ai_town_llm_cost_total_usd":
+                    result["llm"]["cost_total_usd"] = value
+
+                # 消息
+                elif name == "ai_town_message_processed_total":
+                    platform = labels.get("platform", "unknown")
+                    status = labels.get("status", "unknown")
+                    result["messages"].setdefault("by_platform", {})
+                    result["messages"]["by_platform"].setdefault(platform, {"success": 0, "failed": 0})
+                    result["messages"]["by_platform"][platform][status] += int(value)
+
+                # 系统
+                elif name == "ai_town_active_characters":
+                    result["system"]["active_characters"] = int(value)
+                elif name == "ai_town_redis_connected":
+                    result["system"]["redis_connected"] = int(value)
+
+                # HTTP
+                elif name == "ai_town_http_request_total":
+                    path = labels.get("path", "/")
+                    status = labels.get("status", "unknown")
+                    result["http"].setdefault("requests", {})
+                    result["http"]["requests"].setdefault(path, {"total": 0, "by_status": {}})
+                    result["http"]["requests"][path]["total"] += int(value)
+                    result["http"]["requests"][path]["by_status"][status] = (
+                        result["http"]["requests"][path]["by_status"].get(status, 0) + int(value)
+                    )
+
+        # 转换 defaultdict 为普通 dict
+        if "by_character" in result["characters"]:
+            result["characters"]["by_character"] = dict(result["characters"]["by_character"])
+        if "errors_by_character" in result["characters"]:
+            result["characters"]["errors_by_character"] = dict(result["characters"]["errors_by_character"])
+
+        # 计算汇总
+        result["characters"]["tick_total"] = sum(
+            result["characters"].get("by_character", {}).values()
+        )
+        result["llm"]["tokens_total"] = sum(
+            sum(t.values()) for t in result["llm"].get("tokens", {}).values()
+        )
+        result["llm"]["calls_total"] = sum(
+            sum(c.values()) for c in result["llm"].get("calls", {}).values()
+        )
+
+        return {"data": result}
+    except Exception as e:
+        raise HTTPException(500, f"Failed to parse metrics: {e}")

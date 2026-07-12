@@ -55,7 +55,13 @@ export interface CharacterState {
   money: number;
   phone_battery: number;
   social_energy: number;
-  current_action?: Record<string, unknown> | null;
+  current_action?: {
+    action_id?: string;
+    action_name?: string;
+    params?: Record<string, unknown>;
+    reason?: string;
+    end_time?: string;
+  } | null;
   version: number;
 }
 
@@ -278,6 +284,21 @@ export const api = {
   // MCP 服务器
   getMcpServers: () => request<{ data: McpServerEntry[] }>("/mcp/servers"),
   getMcpTools: () => request<{ data: McpToolEntry[] }>("/mcp/tools"),
+
+  // 系统日志
+  getLogs: (lines = 100, level?: string) => {
+    const qs = new URLSearchParams({
+      lines: String(lines),
+      ...(level ? { level } : {}),
+    }).toString();
+    return request<{ data: LogEntry[]; total: number; source: string }>(
+      `/admin/logs?${qs}`,
+    );
+  },
+
+  // 详细指标
+  getDetailedMetrics: () =>
+    request<{ data: DetailedMetrics }>("/admin/metrics-detail"),
 };
 
 // ===== 扩展类型定义 =====
@@ -416,4 +437,48 @@ export interface McpToolEntry {
   name: string;
   server: string;
   server_type: string;
+}
+
+// ===== 监控指标 & 日志类型 =====
+
+export interface LogEntry {
+  timestamp?: string;
+  level?: string;
+  event?: string;
+  [key: string]: unknown;
+}
+
+export interface DetailedMetrics {
+  world: {
+    tick_total?: number;
+    errors_total?: number;
+    current_tick_id?: number;
+    duration_sum?: number;
+    duration_count?: number;
+  };
+  characters: {
+    tick_total?: number;
+    by_character?: Record<string, number>;
+    errors_by_character?: Record<string, number>;
+  };
+  actions: {
+    by_action?: Record<string, { success: number; failed: number }>;
+  };
+  llm: {
+    cost_total_usd?: number;
+    tokens_total?: number;
+    calls_total?: number;
+    calls?: Record<string, { success: number; failed: number }>;
+    tokens?: Record<string, { prompt: number; completion: number }>;
+  };
+  messages: {
+    by_platform?: Record<string, { success: number; failed: number }>;
+  };
+  system: {
+    active_characters?: number;
+    redis_connected?: number;
+  };
+  http: {
+    requests?: Record<string, { total: number; by_status: Record<string, number> }>;
+  };
 }

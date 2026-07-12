@@ -4,12 +4,19 @@
 1. Character Tick 执行 Action 后，生成记忆片段
 2. 调用 LLM embed() 生成向量
 3. 写入 MemoryEpisode（含 embedding + importance）
+
+重要性评分支持两种模式：
+- 规则评分（默认）：基于 action 类型 + 情绪关键词
+- LLM 评分（可选）：环境变量 MEMORY_LLM_SCORING_ENABLED=true 启用，
+  LLM 在生成记忆的同时进行打分，更精准但增加 LLM 调用成本。
 """
+import re
 from datetime import datetime, timezone
 from uuid import UUID
 
 from structlog import get_logger
 
+from src.config import settings
 from src.db.models import MemoryEpisode
 from src.db.repositories import MemoryRepository
 from src.llm import LLMClient
@@ -24,6 +31,72 @@ class EpisodeService:
         self.llm = llm
         self.repo = repo
 
+    async def score_importance_with_llm(
+        self,
+        character_name: str,
+        content: str,
+        action_id: str | None,
+        reason: str | None,
+        mood: str | None,
+        location: str | None,
+    ) -> int:
+        """使用 LLM 对记忆重要性进行评分（1-10）
+
+        评分维度：
+        - 情感强度：涉及强烈情绪（开心/生气/惊讶）的事件更重要
+        - 关系影响：涉及他人互动的事件更重要
+        - 稀缺性：罕见事件（冒险/达成目标）比日常行为（吃饭/休息）更重要
+        - 后续影响：可能改变角色未来行为的事件更重要
+
+        Args:
+            character_name: 角色名
+            content: 记忆内容
+            action_id: Action ID
+            reason: 决策理由
+            mood: 当前情绪
+            location: 当前位置
+
+        Returns:
+            重要性评分 1-10，失败时返回 5（默认值）
+        """
+        prompt = (
+            f"请对以下角色记忆事件的重要性进行评分（1-10 分）。\n\n"
+            f"角色: {character_name}\n"
+            f"位置: {location or '未知'}\n"
+            f"动作: {action_id or '未知'}\n"
+            f"理由: {reason or '无'}\n"
+            f"情绪: {mood or '平静'}\n"
+            f"记忆内容: {content}\n\n"
+            f"评分标准：\n"
+            f"- 1-3 分: 日常琐事（吃饭、休息、等待）\n"
+            f"- 4-5 分: 普通行为（移动、购物、工作）\n"
+            f"- 6-7 分: 有意义的事件（社交、学习、探索）\n"
+            f"- 8-9 分: 重要事件（达成目标、深度互动、冒险）\n"
+            f"- 10 分: 里程碑事件（人生转折、重大成就）\n\n"
+            f"只输出一个 1-10 的整数，不要其他任何内容。"
+        )
+
+        try:
+            response = await self.llm.chat(prompt, model="chat")
+            # 提取数字（容错：LLM 可能返回 "7" 或 "7分" 或 "重要性：7"）
+            match = re.search(r"\b(\d+)\b", response.strip())
+            if match:
+                score = int(match.group(1))
+                return max(1, min(10, score))
+            logger.warning(
+                "llm_importance_parse_failed",
+                response=response[:100],
+                fallback=5,
+            )
+            return 5
+        except Exception as e:
+            logger.warning(
+                "llm_importance_scoring_failed",
+                error=str(e),
+                fallback=5,
+            )
+            return 5
+
     async def create_episode(
         self,
         character_id: UUID,
@@ -31,28 +104,58 @@ class EpisodeService:
         action_id: str | None = None,
         location: str | None = None,
         importance: int = 5,
+        character_name: str | None = None,
+        reason: str | None = None,
+        mood: str | None = None,
     ) -> MemoryEpisode:
         """创建记忆片段
 
         ⚠️ embedding 由 EmbeddingWorker 异步生成，此处不阻塞 Tick 循环。
         新记忆 materialized=false, embedding=NULL，worker 批量拉取后调 LLM 生成。
 
+        重要性评分：
+        - 若 MEMORY_LLM_SCORING_ENABLED=true 且提供 character_name，
+          调用 LLM 评分（更精准），失败时回退到传入的 importance
+        - 否则使用调用方计算的规则评分 importance
+
         Args:
             character_id: 角色 ID
             content: 记忆内容（自然语言描述）
             action_id: 关联 Action ID
             location: 发生场景
-            importance: 重要性评分（1-10）
+            importance: 规则评分（1-10），LLM 评分启用时作为回退值
+            character_name: 角色名（LLM 评分所需）
+            reason: 决策理由（LLM 评分所需）
+            mood: 当前情绪（LLM 评分所需）
 
         Returns:
             MemoryEpisode 实体
         """
+        final_importance = importance
+
+        # LLM 评分（可选，环境变量控制）
+        if settings.memory_llm_scoring_enabled and character_name:
+            final_importance = await self.score_importance_with_llm(
+                character_name=character_name,
+                content=content,
+                action_id=action_id,
+                reason=reason,
+                mood=mood,
+                location=location,
+            )
+            logger.info(
+                "memory_importance_llm_scored",
+                character_id=str(character_id),
+                rule_importance=importance,
+                llm_importance=final_importance,
+            )
+
         episode = MemoryEpisode(
             character_id=character_id,
             content=content,
             embedding=None,          # 异步 worker 生成
             materialized=False,      # 标记为未向量化
-            importance=importance,
+            importance=final_importance,
             timestamp=datetime.now(timezone.utc),
             action_id=action_id,
             location=location,
@@ -62,7 +165,8 @@ class EpisodeService:
         logger.info(
             "memory_episode_created",
             character_id=str(character_id),
-            importance=importance,
+            importance=final_importance,
+            scoring_method="llm" if settings.memory_llm_scoring_enabled and character_name else "rule",
         )
         return saved
 

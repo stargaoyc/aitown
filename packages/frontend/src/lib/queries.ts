@@ -241,3 +241,19 @@ export function useVectorSearch() {
     }) => api.vectorSearch(characterId, query, topK),
   });
 }
+
+export function useLogs(lines = 100, level?: string, refetchInterval = 5000) {
+  return useQuery({
+    queryKey: ["logs", lines, level],
+    queryFn: () => api.getLogs(lines, level),
+    refetchInterval,
+  });
+}
+
+export function useDetailedMetrics(refetchInterval = 5000) {
+  return useQuery({
+    queryKey: ["detailedMetrics"],
+    queryFn: () => api.getDetailedMetrics(),
+    refetchInterval,
+  });
+}

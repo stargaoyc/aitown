@@ -59,6 +59,7 @@ class CharacterCard(BaseModel):
     name: str = Field(min_length=1, max_length=100, description="角色名")
     age: int | None = Field(default=None, ge=0, le=200)
     occupation: str | None = Field(default=None, max_length=100)
+    is_active: bool = Field(default=True, description="是否立即激活")
     personality: list[str] = Field(default_factory=list, description="性格标签")
     traits: dict[str, Any] = Field(default_factory=dict, description="特征字典")
     backstory: str | None = None

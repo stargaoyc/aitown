@@ -20,6 +20,7 @@ import { Route as ReflectionsRouteImport } from './routes/reflections'
 import { Route as QqMonitorRouteImport } from './routes/qq-monitor'
 import { Route as PlansRouteImport } from './routes/plans'
 import { Route as NotificationsRouteImport } from './routes/notifications'
+import { Route as MonitoringRouteImport } from './routes/monitoring'
 import { Route as MetricsRouteImport } from './routes/metrics'
 import { Route as MemoriesRouteImport } from './routes/memories'
 import { Route as MapRouteImport } from './routes/map'
@@ -91,6 +92,11 @@ const PlansRoute = PlansRouteImport.update({
 const NotificationsRoute = NotificationsRouteImport.update({
   id: '/notifications',
   path: '/notifications',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MonitoringRoute = MonitoringRouteImport.update({
+  id: '/monitoring',
+  path: '/monitoring',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MetricsRoute = MetricsRouteImport.update({
@@ -195,6 +201,7 @@ export interface FileRoutesByFullPath {
   '/map': typeof MapRoute
   '/memories': typeof MemoriesRoute
   '/metrics': typeof MetricsRoute
+  '/monitoring': typeof MonitoringRoute
   '/notifications': typeof NotificationsRoute
   '/plans': typeof PlansRoute
   '/qq-monitor': typeof QqMonitorRoute
@@ -224,6 +231,7 @@ export interface FileRoutesByTo {
   '/map': typeof MapRoute
   '/memories': typeof MemoriesRoute
   '/metrics': typeof MetricsRoute
+  '/monitoring': typeof MonitoringRoute
   '/notifications': typeof NotificationsRoute
   '/plans': typeof PlansRoute
   '/qq-monitor': typeof QqMonitorRoute
@@ -255,6 +263,7 @@ export interface FileRoutesById {
   '/map': typeof MapRoute
   '/memories': typeof MemoriesRoute
   '/metrics': typeof MetricsRoute
+  '/monitoring': typeof MonitoringRoute
   '/notifications': typeof NotificationsRoute
   '/plans': typeof PlansRoute
   '/qq-monitor': typeof QqMonitorRoute
@@ -287,6 +296,7 @@ export interface FileRouteTypes {
     | '/map'
     | '/memories'
     | '/metrics'
+    | '/monitoring'
     | '/notifications'
     | '/plans'
     | '/qq-monitor'
@@ -316,6 +326,7 @@ export interface FileRouteTypes {
     | '/map'
     | '/memories'
     | '/metrics'
+    | '/monitoring'
     | '/notifications'
     | '/plans'
     | '/qq-monitor'
@@ -346,6 +357,7 @@ export interface FileRouteTypes {
     | '/map'
     | '/memories'
     | '/metrics'
+    | '/monitoring'
     | '/notifications'
     | '/plans'
     | '/qq-monitor'
@@ -377,6 +389,7 @@ export interface RootRouteChildren {
   MapRoute: typeof MapRoute
   MemoriesRoute: typeof MemoriesRoute
   MetricsRoute: typeof MetricsRoute
+  MonitoringRoute: typeof MonitoringRoute
   NotificationsRoute: typeof NotificationsRoute
   PlansRoute: typeof PlansRoute
   QqMonitorRoute: typeof QqMonitorRoute
@@ -467,6 +480,13 @@ declare module '@tanstack/react-router' {
       path: '/notifications'
       fullPath: '/notifications'
       preLoaderRoute: typeof NotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/monitoring': {
+      id: '/monitoring'
+      path: '/monitoring'
+      fullPath: '/monitoring'
+      preLoaderRoute: typeof MonitoringRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/metrics': {
@@ -621,6 +641,7 @@ const rootRouteChildren: RootRouteChildren = {
   MapRoute: MapRoute,
   MemoriesRoute: MemoriesRoute,
   MetricsRoute: MetricsRoute,
+  MonitoringRoute: MonitoringRoute,
   NotificationsRoute: NotificationsRoute,
   PlansRoute: PlansRoute,
   QqMonitorRoute: QqMonitorRoute,

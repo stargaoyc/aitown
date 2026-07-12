@@ -345,11 +345,13 @@ function ComparePage() {
                       </div>
                       <div className="text-sm text-twilight-600 bg-white/40 rounded-lg px-2 py-1.5 border border-white/40 break-words">
                         {state?.current_action
-                          ? typeof state.current_action === "object" &&
-                            "action_id" in state.current_action
+                          ? typeof state.current_action === "object"
                             ? String(
                                 (state.current_action as Record<string, unknown>)
-                                  .action_id,
+                                  .action_name ??
+                                (state.current_action as Record<string, unknown>)
+                                  .action_id ??
+                                "无",
                               )
                             : JSON.stringify(state.current_action)
                           : "无"}
