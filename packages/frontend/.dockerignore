@@ -1,0 +1,8 @@
+# packages/frontend/.dockerignore
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+.env
+*.md
+.git/

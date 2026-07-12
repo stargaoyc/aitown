@@ -4,6 +4,7 @@
 - 列出所有可用工具及其描述
 - 通过 HTTP/SSE 调用 MCP Server 的工具
 - 工具结果返回给角色 Tick 引擎，注入记忆
+- 支持按 Server 粒度启用/禁用（状态存储在 Redis hash `mcp:enabled`）
 
 使用方式：
     client = MCPClient()
@@ -19,6 +20,9 @@ import httpx
 from structlog import get_logger
 
 logger = get_logger(__name__)
+
+# Redis hash key：存储各 MCP Server 的启用状态（值为 "true" / "false"）
+MCP_ENABLED_KEY = "mcp:enabled"
 
 
 # MCP Server 配置（与 main.py 中的 _MCP_SERVERS_CONFIG 保持一致）
@@ -71,11 +75,49 @@ MCP_SERVERS: list[dict[str, Any]] = [
 ]
 
 
+def _get_redis():
+    """延迟获取全局 Redis 客户端（避免循环导入）"""
+    from src.main import redis  # type: ignore
+    return redis
+
+
+async def get_enabled_servers() -> set[str]:
+    """从 Redis 读取已启用的 MCP Server 名称集合
+
+    Redis hash `mcp:enabled` 存储 {server_name: "true"|"false"}。
+    未配置（hash 为空）时默认全部启用。
+
+    Returns:
+        已启用的 Server 名称集合；Redis 不可用时返回全部 Server 名。
+    """
+    r = _get_redis()
+    if r is None:
+        return {cfg["name"] for cfg in MCP_SERVERS}
+    try:
+        raw = await r.hgetall(MCP_ENABLED_KEY)
+        if not raw:
+            return {cfg["name"] for cfg in MCP_SERVERS}
+        return {
+            name for name, enabled in raw.items()
+            if str(enabled).lower() in ("true", "1", "yes")
+        }
+    except Exception:
+        logger.warning("mcp_enabled_read_failed", exc_info=True)
+        return {cfg["name"] for cfg in MCP_SERVERS}
+
+
+async def is_server_enabled(server_name: str) -> bool:
+    """检查单个 MCP Server 是否启用"""
+    enabled = await get_enabled_servers()
+    return server_name in enabled
+
+
 class MCPClient:
     """MCP 工具客户端
 
     通过 HTTP 调用 MCP Server 的工具接口。
     如果 Server 离线，返回错误信息但不中断 Tick 流程。
+    支持按 Server 粒度启用/禁用（状态存储在 Redis）。
     """
 
     def __init__(self, timeout: float = 15.0):
@@ -91,10 +133,16 @@ class MCPClient:
                 )
         return None
 
-    def list_tools(self) -> list[dict[str, Any]]:
-        """列出所有可用工具（静态配置，不依赖 Server 在线）"""
+    async def list_tools(self) -> list[dict[str, Any]]:
+        """列出所有已启用 Server 的可用工具（静态配置，不依赖 Server 在线）
+
+        被 Redis 中标记为禁用的 Server 的工具不会被列出。
+        """
+        enabled = await get_enabled_servers()
         tools = []
         for cfg in MCP_SERVERS:
+            if cfg["name"] not in enabled:
+                continue
             for tool_name, tool_info in cfg["tools"].items():
                 tools.append({
                     "server": cfg["name"],
@@ -105,10 +153,13 @@ class MCPClient:
                 })
         return tools
 
-    def format_tools_for_prompt(self) -> str:
-        """格式化工具列表供 LLM Prompt 使用"""
+    async def format_tools_for_prompt(self) -> str:
+        """格式化工具列表供 LLM Prompt 使用（仅包含已启用的 Server）"""
+        tools = await self.list_tools()
+        if not tools:
+            return "（暂无可用工具，可在设置页启用 MCP 插件）"
         lines = []
-        for t in self.list_tools():
+        for t in tools:
             params_str = ", ".join(f'{k}: {v}' for k, v in t["params"].items())
             lines.append(f"- {t['full_name']}({params_str}): {t['description']}")
         return "\n".join(lines)
@@ -133,6 +184,14 @@ class MCPClient:
         endpoint = self.get_server_endpoint(server_name)
         if not endpoint:
             return {"success": False, "error": f"Unknown server: {server_name}", "result": None}
+
+        # 检查该 Server 是否已被禁用
+        if not await is_server_enabled(server_name):
+            return {
+                "success": False,
+                "error": f"MCP Server '{server_name}' is disabled",
+                "result": None,
+            }
 
         try:
             async with httpx.AsyncClient(timeout=self.timeout) as client:

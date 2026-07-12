@@ -290,11 +290,101 @@ mcp:
 | 端点 | 方法 | 说明 | 状态 |
 |------|------|------|------|
 | `/api/v1/modules` | GET | 模块列表（含运行状态） | ✅ |
-| `/api/v1/mcp/servers` | GET | MCP Server 列表（含工具清单） | ✅ |
+| `/api/v1/mcp/servers` | GET | MCP Server 列表（含工具清单 + `enabled` 字段） | ✅ |
 | `/api/v1/mcp/servers/{name}` | GET | 单个 MCP Server 详情 | ✅ |
-| `/api/v1/mcp/tools` | GET | 所有可用工具列表 | ✅ |
+| `/api/v1/mcp/servers/{server_name}/enabled` | PUT | **动态启用/禁用单个 MCP Server**（Redis 持久化） | ✅ |
+| `/api/v1/mcp/tools` | GET | 所有可用工具列表（仅返回已启用 Server 的工具） | ✅ |
 
 详细请求/响应见 [API设计文档](api-spec.md)。
+
+### 5.1 MCP 插件单独开关（Redis 持久化）
+
+#### 设计目标
+
+每个 MCP Server 都可独立启用/禁用，无需重启后端。开关状态持久化到 Redis，重启后自动恢复。前端 Dashboard 提供可视化 toggle 控件。
+
+#### 实现架构
+
+```text
+┌──────────────────────────────────────────────────────────┐
+│  前端 Dashboard (/settings)                              │
+│  ┌──────────────────────────────────────────────────┐    │
+│  │  MCP Server 卡片                                 │    │
+│  │  ┌────────────┐  ┌──────────┐  ┌────────────┐  │    │
+│  │  │ code-exec  │  │ shop-sim │  │ web-search │  │    │
+│  │  │ [ON/OFF]   │  │ [ON/OFF] │  │ [ON/OFF]   │  │    │
+│  │  └────────────┘  └──────────┘  └────────────┘  │    │
+│  └──────────────────────────────────────────────────┘    │
+└────────────────────────┬─────────────────────────────────┘
+                         │ PUT /api/v1/mcp/servers/{name}/enabled
+                         ▼
+┌──────────────────────────────────────────────────────────┐
+│  后端 (main.py)                                          │
+│  ┌──────────────────────────────────────────────────┐    │
+│  │  PUT /api/v1/mcp/servers/{server_name}/enabled   │    │
+│  │  → redis.hset("mcp:enabled", server_name, bool)  │    │
+│  └──────────────────────────────────────────────────┘    │
+└────────────────────────┬─────────────────────────────────┘
+                         │ Redis hash: mcp:enabled
+                         ▼
+┌──────────────────────────────────────────────────────────┐
+│  Redis                                                   │
+│  ┌──────────────────────────────────────────────────┐    │
+│  │  HGETALL mcp:enabled                             │    │
+│  │  ┌─────────────────┬─────────┐                   │    │
+│  │  │ Field           │ Value   │                   │    │
+│  │  ├─────────────────┼─────────┤                   │    │
+│  │  │ code-executor   │ true    │                   │    │
+│  │  │ shop-simulator  │ false   │  ← 已禁用         │    │
+│  │  │ web-search      │ true    │                   │    │
+│  │  └─────────────────┴─────────┘                   │    │
+│  └──────────────────────────────────────────────────┘    │
+└──────────────────────────────────────────────────────────┘
+                         │ 读取开关状态
+                         ▼
+┌──────────────────────────────────────────────────────────┐
+│  MCPClient (mcp/client.py)                               │
+│  ┌──────────────────────────────────────────────────┐    │
+│  │  async list_tools()                              │    │
+│  │    → get_enabled_servers() 过滤禁用 Server        │    │
+│  │  async format_tools_for_prompt()                 │    │
+│  │    → 仅注入已启用 Server 的工具到 LLM Prompt      │    │
+│  │  async call_tool(name, params)                   │    │
+│  │    → is_server_enabled() 检查，禁用则抛异常       │    │
+│  └──────────────────────────────────────────────────┘    │
+└──────────────────────────────────────────────────────────┘
+```
+
+#### 关键代码位置
+
+| 文件 | 函数/方法 | 说明 |
+|------|-----------|------|
+| `src/mcp/client.py` | `MCP_ENABLED_KEY = "mcp:enabled"` | Redis hash key 常量 |
+| `src/mcp/client.py` | `_get_redis()` | 延迟导入全局 Redis 客户端（`from src.main import redis`） |
+| `src/mcp/client.py` | `get_enabled_servers()` | 读取 Redis hash，返回启用的 Server 集合（未配置时默认全部启用） |
+| `src/mcp/client.py` | `is_server_enabled(name)` | 检查单个 Server 是否启用 |
+| `src/mcp/client.py` | `async list_tools()` | 异步方法，过滤禁用 Server 的工具 |
+| `src/mcp/client.py` | `async format_tools_for_prompt()` | 异步方法，仅注入已启用工具到 LLM Prompt |
+| `src/mcp/client.py` | `async call_tool(name, params)` | 调用前检查启用状态，禁用则抛 `RuntimeError` |
+| `src/main.py` | `PUT /api/v1/mcp/servers/{server_name}/enabled` | 切换开关的 API 端点 |
+| `src/main.py` | `list_mcp_servers()` | 响应中包含 `enabled` 字段 |
+| `packages/frontend/src/routes/settings.tsx` | MCP 服务器卡片 toggle | 前端 toggle 控件（sakura 色主题） |
+| `packages/frontend/src/lib/api.ts` | `toggleMcpServer(name, enabled)` | 前端 API 调用方法 |
+| `packages/frontend/src/lib/queries.ts` | `useToggleMcpServer` | TanStack Query mutation hook |
+
+#### 默认行为
+
+- **未配置开关时**：`get_enabled_servers()` 返回所有已注册 Server，即默认全部启用；
+- **配置后**：仅 Redis hash 中值为 `true` 的 Server 被启用；
+- **重启后端**：Redis 中开关状态自动恢复，无需重新配置。
+
+#### 前端 UI 设计
+
+- 每个 MCP Server 卡片右上角显示 toggle 开关按钮；
+- 启用状态：sakura 色主题（樱花粉），显示"已启用"标签；
+- 禁用状态：灰色 + `opacity-70` + "已禁用"标签；
+- 点击 toggle 立即调用 API，无需额外确认；
+- 切换成功后自动刷新 MCP Server 列表（TanStack Query 缓存失效）。
 
 ---
 
@@ -317,3 +407,5 @@ mcp:
 | 数据模型（module_configs） | [data-model.md](data-model.md) |
 | API 设计 | [api-spec.md](api-spec.md) |
 | 配置参考 | [config-reference.md](config-reference.md) |
+| 前端设计（MCP toggle UI） | [frontend-design.md](frontend-design.md) |
+| Docker 部署 | [docker-deployment.md](docker-deployment.md) |

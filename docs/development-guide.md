@@ -502,3 +502,5 @@ curl -X POST http://localhost:8000/api/v1/admin/tick \
 | 架构总览 | [architecture.md](architecture.md) |
 | 配置参考 | [config-reference.md](config-reference.md) |
 | 部署 | [deployment.md](deployment.md) |
+| Docker 部署 | [docker-deployment.md](docker-deployment.md) |
+| 新手学习指南 | [getting-started.md](getting-started.md) |

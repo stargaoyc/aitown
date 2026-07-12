@@ -46,8 +46,17 @@
 | `MODEL_EMBEDDING` | 否 | text-embedding-3-small | embedding 模型 |
 | `LLM_TIMEOUT` | 否 | 30 | LLM 调用超时（秒） |
 | `LLM_MAX_RETRIES` | 否 | 2 | 最大重试次数 |
+| `LLM_DAILY_BUDGET_USD` | 否 | 10.0 | 每日 LLM 成本预算上限（超预算自动降级到 flash 模型） |
 
-### 1.5 MCP Servers
+### 1.5 记忆系统
+
+| 变量 | 必填 | 默认 | 说明 |
+|------|------|------|------|
+| `MEMORY_LLM_SCORING_ENABLED` | 否 | `false` | 是否启用 LLM 记忆重要程度评分。启用后，每条事件由 LLM 按 1-10 分评分（基于情感强度、关系影响、稀缺性、后续影响）；禁用时使用默认固定分值 5 |
+
+> **说明**：LLM 评分会额外消耗 Token，建议在低角色数（<10）或调试期启用。生产环境 50 角色时建议保持 `false` 以控制成本。
+
+### 1.6 MCP Servers
 
 | 变量 | 必填 | 默认 | 说明 |
 |------|------|------|------|
@@ -58,7 +67,9 @@
 | `MCP_KB_SERVER` | 否 | — | 知识库 Server URL |
 | `MCP_TOOL_TIMEOUT` | 否 | 30 | 工具调用超时（秒） |
 
-### 1.6 可观测性
+> **MCP 插件开关**：每个 MCP Server 的启用/禁用状态存储在 Redis hash `mcp:enabled` 中，通过前端 Dashboard 或 `PUT /api/v1/mcp/servers/{name}/enabled` API 控制。未配置时默认全部启用。详见 [模块与 MCP 系统设计](module-system.md#51-mcp-插件单独开关redis-持久化)。
+
+### 1.7 可观测性
 
 | 变量 | 必填 | 默认 | 说明 |
 |------|------|------|------|
@@ -74,7 +85,7 @@
 
 ---
 
-### 1.7 消息平台
+### 1.8 消息平台
 
 #### OneBot（QQ 接入）
 
@@ -111,7 +122,7 @@ ONEBOT_GROUP_CHARACTER_MAP={"群号A":"角色UUID-A","群号B":"角色UUID-B"}
 | `LARK_APP_SECRET` | 否 | — | 飞书应用密钥 |
 | `WEB_WS_PATH` | 否 | /ws | Web WebSocket 路径 |
 
-### 1.8 鉴权
+### 1.9 鉴权
 
 | 变量 | 必填 | 默认 | 说明 |
 |------|------|------|------|
@@ -120,7 +131,7 @@ ONEBOT_GROUP_CHARACTER_MAP={"群号A":"角色UUID-A","群号B":"角色UUID-B"}
 | `JWT_EXPIRE_HOURS` | 否 | 24 | JWT 过期时间 |
 | `API_KEY` | 否 | — | 第三方集成 API Key |
 
-### 1.9 世界引擎
+### 1.10 世界引擎
 
 | 变量 | 必填 | 默认 | 说明 |
 |------|------|------|------|
@@ -442,7 +453,12 @@ scenes:
 | embedding 维度 | 1536 | OpenAI small |
 | 连接池大小 | 20 | — |
 | LLM 超时 | 30s | — |
+| LLM 日预算 | 10.0 USD | 超预算降级到 flash |
 | MCP 工具超时 | 30s | — |
+| MCP 插件开关 | 全部启用 | Redis `mcp:enabled` 未配置时默认 |
+| 记忆 LLM 评分 | 关闭 (`false`) | `MEMORY_LLM_SCORING_ENABLED` |
+| OneBot 群聊回复模式 | 智能回复 (`false`) | `ONEBOT_GROUP_AT_ONLY` |
+| OneBot 群聊回复概率上限 | 0.4 | `GROUP_REPLY_PROBABILITY_CAP` |
 | JWT 过期 | 24h | — |
 | Trace 采样率 | 0.5 | — |
 
@@ -453,5 +469,7 @@ scenes:
 | 主题 | 文档 |
 |------|------|
 | 部署环境变量 | [deployment.md](deployment.md#三环境变量清单) |
+| Docker 部署 | [docker-deployment.md](docker-deployment.md) |
 | 模块系统 | [module-system.md](module-system.md) |
 | 世界引擎参数 | [world-engine.md](world-engine.md#六配置参数) |
+| 记忆系统（LLM 评分） | [memory-system.md](memory-system.md#九llm-记忆重要程度评分) |

@@ -197,9 +197,10 @@ POST /api/v1/modules/code-executor/enable
 
 | 端点 | 方法 | 说明 |
 |------|------|------|
-| `/api/v1/mcp/servers` | GET / POST | MCP Server 列表 / 注册 |
+| `/api/v1/mcp/servers` | GET / POST | MCP Server 列表（含 `enabled` 字段）/ 注册 |
 | `/api/v1/mcp/servers/{id}` | DELETE | 注销 MCP Server |
-| `/api/v1/mcp/tools` | GET | 所有可用工具列表（聚合所有 Server） |
+| `/api/v1/mcp/servers/{server_name}/enabled` | PUT | **动态启用/禁用 MCP Server**（Redis 持久化） |
+| `/api/v1/mcp/tools` | GET | 所有可用工具列表（仅返回已启用 Server 的工具） |
 
 #### 查询所有可用工具
 
@@ -216,6 +217,34 @@ GET /api/v1/mcp/tools
   ]
 }
 ```
+
+#### 切换 MCP Server 启用状态
+
+```http
+PUT /api/v1/mcp/servers/{server_name}/enabled
+Content-Type: application/json
+
+{ "enabled": false }
+```
+
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "server_name": "shop-simulator",
+    "enabled": false
+  }
+}
+```
+
+**说明**：
+- 开关状态持久化到 Redis hash `mcp:enabled`，重启后端自动恢复；
+- 禁用后，`list_tools()` 和 `format_tools_for_prompt()` 不再返回该 Server 的工具；
+- 调用已禁用 Server 的工具会抛 `RuntimeError`；
+- 未配置开关时默认全部启用。
+
+详见 [模块与 MCP 系统设计 - MCP 插件单独开关](module-system.md#51-mcp-插件单独开关redis-持久化)。
 
 ### 2.5 会话与消息
 
@@ -282,6 +311,52 @@ GET /api/v1/conversations/{id}/messages?page=1&page_size=20
 | `/api/v1/admin/partitions/precreate` | POST | 手动预创建分区 |
 | `/api/v1/admin/tick` | POST | 强制触发某角色 Tick（调试用） |
 | `/api/v1/admin/restore-snapshot` | POST | 用指定快照重置世界态（调试用） |
+| `/api/v1/admin/logs` | GET | 读取后端日志文件（支持行数与级别过滤） |
+| `/api/v1/admin/metrics-detail` | GET | 解析 Prometheus 指标为结构化 JSON（World/Character/Action/LLM/Message/HTTP 分类） |
+
+#### 读取后端日志
+
+```http
+GET /api/v1/admin/logs?lines=200&level=ERROR
+```
+
+```json
+{
+  "code": 0,
+  "data": {
+    "file": "data/logs/backend.log",
+    "lines": 200,
+    "level": "ERROR",
+    "content": "[2026-07-12 10:23:45] ERROR src.core.world_engine: tick_failed ..."
+  }
+}
+```
+
+**参数**：
+- `lines`（可选，默认 200）：返回最后 N 行日志；
+- `level`（可选，默认全部）：过滤日志级别（DEBUG/INFO/WARN/ERROR）。
+
+#### 解析 Prometheus 指标
+
+```http
+GET /api/v1/admin/metrics-detail
+```
+
+```json
+{
+  "code": 0,
+  "data": {
+    "world": { "tick_total": 1234, "tick_duration_p95": 1.2 },
+    "character": { "active_count": 8, "tick_duration_p95": 2.1 },
+    "action": { "success_rate": 0.98, "total": 5678 },
+    "llm": { "call_total": 890, "cost_total_usd": 1.23, "error_rate": 0.01 },
+    "message": { "processed_total": 234, "response_time_p95": 3.4 },
+    "http": { "request_total": 5678, "error_5xx_rate": 0.001 }
+  }
+}
+```
+
+**说明**：该端点解析 `/metrics` Prometheus 文本格式，转换为结构化 JSON 便于前端监控页面直接消费，无需对接 Grafana。
 
 ---
 
@@ -401,3 +476,4 @@ data: {"trace_id":"def","span":"llm.generate","model":"gpt-4o","tokens":450}
 | 模块系统 | [module-system.md](module-system.md) |
 | 数据模型 | [data-model.md](data-model.md) |
 | 配置参考 | [config-reference.md](config-reference.md) |
+| 可观测性端点 | [observability.md](observability.md) |

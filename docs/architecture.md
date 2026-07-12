@@ -1849,3 +1849,5 @@ shutdown 顺序（逆序）：
 | 模块管理与 MCP | [module-system.md](module-system.md) |
 | 数据模型 DDL | [data-model.md](data-model.md) |
 | 部署与高可用 | [deployment.md](deployment.md) |
+| Docker 部署指南 | [docker-deployment.md](docker-deployment.md) |
+| 项目不足审查与改进 | [gap-analysis.md](gap-analysis.md) |

@@ -1819,7 +1819,10 @@ uvicorn src.main:app --reload --port 8001
 12. **[frontend-design.md](frontend-design.md)**：前端设计
 13. **[observability.md](observability.md)**：可观测性
 14. **[deployment.md](deployment.md)**：部署与运维
-15. **[development-guide.md](development-guide.md)**：开发指南
+15. **[docker-deployment.md](docker-deployment.md)**：Docker 部署指南（完整编排、多阶段构建、Profile 按需启动）
+16. **[development-guide.md](development-guide.md)**：开发指南
+17. **[gap-analysis.md](gap-analysis.md)**：项目不足审查与改进路线图
+18. **[roadmap.md](roadmap.md)**：开发路线图
 
 ### 11.2 如何修改角色行为
 

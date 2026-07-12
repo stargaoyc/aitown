@@ -266,15 +266,45 @@ export function CharacterCard({ character }: { character: Character }) {
 
 ## 三、页面详细功能
 
-| 页面 | 核心功能 | 关键组件 |
-|------|----------|----------|
-| 仪表盘 | 总览卡片、趋势图、最近事件流、世界时钟 | GlassCard、Recharts、滚动列表 |
-| 小镇管理 | 世界状态控制（时间/天气）、场景地图、事件广播 | 可视化地图、控制面板 |
-| 角色管理 | 角色卡牌墙、详情侧滑、实时状态、关系图谱 | CharacterCard、关系图 |
-| 模块管理 | 模块列表（类型/状态/依赖）、开关控制、MCP Server 管理 | 表格、开关组件、日志查看器 |
-| 会话监控 | 多渠道会话列表、对话详情、人工干预 | 聊天气泡（二次元风格）、消息编辑器 |
-| 可观测性 | 调用链追踪、日志查询、指标图表、告警配置 | Trace 视图、日志搜索、图表面板 |
-| 系统设置 | 模型配置、Prompt 编辑、权限管理 | 表单、代码编辑器 |
+实际已实现 24 个页面，覆盖完整的管理与监控场景：
+
+| 页面路由 | 核心功能 | 关键组件 |
+|----------|----------|----------|
+| `/` 仪表盘 | 总览卡片、趋势图、最近事件流、世界时钟 | GlassCard、Recharts、滚动列表 |
+| `/characters` 角色列表 | 角色卡牌墙、状态/位置/当前行为 | CharacterCard、状态条 |
+| `/characters/$characterId` 角色详情 | 状态、记忆、计划、关系、行为日志 | 标签页切换、Recharts |
+| `/characters/import` 角色导入 | YAML/JSON 角色卡导入 | 表单、文件上传 |
+| `/characters/compare` 角色对比 | 多角色状态对比 | 对比表格、Recharts |
+| `/map` 小镇地图 | 场景热力图、拥挤度可视化 | 可视化地图 |
+| `/memory` 记忆时间线 | 记忆查询、重要程度筛选 | 时间线、向量检索 |
+| `/memory/$characterId/reflections` 反思查看器 | 反思列表、来源记忆追溯 | 卡片列表 |
+| `/memory/vector-search` 向量检索测试 | 输入查询、查看相似记忆 | 搜索表单、结果列表 |
+| `/plans` 规划系统 | 角色计划列表、进度跟踪 | 看板、进度条 |
+| `/relations` 关系图谱 | 角色关系网络可视化 | 关系图、力导向图 |
+| `/events` 世界事件时间线 | 事件流、可展开 EventCard | Framer Motion AnimatePresence |
+| `/actions` 角色行为日志 | 行为历史、参数详情 | 表格、JSON 查看器 |
+| `/messages` QQ 消息监控 | 消息列表、会话详情 | 聊天气泡、消息编辑器 |
+| `/messages/proactive` 主动分享历史 | 分享记录、文案查看 | 卡片列表 |
+| `/messages/export` 聊天记录导出 | 导出会话记录 | 表单、下载 |
+| `/conversations` 会话管理 | 多渠道会话列表 | 表格 |
+| `/monitoring` 监控 | Grafana 集成 + 原生日志/指标面板 | iframe、GlassCard |
+| `/monitoring/llm-cost` LLM 成本仪表盘 | Token 消耗、成本趋势 | Recharts |
+| `/snapshots` 世界快照管理 | 快照列表、冷启动恢复 | 表格、操作按钮 |
+| `/character-cards` 角色卡预览 | 角色卡渲染预览 | 卡片组件 |
+| `/notifications` 通知中心 | 系统通知列表 | 列表 |
+| `/settings` 系统设置 | 模型配置、Prompt 编辑、**MCP 插件开关** | 表单、toggle 控件 |
+| `/settings/mcp` MCP 服务器管理 | MCP Server 列表、工具清单、启用状态 | 表格、toggle |
+
+### 3.1 MCP 插件开关 UI
+
+设置页 `/settings` 中的 MCP 服务器卡片提供 toggle 开关：
+
+- **启用状态**：sakura 色主题（樱花粉 #FF8FAB），显示"已启用"绿色标签；
+- **禁用状态**：灰色 + `opacity-70`，显示"已禁用"灰色标签；
+- **交互**：点击 toggle 立即调用 `PUT /api/v1/mcp/servers/{name}/enabled`，成功后 TanStack Query 自动刷新列表；
+- **数据流**：`useToggleMcpServer` mutation → `toggleMcpServer` API → 后端 Redis `hset mcp:enabled`。
+
+详见 [模块与 MCP 系统设计 - MCP 插件单独开关](module-system.md#51-mcp-插件单独开关redis-持久化)。
 
 ---
 
@@ -532,3 +562,4 @@ pnpm preview                # 预览生产构建
 | API 端点 | [api-spec.md](api-spec.md) |
 | 可观测性前端展示 | [observability.md](observability.md) |
 | 部署 | [deployment.md](deployment.md) |
+| Docker 部署 | [docker-deployment.md](docker-deployment.md) |

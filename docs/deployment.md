@@ -1,6 +1,8 @@
 # 部署与运维
 
 > 本文档定义 AI Town 的部署架构、容器化、环境变量、容量规划、备份与高可用。
+>
+> 📌 **Docker 一键部署**：如需完整的 Docker Compose 编排（含多阶段构建、Nginx 反代、Profile 按需启动、生产环境配置），请参阅 [Docker 部署指南](docker-deployment.md)。本文档侧重部署架构设计与运维策略。
 
 ---
 
@@ -472,6 +474,7 @@ curl -X POST http://localhost:8000/api/v1/admin/partitions/precreate \
 
 | 主题 | 文档 |
 |------|------|
+| Docker 部署指南 | [docker-deployment.md](docker-deployment.md) |
 | 配置参考 | [config-reference.md](config-reference.md) |
 | 可观测性 | [observability.md](observability.md) |
 | 数据模型 | [data-model.md](data-model.md) |

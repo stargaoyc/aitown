@@ -1,0 +1,268 @@
+# docker-compose.yml - AI Town 完整生产部署编排
+# 包含：基础设施（PG/Redis/MinIO）+ 应用（后端/前端/MCP）+ 可观测性（Prometheus/Grafana/Loki/Jaeger）
+#
+# 使用方法：
+#   1. 复制 .env.example 为 .env 并填写配置
+#   2. docker compose up -d
+#   3. 访问 http://localhost （前端）/ http://localhost:8000/docs （后端 API）
+#
+# 分层启动：
+#   docker compose up -d postgres redis minio           # 仅基础设施
+#   docker compose up -d backend frontend               # 加应用
+#   docker compose --profile observability up -d        # 加可观测性
+
+services:
+  # ============================================================
+  # 基础设施层
+  # ============================================================
+
+  postgres:
+    build:
+      context: ./docker/postgres
+      dockerfile: Dockerfile
+    container_name: aitown-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ai_town
+      POSTGRES_USER: ${DB_USER:-ai_town}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-ai_town}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [aitown-net]
+
+  redis:
+    image: redis:8.0-alpine
+    container_name: aitown-redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks: [aitown-net]
+
+  minio:
+    image: minio/minio
+    container_name: aitown-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    networks: [aitown-net]
+
+  # ============================================================
+  # 应用层
+  # ============================================================
+
+  backend:
+    build:
+      context: ./packages/backend
+      dockerfile: Dockerfile
+    container_name: aitown-backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${DB_USER:-ai_town}:${DB_PASSWORD:-password}@postgres:5432/ai_town
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data/logs:/app/data/logs
+    networks: [aitown-net]
+
+  frontend:
+    build:
+      context: ./packages/frontend
+      dockerfile: Dockerfile
+    container_name: aitown-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    networks: [aitown-net]
+
+  # ============================================================
+  # MCP Server 层（按需启用）
+  # ============================================================
+
+  mcp-web-search:
+    build:
+      context: ./packages/mcp-servers
+      dockerfile: Dockerfile
+      args:
+        SERVER: web-search
+    container_name: aitown-mcp-search
+    restart: unless-stopped
+    environment:
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+    ports:
+      - "8002:8002"
+    networks: [aitown-net]
+    profiles: [mcp]
+
+  mcp-weather:
+    build:
+      context: ./packages/mcp-servers
+      dockerfile: Dockerfile
+      args:
+        SERVER: weather
+    container_name: aitown-mcp-weather
+    restart: unless-stopped
+    environment:
+      OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY:-}
+    ports:
+      - "8003:8003"
+    networks: [aitown-net]
+    profiles: [mcp]
+
+  mcp-shop-simulator:
+    build:
+      context: ./packages/mcp-servers
+      dockerfile: Dockerfile
+      args:
+        SERVER: shop-simulator
+    container_name: aitown-mcp-shop
+    restart: unless-stopped
+    ports:
+      - "8004:8004"
+    networks: [aitown-net]
+    profiles: [mcp]
+
+  mcp-knowledge-base:
+    build:
+      context: ./packages/mcp-servers
+      dockerfile: Dockerfile
+      args:
+        SERVER: knowledge-base
+    container_name: aitown-mcp-kb
+    restart: unless-stopped
+    ports:
+      - "8005:8005"
+    networks: [aitown-net]
+    profiles: [mcp]
+
+  mcp-character-social:
+    build:
+      context: ./packages/mcp-servers
+      dockerfile: Dockerfile
+      args:
+        SERVER: character-social
+    container_name: aitown-mcp-social
+    restart: unless-stopped
+    ports:
+      - "8006:8006"
+    networks: [aitown-net]
+    profiles: [mcp]
+
+  # ============================================================
+  # 可观测性层（通过 --profile observability 启用）
+  # ============================================================
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: aitown-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./docker/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks: [aitown-net]
+    profiles: [observability]
+
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: aitown-loki
+    restart: unless-stopped
+    volumes:
+      - ./docker/observability/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    networks: [aitown-net]
+    profiles: [observability]
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.60
+    container_name: aitown-jaeger
+    restart: unless-stopped
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"
+      - "4318:4318"
+    networks: [aitown-net]
+    profiles: [observability]
+
+  alloy:
+    image: grafana/alloy:latest
+    container_name: aitown-alloy
+    restart: unless-stopped
+    volumes:
+      - ./docker/observability/alloy.config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./data/logs:/var/log/aitown:ro
+    command: run --server.http.listen-addr=0.0.0.0:12345 /etc/alloy/config.alloy
+    ports:
+      - "12345:12345"
+    depends_on:
+      - loki
+    networks: [aitown-net]
+    profiles: [observability]
+
+  grafana:
+    image: grafana/grafana:12.0.0
+    container_name: aitown-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin123}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./docker/observability/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./docker/observability/grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+      - ./docker/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+      - loki
+      - jaeger
+    networks: [aitown-net]
+    profiles: [observability]
+
+volumes:
+  pg_data:
+  redis_data:
+  minio_data:
+  prometheus_data:
+  loki_data:
+  grafana_data:
+
+networks:
+  aitown-net:
+    driver: bridge

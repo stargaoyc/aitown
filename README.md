@@ -14,12 +14,15 @@
 | 世界持续运行 | 世界状态推进不依赖用户消息，角色在用户不在时依然生活 |
 | 记忆与演化 | 角色拥有记忆流、反思能力和长期规划，行为长期一致且可演化 |
 | 可插拔能力 | 功能模块（代码执行、搜索、绘图等）可动态启用/禁用，热插拔 |
+| **MCP 插件单独开关** | 每个 MCP Server 都可在前端 Dashboard 单独启用/禁用（Redis 持久化开关状态），无需重启后端，精细控制角色可调用的工具集 |
 | 全链路可观测 | 每个决策周期可追踪、可审计、可调试 |
 | 多端触达 | 支持 Web Dashboard、QQ、飞书等多渠道交互 |
 | **QQ 群聊智能回复** | 不再局限于被 @ 时才回复——读取所有群消息，结合角色名命中、疑问/情绪启发式与轻量级 LLM 判断智能决策是否插话，自然融入群聊 |
 | **多段回复** | 长回复自动按段落拆分为多条消息依次发送，段间附带打字间隔，更像真人说话节奏 |
 | **主动分享** | 角色在 Tick 中产生分享意图时（`proactiveShareIntent`），会主动把小镇中刚发生的事推送给你，无需你先开口 |
 | **反思系统** | 角色定期从记忆流中归纳出高层认知（`ReflectionService.check_and_reflect`），影响后续决策，让陪伴更"懂你" |
+| **LLM 记忆评分** | 通过 `MEMORY_LLM_SCORING_ENABLED` 开关启用 LLM 对事件重要程度进行 1-10 分评分（基于情感强度、关系影响、稀缺性、后续影响），替代默认固定分值 5 |
+| **Docker 一键部署** | 提供完整的 Docker Compose 编排（多阶段构建 + Nginx 反代 + Profile 按需启动），支持开发/生产/可观测性多种部署模式 |
 
 ---
 
@@ -170,8 +173,11 @@ ONEBOT_GROUP_CHARACTER_MAP={"987654321":"01964000-0000-7000-8000-000000000002"}
 | [前端设计](docs/frontend-design.md) | 页面结构、目录结构、实时数据流 |
 | [可观测性设计](docs/observability.md) | 埋点矩阵、链路追踪、指标与告警 |
 | [部署与运维](docs/deployment.md) | 部署架构、容器化、环境变量、容量规划 |
+| [Docker 部署指南](docs/docker-deployment.md) | 完整 Docker Compose 编排、多阶段构建、Profile 按需启动、生产环境配置 |
 | [开发指南](docs/development-guide.md) | 本地开发、代码规范、测试、贡献流程 |
 | [新手学习指南](docs/getting-started.md) | 手把手教学，从零到运行 |
+| [项目不足审查与改进](docs/gap-analysis.md) | 九大维度项目不足审查 + yuiju 项目对比分析 + 改进路线图 |
+| [开发路线图](docs/roadmap.md) | 分阶段任务清单、里程碑、风险与依赖 |
 
 ---
 
@@ -184,23 +190,36 @@ ai-town/
 │   │   ├── src/
 │   │   │   ├── core/           # 世界引擎 / Action 系统
 │   │   │   ├── agents/         # 角色实现
-│   │   │   ├── memory/         # 记忆系统
+│   │   │   ├── memory/         # 记忆系统（含 LLM 评分、反思、Embedding Worker）
 │   │   │   ├── modules/        # 模块管理器
-│   │   │   ├── tools/          # MCP 集成
+│   │   │   ├── tools/          # MCP 集成（含插件开关）
 │   │   │   ├── messaging/      # 消息服务（含主动分享）
 │   │   │   ├── adapters/       # 平台适配器（OneBot 等）
 │   │   │   ├── api/            # FastAPI 路由
 │   │   │   ├── db/             # 数据访问层 (models / repositories / migrations)
-│   │   │   ├── observability/  # OTel 配置
+│   │   │   ├── observability/  # OTel 配置 / Prometheus 指标 / 日志端点
 │   │   │   └── main.py
+│   │   ├── alembic/            # 数据库迁移脚本
+│   │   ├── prompts/            # 系统提示词（独立目录便于维护）
 │   │   ├── pyproject.toml
-│   │   ├── Dockerfile
+│   │   ├── Dockerfile          # 多阶段构建（uv + Python 3.13-slim）
 │   │   └── tests/
 │   ├── frontend/               # React 19 前端 (React Compiler + oxlint + 二次元现代风)
-│   ├── mcp-servers/            # MCP Server 集合 (自研: code-executor/shop/social 等)
+│   │   ├── src/
+│   │   │   ├── routes/         # TanStack Router 文件路由（24 个页面）
+│   │   │   ├── components/     # Glassmorphism 组件 + Framer Motion
+│   │   │   └── lib/            # API 客户端 + TanStack Query hooks
+│   │   ├── Dockerfile          # 多阶段构建（pnpm + Vite → Nginx）
+│   │   └── nginx.conf          # SPA 回退 + API 反代 + WebSocket 反代
+│   ├── mcp-servers/            # MCP Server 集合 (自研: code-executor/shop/social/kb)
+│   │   ├── Dockerfile          # 通用模板（--build-arg SERVER=<name>）
+│   │   ├── code-executor/      # 沙箱代码执行（端口 8001）
+│   │   ├── shop-simulator/     # 商店模拟（端口 8004）
+│   │   ├── character-social/   # 角色社交（端口 8006）
+│   │   └── knowledge-base/     # 小镇设定库（端口 8005）
 │   └── shared/                 # 前后端共享 (types / openapi)
-├── docs/                       # 项目文档
-├── docker-compose.yml
+├── docs/                       # 项目文档（19 篇设计文档 + 部署/审查/路线图）
+├── docker-compose.yml          # 完整生产部署编排（含 Profile 按需启动）
 ├── config.yaml
 ├── .env.example
 └── README.md

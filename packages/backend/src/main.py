@@ -1827,8 +1827,11 @@ async def list_mcp_servers():
     """列出所有已配置的 MCP Server
 
     Returns:
-        MCP Server 列表（含连接地址、工具清单、类型）
+        MCP Server 列表（含连接地址、工具清单、类型、启用状态）
     """
+    from src.mcp import get_enabled_servers
+
+    enabled_set = await get_enabled_servers()
     servers = []
     for cfg in _MCP_SERVERS_CONFIG:
         endpoint = getattr(settings, cfg["env_key"].lower(), None)
@@ -1844,6 +1847,7 @@ async def list_mcp_servers():
             "description": cfg["description"],
             "tools": cfg["tools"],
             "tool_count": len(cfg["tools"]),
+            "enabled": cfg["name"] in enabled_set,
         })
 
     return {
@@ -1887,13 +1891,18 @@ async def get_mcp_server_detail(server_name: str):
 
 @app.get("/api/v1/mcp/tools")
 async def list_all_mcp_tools():
-    """列出所有 MCP Server 提供的工具
+    """列出所有已启用 MCP Server 提供的工具
 
     Returns:
-        所有可用工具的扁平列表（含所属 Server）
+        所有可用工具的扁平列表（含所属 Server，仅含已启用 Server 的工具）
     """
+    from src.mcp import get_enabled_servers
+
+    enabled_set = await get_enabled_servers()
     tools = []
     for cfg in _MCP_SERVERS_CONFIG:
+        if cfg["name"] not in enabled_set:
+            continue
         for tool_name in cfg["tools"]:
             tools.append({
                 "name": tool_name,
@@ -1957,6 +1966,49 @@ async def check_mcp_servers_health_impl():
         "total": len(results),
         "online": sum(1 for r in results if r["status"] == "online"),
         "offline": sum(1 for r in results if r["status"] == "offline"),
+    }
+
+
+@app.put("/api/v1/mcp/servers/{server_name}/enabled")
+async def toggle_mcp_server(
+    server_name: str,
+    payload: dict = Body(...),
+):
+    """启用/禁用单个 MCP Server（前端控制开关）
+
+    状态持久化到 Redis hash `mcp:enabled`，Character Tick 决策时
+    会读取该状态过滤可用工具列表。
+
+    Args:
+        server_name: MCP Server 名称
+        payload: {"enabled": true|false}
+
+    Returns:
+        更新后的启用状态
+    """
+    from src.mcp.client import MCP_ENABLED_KEY
+
+    cfg = next((c for c in _MCP_SERVERS_CONFIG if c["name"] == server_name), None)
+    if cfg is None:
+        raise HTTPException(status_code=404, detail=f"MCP Server '{server_name}' not found")
+
+    enabled = bool(payload.get("enabled", True))
+    if redis is None:
+        raise HTTPException(500, "Redis not available")
+
+    # 写入 Redis hash（值为字符串 "true" / "false"）
+    await redis.hset(MCP_ENABLED_KEY, server_name, "true" if enabled else "false")
+
+    logger.info(
+        "mcp_server_toggled",
+        server=server_name,
+        enabled=enabled,
+    )
+
+    return {
+        "success": True,
+        "server": server_name,
+        "enabled": enabled,
     }
 
 

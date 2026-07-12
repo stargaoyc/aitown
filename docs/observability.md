@@ -376,11 +376,11 @@ OTel Collector 配置 tail-based sampling，错误与慢请求优先保留。
 
 ---
 
-## 十二、部署实现（Docker Compose）
+## 十一、部署实现（Docker Compose）
 
 > 以下配置已落地，位于 `docker/observability/` 目录与 `docker-compose-win.infra.yml`。
 
-### 12.1 文件清单
+### 11.1 文件清单
 
 | 文件 | 说明 |
 |------|------|
@@ -393,7 +393,7 @@ OTel Collector 配置 tail-based sampling，错误与慢请求优先保留。
 | `docker/observability/grafana/dashboards/ai-town-llm.json` | LLM 监控面板（Token / Cost / 延迟 / 错误率） |
 | `docker/observability/grafana/dashboards/ai-town-character-tick.json` | 角色 Tick 面板（耗时 / 成败 / Action 分布） |
 
-### 12.2 Docker Compose 服务
+### 11.2 Docker Compose 服务
 
 | 服务 | 镜像 | 端口 | 说明 |
 |------|------|------|------|
@@ -403,7 +403,7 @@ OTel Collector 配置 tail-based sampling，错误与慢请求优先保留。
 | `alloy` | `grafana/alloy:latest` | 12345 | 统一日志采集器（Docker 容器日志 → Loki） |
 | `grafana` | `grafana/grafana:12.0.0` | 3000 | 统一可视化面板 |
 
-### 12.3 启动方式
+### 11.3 启动方式
 
 ```bash
 # Windows 本地开发
@@ -413,7 +413,7 @@ docker compose -f docker-compose-win.infra.yml up -d
 docker compose -f docker-compose.infra.yml up -d
 ```
 
-### 12.4 访问地址
+### 11.4 访问地址
 
 | 服务 | URL | 账号 |
 |------|-----|------|
@@ -423,7 +423,7 @@ docker compose -f docker-compose.infra.yml up -d
 | Loki API | http://localhost:3100 | — |
 | Alloy UI | http://localhost:12345 | — |
 
-### 12.5 后端接入
+### 11.5 后端接入
 
 `.env` 中配置 OTel endpoint 指向 Jaeger 的 OTLP HTTP 接收端口：
 
@@ -433,7 +433,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 
 后端启动后，OTel SDK 自动将 Trace 发送到 Jaeger，Prometheus 采集 `/metrics` 端点，Alloy 采集后端 stdout 日志推送到 Loki。
 
-### 12.6 Grafana 面板预览
+### 11.6 Grafana 面板预览
 
 **AI Town Overview**（默认面板）包含：
 - 活跃角色数 / World Tick ID / Redis 状态 / LLM 费用 / HTTP QPS / 5xx 错误率（6 个 Stat）
@@ -452,7 +452,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 **AI Town - Character Tick** 包含：
 - Tick 耗时分布 / Tick 频率 / 错误次数 / Action 执行统计 / Tick 日志流
 
-### 12.7 Trace ↔ Logs 联动
+### 11.7 Trace ↔ Logs 联动
 
 Grafana 数据源已配置双向联动：
 
@@ -465,6 +465,39 @@ Grafana 数据源已配置双向联动：
 
 ---
 
+## 十二、前端监控页面集成
+
+后端提供两个轻量级端点，让前端 Dashboard 的 `/monitoring` 页面无需对接 Grafana 即可直接消费日志与指标：
+
+### 12.1 `/api/v1/admin/logs` — 日志读取
+
+读取 `data/logs/backend.log` 文件最后 N 行，支持级别过滤：
+
+```http
+GET /api/v1/admin/logs?lines=200&level=ERROR
+```
+
+### 12.2 `/api/v1/admin/metrics-detail` — 指标结构化
+
+解析 `/metrics` Prometheus 文本格式，转换为按类别分组的 JSON：
+
+| 类别 | 包含指标 |
+|------|----------|
+| `world` | tick_total / tick_duration_p95 |
+| `character` | active_count / tick_duration_p95 |
+| `action` | success_rate / total |
+| `llm` | call_total / cost_total_usd / error_rate |
+| `message` | processed_total / response_time_p95 |
+| `http` | request_total / error_5xx_rate |
+
+### 12.3 前端 `/monitoring` 页面
+
+- 集成 Grafana iframe（如已部署可观测性栈）；
+- 同时提供原生日志面板与指标卡片，直接消费后端 `/admin/logs` 与 `/admin/metrics-detail`；
+- 采用与全站一致的 Glassmorphism 风格（樱花粉/天空蓝/暮光紫主题）。
+
+---
+
 ## 十三、相关文档
 
 | 主题 | 文档 |
@@ -472,4 +505,6 @@ Grafana 数据源已配置双向联动：
 | 世界引擎埋点 | [world-engine.md](world-engine.md) |
 | Action 系统埋点 | [action-system.md](action-system.md) |
 | 部署可观测组件 | [deployment.md](deployment.md) |
+| Docker 部署 | [docker-deployment.md](docker-deployment.md) |
 | 配置参考 | [config-reference.md](config-reference.md) |
+| API 端点 | [api-spec.md](api-spec.md) |

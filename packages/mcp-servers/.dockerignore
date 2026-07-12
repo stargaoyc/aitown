@@ -1,0 +1,9 @@
+# packages/mcp-servers/.dockerignore
+__pycache__/
+*.pyc
+.venv/
+.env
+*.egg-info/
+uv.lock
+*.md
+.git/

@@ -537,14 +537,17 @@ Phase 5: 前端 Dashboard        ✅ 已完成
 
 所有 Phase 0-5 已全部完成。后续优化方向：
 
-1. **生产部署**：Docker Compose 编排 + Nginx 反向代理 + HTTPS
+1. ~~**生产部署**：Docker Compose 编排 + Nginx 反向代理 + HTTPS~~ ✅ 已完成（详见 [Docker 部署指南](docker-deployment.md)）
 2. ~~**Grafana 统一面板**：集成 Prometheus + Loki + Jaeger 数据源~~ ✅ 已完成（3 个预置 Dashboard + Trace↔Logs 联动）
-3. **告警规则**：5xx 错误率 / Tick 延迟 / LLM 失败率 → 飞书通知
-4. **Docker 日志轮转**：json-file + max-size 防磁盘撑满
-5. **数据库备份自动化**：pg_cron + WAL 归档
-6. **world_events 按月分区**：待数据量达标后实施
-7. **跨角色全局向量检索**：维护全局非分区向量索引（未来需求）
-8. **冷热分离**：3 个月前 action_records.params 迁移至对象存储
+3. ~~**MCP 插件单独开关**：前端 Dashboard 控制~~ ✅ 已完成（Redis 持久化 + toggle UI）
+4. ~~**LLM 记忆重要程度评分**：`MEMORY_LLM_SCORING_ENABLED` 开关~~ ✅ 已完成
+5. ~~**前端监控页面集成**：`/monitoring` + `/admin/logs` + `/admin/metrics-detail`~~ ✅ 已完成
+6. **告警规则**：5xx 错误率 / Tick 延迟 / LLM 失败率 → 飞书通知
+7. **Docker 日志轮转**：json-file + max-size 防磁盘撑满
+8. **数据库备份自动化**：pg_cron + WAL 归档
+9. **world_events 按月分区**：待数据量达标后实施
+10. **跨角色全局向量检索**：维护全局非分区向量索引（未来需求）
+11. **冷热分离**：3 个月前 action_records.params 迁移至对象存储
 
 ---
 
@@ -556,3 +559,5 @@ Phase 5: 前端 Dashboard        ✅ 已完成
 | 开发指南 | [development-guide.md](development-guide.md) |
 | 数据模型 | [data-model.md](data-model.md) |
 | 部署 | [deployment.md](deployment.md) |
+| Docker 部署 | [docker-deployment.md](docker-deployment.md) |
+| 项目不足审查 | [gap-analysis.md](gap-analysis.md) |

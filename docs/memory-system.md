@@ -45,7 +45,7 @@
 |------|------|
 | `content` | 自然语言描述（"小明在咖啡店工作了 2 小时"） |
 | `embedding` | 1536 维向量（OpenAI text-embedding-3-small） |
-| `importance` | 1–10 重要程度，影响检索权重 |
+| `importance` | 1–10 重要程度，影响检索权重。默认固定为 5；启用 `MEMORY_LLM_SCORING_ENABLED=true` 后由 LLM 按情感强度/关系影响/稀缺性/后续影响评分 |
 | `source_type` | `action` / `conversation` / `reflection` / `event` |
 | `related_characters` | 涉及的其他角色 ID |
 | `location` | 发生地点 |
@@ -286,10 +286,52 @@ class PlanRepository:
 | `memory.write` | `character_id`, `importance`, `source_type` |
 | `memory.reflect` | `character_id`, `input_count`, `output_count` |
 | `plan.generate` | `character_id`, `horizon`, `steps_count` |
+| `memory.llm_score` | `character_id`, `event_content`, `score`, `model` |
 
 ---
 
-## 九、相关文档
+## 九、LLM 记忆重要程度评分
+
+### 9.1 设计动机
+
+默认情况下，所有记忆的 `importance` 字段固定为 5，无法区分"日常喝水"与"与好友吵架"的重要程度。启用 LLM 评分后，每条事件由 LLM 按 1-10 分评分，让记忆检索更精准。
+
+### 9.2 启用方式
+
+通过环境变量 `MEMORY_LLM_SCORING_ENABLED=true` 启用（默认 `false`）：
+
+```bash
+# .env
+MEMORY_LLM_SCORING_ENABLED=true
+```
+
+### 9.3 评分维度
+
+LLM 基于以下四个维度综合评分（1-10）：
+
+| 维度 | 说明 | 示例高分场景 |
+|------|------|-------------|
+| **情感强度** | 事件引发的情感波动程度 | 角色大哭、暴怒、狂喜 |
+| **关系影响** | 对角色关系的改变程度 | 初次见面、关系破裂、表白 |
+| **稀缺性** | 事件发生的罕见程度 | 罕见节日、意外相遇、突发事件 |
+| **后续影响** | 对未来决策的影响程度 | 获得新工作、受伤、搬家 |
+
+### 9.4 实现位置
+
+| 文件 | 方法 | 说明 |
+|------|------|------|
+| `src/memory/episode_service.py` | `score_importance_with_llm(content, character_context)` | 调用 LLM 进行评分 |
+| `src/memory/episode_service.py` | `_memorize()` | 根据 `MEMORY_LLM_SCORING_ENABLED` 选择 LLM 评分或默认值 5 |
+
+### 9.5 成本考量
+
+- 每条事件额外消耗约 200-400 Token（轻量 prompt + 结构化输出）；
+- 50 角色 × 30s/Tick × 24h = 14.4 万次/天，启用后日增成本约 $0.5-$2（gpt-4o-mini）；
+- 建议在低角色数（<10）或调试期启用，生产环境 50 角色时保持 `false`。
+
+---
+
+## 十、相关文档
 
 | 主题 | 文档 |
 |------|------|

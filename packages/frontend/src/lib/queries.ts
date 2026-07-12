@@ -230,6 +230,18 @@ export function useInvokeMcpTool() {
   });
 }
 
+export function useToggleMcpServer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ serverName, enabled }: { serverName: string; enabled: boolean }) =>
+      api.toggleMcpServer(serverName, enabled),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["mcpServers"] });
+      qc.invalidateQueries({ queryKey: ["mcpTools"] });
+    },
+  });
+}
+
 export function useImportCharacter() {
   const qc = useQueryClient();
   return useMutation({

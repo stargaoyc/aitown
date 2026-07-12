@@ -1,0 +1,14 @@
+# packages/backend/.dockerignore
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+.env
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+data/
+tests/
+*.md
+.git/

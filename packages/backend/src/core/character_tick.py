@@ -297,7 +297,7 @@ class CharacterTickEngine:
         try:
             from src.mcp import MCPClient
             mcp_client = MCPClient()
-            mcp_tools_text = mcp_client.format_tools_for_prompt()
+            mcp_tools_text = await mcp_client.format_tools_for_prompt()
         except Exception:
             mcp_tools_text = "（MCP 工具不可用）"
 

@@ -308,6 +308,15 @@ export const api = {
       method: "POST",
       body: JSON.stringify(args),
     }),
+  toggleMcpServer: (serverName: string, enabled: boolean) =>
+    request<{
+      success: boolean;
+      server: string;
+      enabled: boolean;
+    }>(`/mcp/servers/${serverName}/enabled`, {
+      method: "PUT",
+      body: JSON.stringify({ enabled }),
+    }),
 
   // 系统日志
   getLogs: (lines = 100, level?: string) => {
@@ -515,6 +524,7 @@ export interface McpServerEntry {
   type: string;
   description?: string;
   status?: string;
+  enabled?: boolean;
 }
 
 export interface McpToolEntry {

@@ -9,7 +9,6 @@ import {
   Bot,
   Server,
   Wrench,
-  Lock,
   Activity,
   Boxes,
   Sliders,
@@ -31,6 +30,7 @@ import {
   useMcpServers,
   useMcpTools,
   useMcpServersHealth,
+  useToggleMcpServer,
   useHealth,
   useConfig,
   useUpdateConfig,
@@ -74,6 +74,7 @@ function SettingsPage() {
   const { data: mcpServersData, isLoading: serversLoading, error: serversError } = useMcpServers();
   const { data: mcpToolsData, isLoading: toolsLoading, error: toolsError } = useMcpTools();
   const { data: healthData } = useMcpServersHealth();
+  const toggleMcpServer = useToggleMcpServer();
   const { data: configData } = useConfig();
   const updateConfig = useUpdateConfig();
   const resetConfig = useResetConfig();
@@ -128,18 +129,18 @@ function SettingsPage() {
       <div className="space-y-6 animate-fade-in-up">
         <PageHeader
           title="系统设置"
-          subtitle="查看系统配置与模块状态（只读展示，不支持修改）"
+          subtitle="查看系统配置、模块状态，控制 MCP 插件开关与运行时配置"
           icon="🔧"
         />
 
-        {/* 只读提示横幅 */}
+        {/* 提示横幅 */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-twilight-50/80 border border-twilight-200/50 text-sm text-twilight-500"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-sakura-50/80 border border-sakura-200/50 text-sm text-sakura-600"
         >
-          <Lock className="w-4 h-4 shrink-0" />
-          <span>本页面所有配置均为只读展示，如需修改请编辑后端配置文件</span>
+          <Sliders className="w-4 h-4 shrink-0" />
+          <span>MCP 插件可单独开关，运行时配置可在线编辑并即时生效，无需重启服务</span>
         </motion.div>
 
         {/* 加载与错误状态 */}
@@ -429,13 +430,18 @@ function SettingsPage() {
                   {mcpServers.map((srv, idx) => {
                     const health = healthMap.get(srv.name);
                     const isOnline = health?.status === "online";
+                    const isEnabled = srv.enabled !== false;
                     return (
                     <div
                       key={`${srv.name}-${idx}`}
-                      className="p-3 rounded-xl bg-white/40 border border-white/30 flex items-start gap-3"
+                      className={`p-3 rounded-xl border flex items-start gap-3 transition-all ${
+                        isEnabled
+                          ? "bg-white/40 border-white/30"
+                          : "bg-gray-50/40 border-gray-200/30 opacity-70"
+                      }`}
                     >
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${isOnline ? "bg-gradient-to-br from-emerald-100 to-sky-soft-100" : "bg-gradient-to-br from-gray-100 to-gray-200"}`}>
-                        <Server className={`w-4 h-4 ${isOnline ? "text-emerald-500" : "text-gray-400"}`} />
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${isOnline && isEnabled ? "bg-gradient-to-br from-emerald-100 to-sky-soft-100" : "bg-gradient-to-br from-gray-100 to-gray-200"}`}>
+                        <Server className={`w-4 h-4 ${isOnline && isEnabled ? "text-emerald-500" : "text-gray-400"}`} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -446,8 +452,8 @@ function SettingsPage() {
                             {srv.type}
                           </span>
                           <StatusBadge
-                            status={isOnline ? "ok" : "error"}
-                            label={isOnline ? `在线 ${health?.latency_ms ?? 0}ms` : "离线"}
+                            status={isOnline && isEnabled ? "ok" : isEnabled ? "warning" : "idle"}
+                            label={!isEnabled ? "已禁用" : isOnline ? `在线 ${health?.latency_ms ?? 0}ms` : "离线"}
                           />
                         </div>
                         <p className="text-xs text-twilight-400 mt-1 break-words">
@@ -457,6 +463,26 @@ function SettingsPage() {
                           {health?.endpoint ?? "—"}
                         </p>
                       </div>
+                      {/* 启用/禁用开关 */}
+                      <button
+                        onClick={() =>
+                          toggleMcpServer.mutate({
+                            serverName: srv.name,
+                            enabled: !isEnabled,
+                          })
+                        }
+                        disabled={toggleMcpServer.isPending}
+                        title={isEnabled ? "点击禁用此 MCP 插件" : "点击启用此 MCP 插件"}
+                        className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${
+                          isEnabled ? "bg-sakura-400" : "bg-gray-300"
+                        } ${toggleMcpServer.isPending ? "opacity-50 cursor-wait" : "cursor-pointer"}`}
+                      >
+                        <span
+                          className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${
+                            isEnabled ? "translate-x-5" : ""
+                          }`}
+                        />
+                      </button>
                     </div>
                     );
                   })}
