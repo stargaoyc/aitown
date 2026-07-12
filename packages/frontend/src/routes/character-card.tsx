@@ -63,7 +63,7 @@ function yamlValue(val: unknown, indent = 0): string {
 }
 
 // 将角色对象转换为 YAML 格式字符串
-function characterToYaml(char: Character): string {
+function characterToYaml(char: Omit<Character, "state">): string {
   const lines: string[] = [];
   lines.push(`# AI Town 角色卡`);
   lines.push(`name: "${char.name}"`);

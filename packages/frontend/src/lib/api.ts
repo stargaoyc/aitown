@@ -44,7 +44,7 @@ export interface Character {
   traits?: Record<string, unknown>;
   backstory?: string;
   avatar_url?: string;
-  state?: CharacterState;
+  state?: Partial<CharacterState>;
 }
 
 export interface CharacterState {
@@ -137,7 +137,7 @@ export const api = {
   getCharacter: (id: string) =>
     request<{ character: Character; state: Partial<CharacterState> }>(
       `/characters/${id}`,
-    ).then((res) => ({ ...res.character, state: res.state })),
+    ).then((res): Character => ({ ...res.character, state: res.state })),
 
   getWorld: () => request<WorldState>("/world"),
   getWorldEvents: (tickId: number) =>

@@ -70,9 +70,6 @@ function SettingsPage() {
   const mcpServers = mcpServersData?.data ?? [];
   const mcpTools = mcpToolsData?.data ?? [];
 
-  const isLoading =
-    adminLoading || modulesLoading || serversLoading || toolsLoading;
-
   return (
       <div className="space-y-6 animate-fade-in-up">
         <PageHeader

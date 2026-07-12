@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Download, FileJson, FileText, User, Bot, Clock } from "lucide-react";
+import { Download, FileJson, FileText, User, Clock } from "lucide-react";
 import {
   GlassCard,
   PageHeader,
@@ -38,12 +38,6 @@ function senderLabel(sender: string): string {
   }
 }
 
-// 发送者图标
-function senderIcon(sender: string) {
-  if (sender === "user") return <User className="w-3.5 h-3.5" />;
-  if (sender === "character") return <Bot className="w-3.5 h-3.5" />;
-  return null;
-}
 
 // 格式化时间戳为可读字符串
 function formatTime(dateStr: string): string {

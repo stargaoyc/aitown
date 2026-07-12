@@ -190,8 +190,11 @@ function NotificationsPage() {
   const handleAddMock = useCallback(() => {
     const template =
       mockTemplates[Math.floor(Math.random() * mockTemplates.length)];
+    if (!template) return;
     const newNotif: AppNotification = {
-      ...template,
+      type: template.type,
+      title: template.title,
+      content: template.content,
       id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       created_at: new Date().toISOString(),
       read: false,

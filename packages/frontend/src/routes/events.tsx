@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
-import { motion } from "framer-motion";
-import { Clock, Layers } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Clock, Layers, ChevronDown, ChevronUp } from "lucide-react";
 import {
   GlassCard,
   PageHeader,
@@ -97,6 +97,80 @@ function summarizePayload(payload: Record<string, unknown>): string {
   });
   const more = entries.length > 3 ? ` (+${entries.length - 3})` : "";
   return parts.join("  ·  ") + more;
+}
+
+// 单条事件卡片（可展开查看完整 payload）
+function EventCard({ ev }: { ev: WorldEventEntry }) {
+  const [expanded, setExpanded] = useState(false);
+  const conf = eventTypeConfig[ev.event_type] ?? {
+    icon: "📝",
+    label: ev.event_type,
+    color: "bg-gray-100 text-gray-500 border-gray-200/50",
+    dotColor: "from-gray-300 to-gray-400",
+  };
+  const payloadEntries = Object.keys(ev.payload ?? {}).length;
+
+  return (
+    <GlassCard className="!p-4 space-y-2" hover>
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
+          <span className="text-lg">{conf.icon}</span>
+          <span
+            className={`px-2 py-0.5 rounded-full text-xs font-medium border ${conf.color}`}
+          >
+            {conf.label}
+          </span>
+          {ev.event_key && ev.event_key !== "default" && (
+            <span className="text-xs text-twilight-400 font-mono">
+              {ev.event_key}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-twilight-400 flex items-center gap-1">
+            <Clock className="w-3 h-3" />
+            {formatTime(ev.created_at)}
+          </span>
+          {payloadEntries > 0 && (
+            <button
+              onClick={() => setExpanded((v) => !v)}
+              className="text-xs text-sakura-500 hover:text-sakura-600 flex items-center gap-0.5 px-1.5 py-0.5 rounded-lg hover:bg-sakura-50 transition-colors"
+            >
+              {expanded ? (
+                <>
+                  <ChevronUp className="w-3 h-3" />
+                  收起
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="w-3 h-3" />
+                  展开
+                </>
+              )}
+            </button>
+          )}
+        </div>
+      </div>
+      {/* payload 摘要（始终显示） */}
+      <p className="text-sm text-twilight-600 leading-relaxed break-all">
+        {summarizePayload(ev.payload)}
+      </p>
+      {/* 展开：完整 payload JSON */}
+      <AnimatePresence>
+        {expanded && (
+          <motion.pre
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="text-xs text-twilight-500 bg-white/60 rounded-xl p-3 overflow-x-auto border border-sakura-200/40 font-mono whitespace-pre-wrap break-all"
+          >
+            {JSON.stringify(ev.payload, null, 2)}
+          </motion.pre>
+        )}
+      </AnimatePresence>
+    </GlassCard>
+  );
 }
 
 function EventsPage() {
@@ -253,45 +327,9 @@ function EventsPage() {
 
                     {/* 该 Tick 下的所有事件 */}
                     <div className="space-y-2">
-                      {tickEvents.map((ev) => {
-                        const conf = eventTypeConfig[ev.event_type] ?? {
-                          icon: "📝",
-                          label: ev.event_type,
-                          color: "bg-gray-100 text-gray-500 border-gray-200/50",
-                          dotColor: "from-gray-300 to-gray-400",
-                        };
-                        return (
-                          <GlassCard
-                            key={ev.id}
-                            className="!p-4 space-y-2"
-                            hover
-                          >
-                            <div className="flex items-center justify-between gap-2 flex-wrap">
-                              <div className="flex items-center gap-2">
-                                <span className="text-lg">{conf.icon}</span>
-                                <span
-                                  className={`px-2 py-0.5 rounded-full text-xs font-medium border ${conf.color}`}
-                                >
-                                  {conf.label}
-                                </span>
-                                {ev.event_key && (
-                                  <span className="text-xs text-twilight-400 font-mono">
-                                    {ev.event_key}
-                                  </span>
-                                )}
-                              </div>
-                              <span className="text-xs text-twilight-400 flex items-center gap-1">
-                                <Clock className="w-3 h-3" />
-                                {formatTime(ev.created_at)}
-                              </span>
-                            </div>
-                            {/* payload 摘要 */}
-                            <p className="text-sm text-twilight-600 leading-relaxed break-all">
-                              {summarizePayload(ev.payload)}
-                            </p>
-                          </GlassCard>
-                        );
-                      })}
+                      {tickEvents.map((ev) => (
+                        <EventCard key={ev.id} ev={ev} />
+                      ))}
                     </div>
                   </div>
                 </motion.div>

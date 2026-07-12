@@ -409,18 +409,13 @@ class CharacterTickEngine:
         if decision.action == "move" and decision.params.get("target_scene"):
             new_state["location"] = decision.params["target_scene"]
 
-        # 被动恢复：手机电量/社交能量在非消耗类 Action 下缓慢回升
-        # 避免 LLM 不主动选择 charge_phone/social 时资源永久为 0
-        _PASSIVE_RECOVERY = {
-            "phone_battery": 3,   # 每 Tick 恢复 3（非使用手机类动作）
-            "social_energy": 5,   # 每 Tick 恢复 5（非社交消耗类动作）
-        }
-        if decision.action not in ("use_phone", "charge_phone"):
-            cur_pb = int(new_state.get("phone_battery", 0) or 0)
-            new_state["phone_battery"] = min(100, cur_pb + _PASSIVE_RECOVERY["phone_battery"])
-        if decision.action not in ("chat_with",):
+        # 被动恢复：仅在"休息类"动作下恢复社交能量（休息/睡觉/读书等独处活动）
+        # phone_battery 仅通过 charge_phone 恢复（已在 action cost 中定义）
+        # 避免资源永久为 0，同时不违反常识（读书不会给手机充电）
+        _SOLO_RECOVERY_ACTIONS = {"relax", "sleep", "read_book"}
+        if decision.action in _SOLO_RECOVERY_ACTIONS:
             cur_se = int(new_state.get("social_energy", 0) or 0)
-            new_state["social_energy"] = min(100, cur_se + _PASSIVE_RECOVERY["social_energy"])
+            new_state["social_energy"] = min(100, cur_se + 10)
 
         # 事务化执行
         try:

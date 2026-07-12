@@ -79,24 +79,12 @@ function CharacterDetailPage() {
     sendMessage.mutate(
       { characterId, userId: "web_user", content },
       {
-        onSuccess: (data) => {
-          // 移除乐观消息，服务端会返回完整列表
+        onSuccess: () => {
+          // 移除乐观消息，服务端会通过 query invalidation 返回完整列表（含角色回复）
+          // 不再乐观添加回复，避免与 query 刷新后的数据重复
           setOptimisticMessages((prev) =>
             prev.filter((m) => m.id !== optimisticMsg.id),
           );
-          // 如果有角色回复，也乐观添加
-          if (data?.data?.content) {
-            const replyMsg: Message = {
-              id: data.data.message_id ?? `reply-${Date.now()}`,
-              conversation_id: data.data.conversation_id,
-              sender: "character",
-              content: data.data.content,
-              tokens: data.data.tokens ?? undefined,
-              cost: data.data.cost ?? undefined,
-              created_at: new Date().toISOString(),
-            };
-            setOptimisticMessages((prev) => [...prev, replyMsg]);
-          }
         },
         onError: () => {
           // 发送失败也移除乐观消息

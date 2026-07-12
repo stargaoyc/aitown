@@ -1072,18 +1072,14 @@ async def get_admin_status():
 
 @app.post("/api/v1/admin/characters/import")
 async def import_character_card(
-    yaml_file: UploadFile | None = File(None),
-    yaml: str | None = Body(None),
+    payload: dict = Body(...),
 ):
     """导入角色卡 YAML 文件
 
-    支持两种方式：
-    1. multipart 文件上传（yaml_file 字段）
-    2. JSON body（yaml 字段，值为 YAML 字符串）
+    通过 JSON body 提供 yaml 字段（值为 YAML 字符串）。
 
     Args:
-        yaml_file: YAML 文件上传（可选）
-        yaml: YAML 文本内容（可选，JSON body）
+        payload: JSON body，包含 yaml 字段
 
     Returns:
         创建的角色信息
@@ -1093,16 +1089,11 @@ async def import_character_card(
 
     import yaml as yaml_lib
 
-    # 优先从文件上传读取，否则从 body 的 yaml 字段读取
-    if yaml_file is not None:
-        content = await yaml_file.read()
-        yaml_text = content.decode("utf-8")
-    elif yaml is not None:
-        yaml_text = yaml
-    else:
+    yaml_text = payload.get("yaml")
+    if not yaml_text:
         raise HTTPException(
             status_code=422,
-            detail="请通过 multipart 上传 yaml_file 或在 JSON body 中提供 yaml 字段",
+            detail="请在 JSON body 中提供 yaml 字段",
         )
 
     try:
@@ -1129,11 +1120,13 @@ async def import_character_card(
 
 
 @app.post("/api/v1/admin/characters/import-batch")
-async def import_characters_batch(directory: str = "configs/characters"):
-    """批量导入角色卡目录
+async def import_characters_batch(
+    payload: dict = Body(...),
+):
+    """批量导入角色卡（多角色 YAML，用 --- 分隔）
 
     Args:
-        directory: 角色卡目录路径（默认 configs/characters，相对于项目根目录）
+        payload: JSON body，包含 yaml 字段（多角色 YAML 文本）
 
     Returns:
         导入结果统计
@@ -1141,20 +1134,32 @@ async def import_characters_batch(directory: str = "configs/characters"):
     if not redis:
         raise HTTPException(status_code=503, detail="Redis not connected")
 
-    # 自动定位项目根目录：从 packages/backend 上两级到项目根
-    from pathlib import Path
+    import yaml as yaml_lib
 
-    project_root = Path(__file__).resolve().parents[3]  # src/main.py -> backend -> packages -> aitown
-    resolved = project_root / directory
-    if not resolved.is_dir():
-        raise HTTPException(status_code=400, detail=f"目录不存在: {resolved}")
+    yaml_text = payload.get("yaml")
+    if not yaml_text:
+        raise HTTPException(
+            status_code=422,
+            detail="请在 JSON body 中提供 yaml 字段",
+        )
+
+    # 解析多文档 YAML（--- 分隔）
+    try:
+        docs = list(yaml_lib.safe_load_all(yaml_text))
+    except yaml_lib.YAMLError as e:
+        raise HTTPException(status_code=400, detail=f"YAML 解析失败: {e}")
+
+    docs = [d for d in docs if d]  # 过滤空文档
 
     async with db.session() as session:
         importer = CharacterImporter(session, redis)
-        try:
-            characters = await importer.import_directory(str(resolved))
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=str(e))
+        characters = []
+        for i, data in enumerate(docs):
+            try:
+                character = await importer.import_from_dict(data)
+                characters.append(character)
+            except Exception as e:
+                logger.warning("batch_import_item_failed", index=i, error=str(e))
 
     return {
         "message": f"批量导入完成: {len(characters)} 个角色",
@@ -1486,6 +1491,7 @@ async def send_message(
             session=session,
             llm=llm,
             prompts=prompts,
+            redis=redis,
         )
         try:
             result = await svc.handle_user_message(
@@ -2207,21 +2213,24 @@ async def get_onebot_messages(limit: int = 50):
 async def get_proactive_shares(limit: int = 50):
     """获取主动分享历史记录
 
-    查询 sender=character 且 content 以特定标记开头的消息，
-    或 source_type 包含 proactive 的记忆片段。
+    仅查询 extra_data.share_type='proactive' 的消息，
+    过滤掉普通用户回复（sender=character 但非主动分享）。
 
     Returns:
         分享记录列表
     """
-    from sqlalchemy import desc, select
+    from sqlalchemy import desc, select, text
 
     from src.db.models import Message
 
     async with db.session() as session:
-        # 查询角色主动发送的消息（sender=character）
+        # 仅查询 extra_data 中 share_type=proactive 的消息
         stmt = (
             select(Message)
-            .where(Message.sender == "character")
+            .where(
+                Message.sender == "character",
+                text("extra_data->>'share_type' = 'proactive'"),
+            )
             .order_by(desc(Message.created_at))
             .limit(limit)
         )
@@ -2287,13 +2296,13 @@ async def vector_search(
             "character_id": str(character_id),
             "data": [
                 {
-                    "id": str(ep.id),
-                    "content": ep.content,
-                    "importance": ep.importance,
-                    "timestamp": ep.timestamp.isoformat() if ep.timestamp else None,
-                    "similarity": float(ep.similarity) if hasattr(ep, "similarity") else 0.0,
-                    "is_reflected": ep.is_reflected,
-                    "source_type": ep.source_type,
+                    "id": str(ep["id"]),
+                    "content": ep["content"],
+                    "importance": ep["importance"],
+                    "timestamp": ep["timestamp"].isoformat() if ep.get("timestamp") else None,
+                    "similarity": float(ep.get("sim_score", 0.0)),
+                    "is_reflected": ep.get("is_reflected", False),
+                    "source_type": ep.get("source_type", "action"),
                 }
                 for ep in results
             ],

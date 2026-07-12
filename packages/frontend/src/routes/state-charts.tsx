@@ -207,7 +207,6 @@ function StateChartsPage() {
               {/* 顶部统计卡片：当前状态值 */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {dimensions.map((dim) => {
-                  const Icon = dim.icon;
                   const value = (currentState[dim.key] as number) ?? 0;
                   return (
                     <StatCard

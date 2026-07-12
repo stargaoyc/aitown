@@ -16,13 +16,12 @@ import {
   GlassCard,
   PageHeader,
   StatCard,
-  LoadingSpinner,
   ErrorDisplay,
   EmptyState,
   StatusBadge,
   ProgressBar,
 } from "@/components/ui";
-import { useCharacters } from "@/lib/queries";
+import { useCharacters, useCharacter } from "@/lib/queries";
 import type { Character } from "@/lib/api";
 
 export const Route = createFileRoute("/compare")({
@@ -81,7 +80,7 @@ const stateDimensions: {
 ];
 
 function ComparePage() {
-  // 获取活跃角色列表
+  // 获取活跃角色列表（仅基本信息，用于选择）
   const { data: charactersData, isLoading, error } = useCharacters({
     active_only: true,
   });
@@ -90,12 +89,17 @@ function ComparePage() {
   // 已选角色 ID 列表（最多 4 个）
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
-  // 已选角色详情
+  // 逐个获取已选角色详情（含 state 数据）
+  const char1 = useCharacter(selectedIds[0] ?? "");
+  const char2 = useCharacter(selectedIds[1] ?? "");
+  const char3 = useCharacter(selectedIds[2] ?? "");
+  const char4 = useCharacter(selectedIds[3] ?? "");
+
+  // 已选角色详情（含 state）
   const selectedCharacters = useMemo(() => {
-    return selectedIds
-      .map((id) => characters.find((c) => c.id === id))
-      .filter((c): c is Character => !!c);
-  }, [selectedIds, characters]);
+    const chars = [char1.data, char2.data, char3.data, char4.data];
+    return chars.filter((c): c is Character => !!c);
+  }, [char1.data, char2.data, char3.data, char4.data]);
 
   // 切换角色选中状态
   const toggleSelect = (id: string) => {
@@ -168,8 +172,8 @@ function ComparePage() {
                   return (
                     <motion.button
                       key={char.id}
-                      whileHover={!disabled ? { scale: 1.05 } : undefined}
-                      whileTap={!disabled ? { scale: 0.95 } : undefined}
+                      {...(!disabled ? { whileHover: { scale: 1.05 } } : {})}
+                      {...(!disabled ? { whileTap: { scale: 0.95 } } : {})}
                       onClick={() => !disabled && toggleSelect(char.id)}
                       disabled={disabled}
                       className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-medium border transition-all ${

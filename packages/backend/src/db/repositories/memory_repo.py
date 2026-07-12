@@ -271,14 +271,14 @@ class MemoryRepository(BaseRepository[MemoryEpisode]):
         # 3. 向量召回 + 混合排序（使用 asyncpg 原生 $1 占位符）
         query_sql = """
             WITH candidates AS (
-                SELECT id, content, importance, timestamp,
+                SELECT id, content, importance, timestamp, source_type, is_reflected,
                        1 - (embedding <=> $2::halfvec) AS sim_score
                 FROM memory_episodes
                 WHERE character_id = $1 AND materialized = TRUE
                 ORDER BY embedding <=> $2::halfvec
                 LIMIT $3
             )
-            SELECT id, content,
+            SELECT id, content, importance, timestamp, source_type, is_reflected, sim_score,
                    sim_score * 0.6 + importance * 0.05
                    - EXTRACT(EPOCH FROM (now() - timestamp)) / 86400.0 * 0.05 AS final_score
             FROM candidates

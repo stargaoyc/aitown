@@ -56,7 +56,7 @@ function colorForActionId(actionId: string): string {
   for (let i = 0; i < actionId.length; i++) {
     hash = (hash * 31 + actionId.charCodeAt(i)) | 0;
   }
-  return actionColorPalette[Math.abs(hash) % actionColorPalette.length];
+  return actionColorPalette[Math.abs(hash) % actionColorPalette.length] ?? actionColorPalette[0] ?? "";
 }
 
 // 单条行为日志（结果可折叠）
@@ -66,14 +66,12 @@ function ActionLogItem({
   duration,
   result,
   createdAt,
-  index,
 }: {
   actionId: string;
   actionName?: string;
   duration?: number;
   result?: Record<string, unknown>;
   createdAt: string;
-  index: number;
 }) {
   const [expanded, setExpanded] = useState(false);
   const hasResult = result && Object.keys(result).length > 0;
@@ -274,11 +272,12 @@ function ActionsPage() {
               <ActionLogItem
                 key={action.id ?? idx}
                 actionId={action.action_id}
-                actionName={action.action_name}
-                duration={action.duration_minutes ?? action.duration}
-                result={action.result ?? undefined}
+                {...(action.action_name !== undefined && { actionName: action.action_name })}
+                {...(action.duration_minutes ?? action.duration !== undefined
+                  ? { duration: action.duration_minutes ?? action.duration }
+                  : {})}
+                {...(action.result !== undefined && action.result !== null ? { result: action.result } : {})}
                 createdAt={action.timestamp ?? action.created_at ?? ""}
-                index={idx}
               />
             ))}
           </motion.div>
