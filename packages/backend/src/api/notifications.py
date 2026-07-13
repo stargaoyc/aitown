@@ -1,7 +1,7 @@
 """通知中心 API 路由"""
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 from structlog import get_logger
@@ -36,7 +36,7 @@ async def _create_notification(
         "type": notif_type,
         "title": title,
         "content": content,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
         "read": False,
     }
     await redis.lpush(_notif_key(user_id), json.dumps(notif))

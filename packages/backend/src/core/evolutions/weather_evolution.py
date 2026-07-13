@@ -4,6 +4,7 @@
 并输出天气影响矩阵（移动耗时倍率、室外活动失败概率增量）。
 状态存储于 Redis Hash: `world:state:weather`。
 """
+
 import random
 
 from redis.asyncio import Redis
@@ -56,12 +57,16 @@ class WeatherEvolution(WorldEvolution):
         existing = await redis.hgetall(WEATHER_KEY)
         if not existing:
             weather = "sunny"
-            await self.hset_json(redis, WEATHER_KEY, {
-                "weather": weather,
-                "season": "spring",
-                "impact": WEATHER_IMPACT[weather],
-                "last_updated_tick": 0,
-            })
+            await self.hset_json(
+                redis,
+                WEATHER_KEY,
+                {
+                    "weather": weather,
+                    "season": "spring",
+                    "impact": WEATHER_IMPACT[weather],
+                    "last_updated_tick": 0,
+                },
+            )
             logger.info("weather_evolution_initialized", weather=weather)
 
     async def evolve(self, redis: Redis, tick_id: int, world_state: dict) -> dict:
@@ -71,7 +76,9 @@ class WeatherEvolution(WorldEvolution):
 
         last_updated = state.get("last_updated_tick", 0) if state else 0
         current_weather = state.get("weather", "sunny") if state else "sunny"
-        current_impact = state.get("impact", WEATHER_IMPACT[current_weather]) if state else WEATHER_IMPACT[current_weather]
+        current_impact = (
+            state.get("impact", WEATHER_IMPACT[current_weather]) if state else WEATHER_IMPACT[current_weather]
+        )
 
         # 是否到达更新时机（首次或间隔满足）
         should_update = (not state) or (tick_id - last_updated) >= interval

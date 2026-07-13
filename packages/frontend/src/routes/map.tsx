@@ -29,10 +29,8 @@ function MapPage() {
   const { data, isLoading, error } = useScenes();
 
   const getCrowdednessColor = (c?: number) => {
-    if (!c || c <= 0.3)
-      return "bg-emerald-100/80 text-emerald-700 border border-emerald-200/60";
-    if (c <= 0.7)
-      return "bg-amber-100/80 text-amber-700 border border-amber-200/60";
+    if (!c || c <= 0.3) return "bg-emerald-100/80 text-emerald-700 border border-emerald-200/60";
+    if (c <= 0.7) return "bg-amber-100/80 text-amber-700 border border-amber-200/60";
     return "bg-red-100/80 text-red-600 border border-red-200/60";
   };
 
@@ -48,9 +46,7 @@ function MapPage() {
 
       {isLoading && <SkeletonList count={4} />}
       {error && <ErrorDisplay error={error} />}
-      {data && data.data.length === 0 && (
-        <EmptyState icon="🏝️" title="暂无场景数据" />
-      )}
+      {data && data.data.length === 0 && <EmptyState icon="🏝️" title="暂无场景数据" />}
 
       {data && data.data.length > 0 && (
         <motion.div
@@ -63,24 +59,18 @@ function MapPage() {
             <motion.div key={scene.id} variants={item}>
               <GlassCard className="space-y-3 h-full">
                 <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-semibold text-sakura-600 truncate">
-                    {scene.name}
-                  </h3>
+                  <h3 className="font-semibold text-sakura-600 truncate">{scene.name}</h3>
                   <span
                     className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-medium ${getCrowdednessColor(
                       scene.crowdedness,
                     )}`}
                   >
                     {getCrowdednessEmoji(scene.crowdedness)}{" "}
-                    {scene.crowdedness != null
-                      ? `${Math.round(scene.crowdedness * 100)}%`
-                      : "—"}
+                    {scene.crowdedness != null ? `${Math.round(scene.crowdedness * 100)}%` : "—"}
                   </span>
                 </div>
                 {scene.description && (
-                  <p className="text-xs text-twilight-400 line-clamp-2">
-                    {scene.description}
-                  </p>
+                  <p className="text-xs text-twilight-400 line-clamp-2">{scene.description}</p>
                 )}
                 <div className="text-xs text-twilight-400 flex items-center gap-2 flex-wrap">
                   {scene.type && (
@@ -96,13 +86,12 @@ function MapPage() {
                     color={scene.crowdedness > 0.7 ? "twilight" : "sakura"}
                   />
                 )}
-                {scene.characters_present &&
-                  scene.characters_present.length > 0 && (
-                    <div className="text-xs text-twilight-400 flex items-center gap-1 pt-1">
-                      <Users className="w-3.5 h-3.5" />
-                      在场 {scene.characters_present.length} 人
-                    </div>
-                  )}
+                {scene.characters_present && scene.characters_present.length > 0 && (
+                  <div className="text-xs text-twilight-400 flex items-center gap-1 pt-1">
+                    <Users className="w-3.5 h-3.5" />
+                    在场 {scene.characters_present.length} 人
+                  </div>
+                )}
               </GlassCard>
             </motion.div>
           ))}

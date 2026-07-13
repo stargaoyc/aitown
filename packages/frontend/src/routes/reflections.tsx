@@ -68,11 +68,7 @@ function ReflectionsPage() {
   const { data: charactersData, isLoading: charsLoading } = useCharacters();
   const characters = charactersData?.data ?? [];
 
-  const {
-    data: reflectionsData,
-    isLoading,
-    error,
-  } = useReflections(selectedCharacter);
+  const { data: reflectionsData, isLoading, error } = useReflections(selectedCharacter);
   const reflections = reflectionsData?.data ?? [];
 
   // 解析每条反思内容
@@ -95,10 +91,7 @@ function ReflectionsPage() {
   }, [parsedReflections, searchQuery]);
 
   // 认知点总数
-  const totalPoints = parsedReflections.reduce(
-    (sum, r) => sum + r.parsed.points.length,
-    0,
-  );
+  const totalPoints = parsedReflections.reduce((sum, r) => sum + r.parsed.points.length, 0);
 
   return (
     <div className="space-y-6 animate-fade-in-up">
@@ -112,33 +105,16 @@ function ReflectionsPage() {
 
       {/* 顶部统计 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard
-          title="反思总数"
-          value={reflections.length}
-          icon="💭"
-          color="sakura"
-        />
-        <StatCard
-          title="认知点"
-          value={totalPoints}
-          icon="✨"
-          color="twilight"
-        />
-        <StatCard
-          title="角色数"
-          value={characters.length}
-          icon="👥"
-          color="sky"
-        />
+        <StatCard title="反思总数" value={reflections.length} icon="💭" color="sakura" />
+        <StatCard title="认知点" value={totalPoints} icon="✨" color="twilight" />
+        <StatCard title="角色数" value={characters.length} icon="👥" color="sky" />
       </div>
 
       {/* 控制栏：角色选择 + 搜索 */}
       <GlassCard hover={false}>
         <div className="grid md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm text-twilight-500 font-medium mb-2">
-              选择角色
-            </label>
+            <label className="block text-sm text-twilight-500 font-medium mb-2">选择角色</label>
             {charsLoading ? (
               <div className="text-sm text-twilight-400">加载角色中...</div>
             ) : (
@@ -157,9 +133,7 @@ function ReflectionsPage() {
             )}
           </div>
           <div>
-            <label className="block text-sm text-twilight-500 font-medium mb-2">
-              搜索反思内容
-            </label>
+            <label className="block text-sm text-twilight-500 font-medium mb-2">搜索反思内容</label>
             <AnimeInput
               placeholder="输入关键词搜索认知点..."
               value={searchQuery}
@@ -171,51 +145,31 @@ function ReflectionsPage() {
       </GlassCard>
 
       {!selectedCharacter && (
+        <EmptyState icon="👆" title="请先选择一个角色" subtitle="选择角色后将展示其反思记录" />
+      )}
+
+      {selectedCharacter && isLoading && <LoadingSpinner text="正在加载反思记录..." />}
+      {selectedCharacter && !isLoading && error && <ErrorDisplay error={error} />}
+
+      {selectedCharacter && !isLoading && !error && reflections.length === 0 && (
         <EmptyState
-          icon="👆"
-          title="请先选择一个角色"
-          subtitle="选择角色后将展示其反思记录"
+          icon="💭"
+          title="暂无反思记录"
+          subtitle="角色需要积累 20 条记忆后才会触发反思"
         />
       )}
-
-      {selectedCharacter && isLoading && (
-        <LoadingSpinner text="正在加载反思记录..." />
-      )}
-      {selectedCharacter && !isLoading && error && (
-        <ErrorDisplay error={error} />
-      )}
-
-      {selectedCharacter &&
-        !isLoading &&
-        !error &&
-        reflections.length === 0 && (
-          <EmptyState
-            icon="💭"
-            title="暂无反思记录"
-            subtitle="角色需要积累 20 条记忆后才会触发反思"
-          />
-        )}
 
       {selectedCharacter &&
         !isLoading &&
         !error &&
         reflections.length > 0 &&
         filteredReflections.length === 0 && (
-          <EmptyState
-            icon="🔍"
-            title="未匹配到反思"
-            subtitle="尝试更换搜索关键词"
-          />
+          <EmptyState icon="🔍" title="未匹配到反思" subtitle="尝试更换搜索关键词" />
         )}
 
       {/* 反思列表 */}
       {filteredReflections.length > 0 && (
-        <motion.div
-          variants={container}
-          initial="hidden"
-          animate="show"
-          className="space-y-4"
-        >
+        <motion.div variants={container} initial="hidden" animate="show" className="space-y-4">
           {filteredReflections.map((reflection) => (
             <motion.div key={reflection.id} variants={item}>
               <GlassCard className="space-y-3" hover>
@@ -262,12 +216,11 @@ function ReflectionsPage() {
                 )}
 
                 {/* 无列表行且有内容时直接展示原文 */}
-                {reflection.parsed.points.length === 0 &&
-                  !reflection.parsed.intro && (
-                    <p className="text-sm text-twilight-700 leading-relaxed whitespace-pre-wrap">
-                      {reflection.content}
-                    </p>
-                  )}
+                {reflection.parsed.points.length === 0 && !reflection.parsed.intro && (
+                  <p className="text-sm text-twilight-700 leading-relaxed whitespace-pre-wrap">
+                    {reflection.content}
+                  </p>
+                )}
               </GlassCard>
             </motion.div>
           ))}

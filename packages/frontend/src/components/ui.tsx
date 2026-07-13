@@ -147,8 +147,7 @@ export function StatusBadge({
   const colors = {
     ok: "bg-emerald-100/80 text-emerald-700 border border-emerald-200/60 shadow-sm",
     error: "bg-red-100/80 text-red-600 border border-red-200/60 shadow-sm",
-    warning:
-      "bg-amber-100/80 text-amber-700 border border-amber-200/60 shadow-sm",
+    warning: "bg-amber-100/80 text-amber-700 border border-amber-200/60 shadow-sm",
     idle: "bg-gray-100/80 text-gray-500 border border-gray-200/60 shadow-sm",
   };
   return (
@@ -160,15 +159,9 @@ export function StatusBadge({
       {status === "ok" && (
         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse" />
       )}
-      {status === "error" && (
-        <span className="w-1.5 h-1.5 rounded-full bg-red-500 mr-1.5" />
-      )}
-      {status === "warning" && (
-        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1.5" />
-      )}
-      {status === "idle" && (
-        <span className="w-1.5 h-1.5 rounded-full bg-gray-400 mr-1.5" />
-      )}
+      {status === "error" && <span className="w-1.5 h-1.5 rounded-full bg-red-500 mr-1.5" />}
+      {status === "warning" && <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1.5" />}
+      {status === "idle" && <span className="w-1.5 h-1.5 rounded-full bg-gray-400 mr-1.5" />}
       {label}
     </motion.span>
   );
@@ -397,11 +390,7 @@ export function PageHeader({
         )}
         {title}
       </h1>
-      {subtitle && (
-        <p className="text-sm md:text-base text-twilight-400 mt-2 ml-1">
-          {subtitle}
-        </p>
-      )}
+      {subtitle && <p className="text-sm md:text-base text-twilight-400 mt-2 ml-1">{subtitle}</p>}
     </motion.div>
   );
 }
@@ -434,9 +423,7 @@ export function EmptyState({
       </motion.div>
       <div className="text-twilight-500 font-semibold text-lg">{title}</div>
       {subtitle && (
-        <div className="text-sm text-twilight-400 mt-1 max-w-xs mx-auto">
-          {subtitle}
-        </div>
+        <div className="text-sm text-twilight-400 mt-1 max-w-xs mx-auto">{subtitle}</div>
       )}
     </motion.div>
   );
@@ -504,9 +491,7 @@ export function AnimeInput({
   return (
     <div className="relative">
       {icon && (
-        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-sakura-400">
-          {icon}
-        </div>
+        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-sakura-400">{icon}</div>
       )}
       <input
         className={`w-full ${icon ? "pl-12" : "pl-4"} pr-4 py-3 rounded-xl bg-white/60 border border-sakura-200/60 text-twilight-700 placeholder:text-twilight-300 focus:outline-none focus:ring-2 focus:ring-sakura-400/50 focus:border-transparent focus:bg-white/80 transition-all ${className}`}

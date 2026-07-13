@@ -2,15 +2,15 @@
 
 对应 configs/scenes.yaml 和 configs/world-map.yaml。
 """
+
 from __future__ import annotations
 
-from enum import Enum
-from typing import Any
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-class SceneType(str, Enum):
+class SceneType(StrEnum):
     """场景类型"""
 
     INDOOR = "indoor"
@@ -28,9 +28,7 @@ class Scene(BaseModel):
     id: str = Field(min_length=1, max_length=50, description="场景 ID（唯一）")
     name: str = Field(min_length=1, max_length=100, description="场景名")
     type: SceneType = Field(description="场景类型")
-    open_hours: list[int] = Field(
-        min_length=2, max_length=2, description="营业时间 [开始, 结束]（24h 制）"
-    )
+    open_hours: list[int] = Field(min_length=2, max_length=2, description="营业时间 [开始, 结束]（24h 制）")
     capacity: int = Field(ge=1, le=1000, description="最大容量")
     activities: list[str] = Field(default_factory=list, description="支持的活动")
     weather_affected: bool = Field(default=True, description="是否受天气影响")
@@ -57,9 +55,7 @@ class WorldMap(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    adjacency: dict[str, dict[str, int]] = Field(
-        default_factory=dict, description="场景连通矩阵"
-    )
+    adjacency: dict[str, dict[str, int]] = Field(default_factory=dict, description="场景连通矩阵")
 
     @field_validator("adjacency")
     @classmethod
@@ -68,9 +64,7 @@ class WorldMap(BaseModel):
         for src, neighbors in v.items():
             for dst, minutes in neighbors.items():
                 if minutes <= 0:
-                    raise ValueError(
-                        f"移动耗时必须 > 0: {src} -> {dst} = {minutes}"
-                    )
+                    raise ValueError(f"移动耗时必须 > 0: {src} -> {dst} = {minutes}")
         return v
 
     def get_travel_time(self, from_scene: str, to_scene: str) -> int | None:

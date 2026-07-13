@@ -1,8 +1,10 @@
 """临时测试：模拟 OneBot 11 私聊消息"""
+
 import asyncio
 import json
-import websockets
 import sys
+
+import websockets
 
 
 async def test():
@@ -29,7 +31,7 @@ async def test():
             reply = await asyncio.wait_for(ws.recv(), timeout=60)
             safe = reply.decode("utf-8", errors="replace") if isinstance(reply, bytes) else reply
             print(f"Reply ({len(reply)} bytes): {safe[:800]}")
-        except asyncio.TimeoutError:
+        except TimeoutError:
             print("Timeout - no reply in 60s")
 
 

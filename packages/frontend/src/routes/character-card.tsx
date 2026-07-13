@@ -1,15 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import {
-  Copy,
-  Download,
-  User,
-  Briefcase,
-  Calendar,
-  CheckCircle2,
-  Sparkles,
-} from "lucide-react";
+import { Copy, Download, User, Briefcase, Calendar, CheckCircle2, Sparkles } from "lucide-react";
 import {
   GlassCard,
   PageHeader,
@@ -84,9 +76,7 @@ function characterToYaml(char: Omit<Character, "state">): string {
         }
       } else if (typeof value === "object" && value !== null) {
         lines.push(`  ${key}:`);
-        for (const [subKey, subVal] of Object.entries(
-          value as Record<string, unknown>,
-        )) {
+        for (const [subKey, subVal] of Object.entries(value as Record<string, unknown>)) {
           lines.push(`    ${subKey}: ${yamlValue(subVal)}`);
         }
       } else {
@@ -197,9 +187,7 @@ function CharacterCardPage() {
             disabled={charsLoading}
             className="w-full px-4 py-3 rounded-xl bg-white/60 border border-sakura-200/60 text-twilight-700 focus:outline-none focus:ring-2 focus:ring-sakura-400/50 focus:border-transparent focus:bg-white/80 transition-all disabled:opacity-50"
           >
-            <option value="">
-              {charsLoading ? "加载角色中..." : "请选择角色"}
-            </option>
+            <option value="">{charsLoading ? "加载角色中..." : "请选择角色"}</option>
             {characters.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}（{c.id}）
@@ -219,9 +207,7 @@ function CharacterCardPage() {
       )}
 
       {/* 加载与错误状态 */}
-      {characterId && isLoading && (
-        <LoadingSpinner text="正在加载角色详情..." />
-      )}
+      {characterId && isLoading && <LoadingSpinner text="正在加载角色详情..." />}
       {characterId && error && <ErrorDisplay error={error} />}
 
       {character && !isLoading && !error && (

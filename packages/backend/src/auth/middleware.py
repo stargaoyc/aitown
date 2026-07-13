@@ -18,6 +18,7 @@ API Key 校验来源：
     async def protected(user: dict = Depends(auth_dependency)):
         return {"user_id": user["user_id"]}
 """
+
 from __future__ import annotations
 
 import secrets

@@ -2,6 +2,7 @@
 
 提供基于世界地图的角色移动系统。
 """
-from src.modules.movement.system import MovementSystem, MovementResult
+
+from src.modules.movement.system import MovementResult, MovementSystem
 
 __all__ = ["MovementSystem", "MovementResult"]

@@ -3,6 +3,7 @@
 根据当前虚拟时间判断各场景是否开放，并基于在场角色数 / 容量计算拥挤度。
 状态存储于 Redis Hash: `world:state:scenes`（field: scene_id → JSON{open, crowded, visitors, capacity}）。
 """
+
 from datetime import datetime
 
 from redis.asyncio import Redis

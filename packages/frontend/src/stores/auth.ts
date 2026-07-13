@@ -4,10 +4,7 @@ interface AuthState {
   token: string | null;
   userId: string | null;
   isAuthenticated: boolean;
-  login: (
-    username: string,
-    password: string,
-  ) => Promise<{ success: boolean; error?: string }>;
+  login: (username: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   init: () => void;
 }

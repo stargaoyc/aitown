@@ -78,11 +78,7 @@ function AdminPage() {
 
   return (
     <div className="space-y-6 animate-fade-in-up">
-      <PageHeader
-        title="系统管理"
-        subtitle="运维操作、状态监控与功能导航"
-        icon="⚙️"
-      />
+      <PageHeader title="系统管理" subtitle="运维操作、状态监控与功能导航" icon="⚙️" />
 
       {/* 功能导航区 */}
       <motion.div variants={container} initial="hidden" animate="show">
@@ -104,9 +100,7 @@ function AdminPage() {
                       <div className="font-medium text-twilight-600 text-sm group-hover:text-sakura-600 transition-colors">
                         {tl.label}
                       </div>
-                      <div className="text-xs text-twilight-400 mt-0.5 truncate">
-                        {tl.desc}
-                      </div>
+                      <div className="text-xs text-twilight-400 mt-0.5 truncate">{tl.desc}</div>
                     </div>
                   </div>
                 </Link>
@@ -120,12 +114,7 @@ function AdminPage() {
       {error && <ErrorDisplay error={error} />}
 
       {status && (
-        <motion.div
-          variants={container}
-          initial="hidden"
-          animate="show"
-          className="space-y-6"
-        >
+        <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
           <motion.div variants={item}>
             <GlassCard>
               <h3 className="font-semibold text-sakura-600 mb-4 flex items-center gap-2 text-lg">
@@ -133,23 +122,17 @@ function AdminPage() {
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="p-4 rounded-2xl bg-gradient-to-br from-white/40 to-sakura-50/30 border border-white/20">
-                  <div className="text-sm text-twilight-400 mb-2">
-                    World Engine
-                  </div>
+                  <div className="text-sm text-twilight-400 mb-2">World Engine</div>
                   <StatusBadge
                     status={status.world_engine.running ? "ok" : "error"}
                     label={status.world_engine.running ? "运行中" : "停止"}
                   />
                 </div>
                 <div className="p-4 rounded-2xl bg-gradient-to-br from-white/40 to-sky-soft-50/30 border border-white/20">
-                  <div className="text-sm text-twilight-400 mb-2">
-                    Character Engine
-                  </div>
+                  <div className="text-sm text-twilight-400 mb-2">Character Engine</div>
                   <StatusBadge
                     status={status.character_engine.available ? "ok" : "idle"}
-                    label={
-                      status.character_engine.available ? "可用" : "未启动"
-                    }
+                    label={status.character_engine.available ? "可用" : "未启动"}
                   />
                 </div>
                 <div className="p-4 rounded-2xl bg-gradient-to-br from-white/40 to-twilight-50/30 border border-white/20">
@@ -159,11 +142,7 @@ function AdminPage() {
                     label={status.redis === "connected" ? "已连接" : "断开"}
                   />
                 </div>
-                <StatCard
-                  title="Tick ID"
-                  value={`#${status.world_engine.tick_id}`}
-                  icon="⏱️"
-                />
+                <StatCard title="Tick ID" value={`#${status.world_engine.tick_id}`} icon="⏱️" />
               </div>
             </GlassCard>
           </motion.div>
@@ -174,10 +153,7 @@ function AdminPage() {
                 <Zap className="w-5 h-5" /> 运维操作
               </h3>
               <div className="flex items-center gap-4 flex-wrap">
-                <AnimeButton
-                  onClick={() => forceTick.mutate()}
-                  disabled={forceTick.isPending}
-                >
+                <AnimeButton onClick={() => forceTick.mutate()} disabled={forceTick.isPending}>
                   {forceTick.isPending ? "⏳ 执行中..." : "⚡ 强制 Tick"}
                 </AnimeButton>
                 {forceTick.isSuccess && (

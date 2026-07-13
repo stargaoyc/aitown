@@ -14,6 +14,7 @@
 - pre_create_partitions 内部已有 undefined_table/duplicate_table 异常捕获
 - 即使某次失败，下个月仍会重试
 """
+
 from __future__ import annotations
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler

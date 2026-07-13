@@ -56,9 +56,7 @@ function LoginPage() {
             <h1 className="text-3xl font-bold bg-gradient-to-r from-sakura-500 via-twilight-400 to-sky-soft-500 bg-clip-text text-transparent">
               AI Town
             </h1>
-            <p className="text-sm text-twilight-400 mt-2">
-              二次元 AI 小镇陪伴智能体
-            </p>
+            <p className="text-sm text-twilight-400 mt-2">二次元 AI 小镇陪伴智能体</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -94,11 +92,7 @@ function LoginPage() {
               </motion.div>
             )}
 
-            <AnimeButton
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 text-base"
-            >
+            <AnimeButton type="submit" disabled={loading} className="w-full py-3 text-base">
               {loading ? "登录中..." : "登录小镇"}
             </AnimeButton>
           </form>

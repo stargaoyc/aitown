@@ -3,6 +3,7 @@
 模板从 YAML 文件加载（configs/prompts/*.yaml）
 或使用默认模板
 """
+
 from pathlib import Path
 
 import yaml

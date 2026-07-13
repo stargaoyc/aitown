@@ -13,6 +13,7 @@ from sqlalchemy import text
 from structlog import get_logger
 
 from src.auth.rbac import require_role
+from src.db.repositories import MemoryRepository
 from src.db.session import db
 from src.memory.diary_service import DiaryService
 from src.memory.person_memory_service import PersonMemoryService
@@ -154,3 +155,41 @@ async def list_person_memories(
             elif isinstance(v, UUID):
                 r[k] = str(v)
     return {"data": rows, "total": len(rows)}
+
+
+# === 角色记忆接口 ===
+
+
+@router.get("/memories/{character_id}")
+async def get_memories(character_id: str, limit: int = 20):
+    """获取角色记忆
+
+    Args:
+        character_id: 角色 UUID
+        limit: 返回数量限制（默认 20）
+
+    Returns:
+        角色最近的记忆片段
+    """
+    try:
+        cid = UUID(character_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid UUID format") from None
+
+    async with db.session() as session:
+        repo = MemoryRepository(session)
+        episodes = await repo.recent(cid, limit)
+
+    return {
+        "data": [
+            {
+                "id": str(e.id),
+                "content": e.content,
+                "timestamp": e.timestamp.isoformat(),
+                "importance": e.importance,
+                "is_reflected": e.is_reflected,
+            }
+            for e in episodes
+        ],
+        "total": len(episodes),
+    }

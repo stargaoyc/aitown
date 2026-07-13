@@ -12,14 +12,15 @@
 - character_id 外键引用 characters(id) ON DELETE CASCADE
   PostgreSQL 11+ 支持分区表引用非分区表，角色删除时记忆自动级联清理
 """
+
 from datetime import datetime
 from uuid import UUID
-from uuid6 import uuid7
 
 from pgvector.sqlalchemy import HALFVEC
 from sqlalchemy import Boolean, ForeignKey, Index, Integer, String, Text, Uuid
 from sqlalchemy.dialects.postgresql import ARRAY, TIMESTAMP
 from sqlalchemy.orm import Mapped, mapped_column
+from uuid6 import uuid7
 
 from src.config import settings
 from src.db.base import Base
@@ -41,52 +42,36 @@ class MemoryEpisode(Base):
         final_score = sim_score * 0.6 + importance * 0.05 + time_decay
     详见 architecture.md §5.7
     """
+
     __tablename__ = "memory_episodes"
 
-    id: Mapped[UUID] = mapped_column(
-        primary_key=True, default=uuid7, comment="记忆 ID"
-    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7, comment="记忆 ID")
     character_id: Mapped[UUID] = mapped_column(
         ForeignKey("characters.id", ondelete="CASCADE"),
-        primary_key=True, comment="所属角色（分区键，外键引用 characters.id）"
+        primary_key=True,
+        comment="所属角色（分区键，外键引用 characters.id）",
     )
     content: Mapped[str] = mapped_column(Text, comment="记忆内容（自然语言）")
     embedding: Mapped[list[float] | None] = mapped_column(
-        HALFVEC(settings.embedding_dim), nullable=True,
-        comment="向量嵌入（materialized=false 时为 NULL）"
+        HALFVEC(settings.embedding_dim), nullable=True, comment="向量嵌入（materialized=false 时为 NULL）"
     )
-    importance: Mapped[int] = mapped_column(
-        Integer, default=5, comment="重要性 1-10"
-    )
-    timestamp: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), server_default="now()", comment="发生时间"
-    )
+    importance: Mapped[int] = mapped_column(Integer, default=5, comment="重要性 1-10")
+    timestamp: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default="now()", comment="发生时间")
     action_id: Mapped[str | None] = mapped_column(String(100), comment="关联 Action")
     location: Mapped[str | None] = mapped_column(String(50), comment="发生场景")
-    related_characters: Mapped[list[UUID]] = mapped_column(
-        ARRAY(Uuid), default=list, comment="相关角色 ID 列表"
-    )
-    is_reflected: Mapped[bool] = mapped_column(
-        Boolean, default=False, comment="是否已被反思消化"
-    )
+    related_characters: Mapped[list[UUID]] = mapped_column(ARRAY(Uuid), default=list, comment="相关角色 ID 列表")
+    is_reflected: Mapped[bool] = mapped_column(Boolean, default=False, comment="是否已被反思消化")
     materialized: Mapped[bool] = mapped_column(
-        Boolean, default=False,
-        comment="embedding 是否已生成（异步 worker 处理）"
+        Boolean, default=False, comment="embedding 是否已生成（异步 worker 处理）"
     )
     # v3 迁移新增：向量化失败处理（最大重试 5 次后熔断）
-    fail_count: Mapped[int] = mapped_column(
-        Integer, default=0, comment="向量化失败次数，达到 5 后不再重试"
-    )
-    last_error: Mapped[str | None] = mapped_column(
-        Text, comment="最近一次失败错误信息（截断 1000 字）"
-    )
+    fail_count: Mapped[int] = mapped_column(Integer, default=0, comment="向量化失败次数，达到 5 后不再重试")
+    last_error: Mapped[str | None] = mapped_column(Text, comment="最近一次失败错误信息（截断 1000 字）")
     # v4 迁移新增：下次可重试时间（指数退避），NULL 表示可立即重试或已成功
     next_retry_at: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True), comment="下次可重试时间（指数退避），NULL 表示可立即重试"
     )
-    source_type: Mapped[str] = mapped_column(
-        String(20), default="action", comment="来源类型"
-    )
+    source_type: Mapped[str] = mapped_column(String(20), default="action", comment="来源类型")
 
     __table_args__ = (
         # 角色记忆时间线查询

@@ -2,6 +2,7 @@
 
 反思由反思系统定期从记忆片段中提炼生成，影响角色长期行为。
 """
+
 from uuid import UUID
 
 from sqlalchemy import select
@@ -31,9 +32,7 @@ class ReflectionRepository(BaseRepository[Reflection]):
         )
         return obj
 
-    async def get_by_character(
-        self, character_id: UUID, limit: int = 10
-    ) -> list[Reflection]:
+    async def get_by_character(self, character_id: UUID, limit: int = 10) -> list[Reflection]:
         """获取角色反思记录（按创建时间倒序，默认 10 条）"""
         stmt = (
             select(Reflection)

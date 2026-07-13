@@ -5,6 +5,7 @@
 - WebSocketManager: Web 客户端 WebSocket 连接管理（单例）
 - ProactiveSharingService: 角色主动分享链路（意图评估 + 文案生成 + 推送）
 """
+
 from src.messaging.proactive_sharing import ProactiveSharingService
 from src.messaging.service import MessageService
 from src.messaging.websocket import WebSocketManager

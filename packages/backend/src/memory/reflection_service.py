@@ -2,6 +2,7 @@
 
 触发条件：未反思记忆数 >= 反思阈值（默认 20）
 """
+
 from uuid import UUID
 
 from structlog import get_logger
@@ -68,10 +69,7 @@ class ReflectionService:
             return None
 
         # 构建反思 Prompt
-        memories_text = "\n".join([
-            f"[{e.timestamp}] {e.content}"
-            for e in episodes
-        ])
+        memories_text = "\n".join([f"[{e.timestamp}] {e.content}" for e in episodes])
 
         prompt = f"""[角色记忆]
 {memories_text}
@@ -97,19 +95,16 @@ class ReflectionService:
                             "properties": {
                                 "summary": {"type": "string"},
                                 "detail": {"type": "string"},
-                            }
-                        }
+                            },
+                        },
                     }
-                }
+                },
             },
             model="chat",
         )
 
         # 构建反思内容
-        content = "\n".join([
-            f"- {r['summary']}: {r['detail']}"
-            for r in result.get("reflections", [])
-        ])
+        content = "\n".join([f"- {r['summary']}: {r['detail']}" for r in result.get("reflections", [])])
 
         # 写入 Reflection（不含 related_episodes，已移至 reflection_sources 中间表）
         reflection = Reflection(
@@ -120,11 +115,13 @@ class ReflectionService:
 
         # 写入 reflection_sources 中间表（复合外键引用 memory_episodes）
         for episode in episodes:
-            self.ref_repo.session.add(ReflectionSource(
-                reflection_id=saved.id,
-                memory_id=episode.id,
-                memory_character_id=episode.character_id,
-            ))
+            self.ref_repo.session.add(
+                ReflectionSource(
+                    reflection_id=saved.id,
+                    memory_id=episode.id,
+                    memory_character_id=episode.character_id,
+                )
+            )
         await self.ref_repo.session.flush()
 
         # 标记记忆为已反思

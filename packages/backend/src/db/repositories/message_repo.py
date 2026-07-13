@@ -5,13 +5,14 @@
 - 按 conversation_id 分页拉取历史消息（ASC/DESC 双向）
 - 支持 token/cost 聚合统计，供 Phase 3.5 LLM 成本控制使用
 """
+
 from datetime import datetime
 from uuid import UUID
-from uuid6 import uuid7
 
-from sqlalchemy import desc, func, select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from structlog import get_logger
+from uuid6 import uuid7
 
 from src.db.models import Message
 from src.db.repositories.base import BaseRepository
@@ -131,13 +132,10 @@ class MessageRepository(BaseRepository[Message]):
         Returns:
             (tokens, cost) 元组
         """
-        stmt = (
-            select(
-                func.coalesce(func.sum(Message.tokens), 0),
-                func.coalesce(func.sum(Message.cost), 0.0),
-            )
-            .where(Message.conversation_id == conversation_id)
-        )
+        stmt = select(
+            func.coalesce(func.sum(Message.tokens), 0),
+            func.coalesce(func.sum(Message.cost), 0.0),
+        ).where(Message.conversation_id == conversation_id)
         result = await self.session.execute(stmt)
         row = result.one()
         return int(row[0]), float(row[1])

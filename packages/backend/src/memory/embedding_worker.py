@@ -8,15 +8,15 @@
 
 或集成到 FastAPI 后台任务（lifespan 中启动）。
 """
+
 from __future__ import annotations
 
 import asyncio
-from contextlib import AsyncExitStack
-from typing import AsyncContextManager, Callable
-from uuid import UUID
+from collections.abc import Callable
+from contextlib import AbstractAsyncContextManager
 
-from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db.repositories.memory_repo import MemoryRepository
 from src.llm.client import LLMClient
@@ -24,7 +24,7 @@ from src.llm.client import LLMClient
 logger = structlog.get_logger(__name__)
 
 # 类型别名：异步会话工厂
-SessionFactory = Callable[[], AsyncContextManager[AsyncSession]]
+SessionFactory = Callable[[], AbstractAsyncContextManager[AsyncSession]]
 
 
 class EmbeddingWorker:
@@ -148,6 +148,7 @@ class EmbeddingWorker:
 
 
 # === 独立运行入口 ===
+
 
 async def main():
     """独立运行 embedding worker"""

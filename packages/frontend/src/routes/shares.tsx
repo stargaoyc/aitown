@@ -73,12 +73,7 @@ function SharesPage() {
 
       {/* 顶部统计 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard
-          title="总分享数"
-          value={data?.total ?? shares.length}
-          icon="📤"
-          color="sakura"
-        />
+        <StatCard title="总分享数" value={data?.total ?? shares.length} icon="📤" color="sakura" />
         <StatCard
           title="总 Token 消耗"
           value={stats.totalTokens.toLocaleString()}
@@ -98,9 +93,7 @@ function SharesPage() {
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-2 text-twilight-500">
             <span className="font-semibold">分享流</span>
-            <span className="text-xs text-twilight-400">
-              （最近 {shares.length} 条）
-            </span>
+            <span className="text-xs text-twilight-400">（最近 {shares.length} 条）</span>
           </div>
           <StatusBadge
             status={shares.length > 0 ? "ok" : "idle"}
@@ -121,12 +114,7 @@ function SharesPage() {
 
       {/* 分享列表 - 聊天气泡样式（角色头像 + 粉色气泡） */}
       {shares.length > 0 && (
-        <motion.div
-          variants={container}
-          initial="hidden"
-          animate="show"
-          className="space-y-4"
-        >
+        <motion.div variants={container} initial="hidden" animate="show" className="space-y-4">
           {shares.map((share) => (
             <motion.div key={share.message_id} variants={item}>
               <div className="flex justify-end">
@@ -149,9 +137,7 @@ function SharesPage() {
                       )}
                     </div>
                     {/* 分享内容 */}
-                    <div className="text-sm break-words whitespace-pre-wrap">
-                      {share.content}
-                    </div>
+                    <div className="text-sm break-words whitespace-pre-wrap">{share.content}</div>
                     {/* 底部元信息：时间 / token / 成本 */}
                     <div className="flex items-center gap-3 mt-2 flex-wrap">
                       <span className="text-xs text-twilight-300 flex items-center gap-1">

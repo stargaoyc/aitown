@@ -5,6 +5,7 @@
 - setup_logging（json / console 配置）
 - bind_context / clear_context（上下文绑定与清除）
 """
+
 from __future__ import annotations
 
 from unittest.mock import patch
@@ -20,7 +21,6 @@ from src.observability.logging import (
     clear_context,
     setup_logging,
 )
-
 
 # ---------------------------------------------------------------------------
 # 共享 fixture：为 trace_id 注入测试设置真实 OTel TracerProvider

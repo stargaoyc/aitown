@@ -1,4 +1,5 @@
 """测试通用 fixtures"""
+
 import os
 
 # Settings() 在 src/config.py 导入时即实例化，需要这些环境变量；
@@ -8,10 +9,10 @@ os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
 os.environ.setdefault("OPENAI_API_KEY", "test")
 os.environ.setdefault("JWT_SECRET", "test-secret")
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock
 
-from src.actions import Action, ActionCategory, ActionRegistry
+import pytest
+
+from src.actions import ActionRegistry
 from src.modules.duration.calculator import DurationCalculator
 
 
@@ -41,6 +42,7 @@ def populated_registry():
     """包含预置 Action 的注册表"""
     reg = ActionRegistry()
     from src.actions import register_all
+
     register_all(reg)
     return reg
 

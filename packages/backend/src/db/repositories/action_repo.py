@@ -2,7 +2,8 @@
 
 ActionRecord 为按月分区表，(idx_action_char_time) 索引支持角色时间线查询。
 """
-from datetime import datetime, timedelta, timezone
+
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from sqlalchemy import select
@@ -32,9 +33,7 @@ class ActionRepository(BaseRepository[ActionRecord]):
         )
         return obj
 
-    async def get_by_character(
-        self, character_id: UUID, limit: int = 50
-    ) -> list[ActionRecord]:
+    async def get_by_character(self, character_id: UUID, limit: int = 50) -> list[ActionRecord]:
         """获取角色行为时间线（按时间倒序，默认 50 条）"""
         stmt = (
             select(ActionRecord)
@@ -45,14 +44,12 @@ class ActionRepository(BaseRepository[ActionRecord]):
         result = await self.session.execute(stmt)
         return list(result.scalars())
 
-    async def get_recent(
-        self, character_id: UUID, hours: int = 24
-    ) -> list[ActionRecord]:
+    async def get_recent(self, character_id: UUID, hours: int = 24) -> list[ActionRecord]:
         """获取角色最近 N 小时的行为（按时间倒序）
 
         以 UTC 当前时间为基准计算截止点，配合 TIMESTAMPTZ 字段比较。
         """
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+        cutoff = datetime.now(UTC) - timedelta(hours=hours)
         stmt = (
             select(ActionRecord)
             .where(

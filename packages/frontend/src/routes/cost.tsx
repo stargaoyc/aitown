@@ -139,19 +139,11 @@ function CostPage() {
                 <MessageSquare className="w-5 h-5" />
                 每日消息数
               </h3>
-              <p className="text-xs text-twilight-400 mb-4 ml-7">
-                按日期统计的消息发送数量趋势
-              </p>
+              <p className="text-xs text-twilight-400 mb-4 ml-7">按日期统计的消息发送数量趋势</p>
               <div className="w-full h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart
-                    data={dailyData}
-                    margin={{ top: 10, right: 20, left: 0, bottom: 10 }}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="rgba(122,95,195,0.15)"
-                    />
+                  <LineChart data={dailyData} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(122,95,195,0.15)" />
                     <XAxis
                       dataKey="date"
                       tick={{ fill: "#7a5fc3", fontSize: 12 }}
@@ -192,19 +184,11 @@ function CostPage() {
                 <Cpu className="w-5 h-5" />
                 每日 Token 消耗
               </h3>
-              <p className="text-xs text-twilight-400 mb-4 ml-7">
-                按日期统计的 LLM Token 消耗量
-              </p>
+              <p className="text-xs text-twilight-400 mb-4 ml-7">按日期统计的 LLM Token 消耗量</p>
               <div className="w-full h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={dailyData}
-                    margin={{ top: 10, right: 20, left: 0, bottom: 10 }}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="rgba(122,95,195,0.15)"
-                    />
+                  <BarChart data={dailyData} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(122,95,195,0.15)" />
                     <XAxis
                       dataKey="date"
                       tick={{ fill: "#7a5fc3", fontSize: 12 }}
@@ -225,12 +209,7 @@ function CostPage() {
                       }}
                       formatter={(v) => [formatNum(Number(v)), "Tokens"]}
                     />
-                    <Bar
-                      dataKey="tokens"
-                      name="Token 数量"
-                      fill="#5db8d5"
-                      radius={[8, 8, 0, 0]}
-                    />
+                    <Bar dataKey="tokens" name="Token 数量" fill="#5db8d5" radius={[8, 8, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -249,14 +228,8 @@ function CostPage() {
               </p>
               <div className="w-full h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart
-                    data={dailyData}
-                    margin={{ top: 10, right: 20, left: 0, bottom: 10 }}
-                  >
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="rgba(122,95,195,0.15)"
-                    />
+                  <LineChart data={dailyData} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(122,95,195,0.15)" />
                     <XAxis
                       dataKey="date"
                       tick={{ fill: "#7a5fc3", fontSize: 12 }}
@@ -299,9 +272,7 @@ function CostPage() {
                 <TrendingUp className="w-5 h-5" />
                 按角色分组的 Token 消耗
               </h3>
-              <p className="text-xs text-twilight-400 mb-4 ml-7">
-                各角色累计消耗的 Token 占比
-              </p>
+              <p className="text-xs text-twilight-400 mb-4 ml-7">各角色累计消耗的 Token 占比</p>
               <div className="w-full h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -313,17 +284,13 @@ function CostPage() {
                       cy="50%"
                       outerRadius={90}
                       innerRadius={40}
-                      label={(entry) =>
-                        `${entry.name}: ${formatNum(entry.value as number)}`
-                      }
+                      label={(entry) => `${entry.name}: ${formatNum(entry.value as number)}`}
                       labelLine={false}
                     >
                       {characterTokenData.map((_, index) => (
                         <Cell
                           key={`cell-${index}`}
-                          fill={
-                            PIE_COLORS[index % PIE_COLORS.length] ?? "#ff7a94"
-                          }
+                          fill={PIE_COLORS[index % PIE_COLORS.length] ?? "#ff7a94"}
                         />
                       ))}
                     </Pie>
@@ -359,8 +326,7 @@ function CostPage() {
                   <span>📝</span> Prompt 输入
                 </div>
                 <p className="text-twilight-400">
-                  输入 Token 按 LLM 供应商单价计费。不同模型单价不同，
-                  通常输入单价低于输出单价。
+                  输入 Token 按 LLM 供应商单价计费。不同模型单价不同， 通常输入单价低于输出单价。
                 </p>
               </div>
               <div className="p-4 rounded-2xl bg-sky-soft-50/50 border border-sky-soft-100/50">
@@ -368,16 +334,14 @@ function CostPage() {
                   <span>✨</span> Completion 输出
                 </div>
                 <p className="text-twilight-400">
-                  输出 Token 单价通常为输入的 2-4 倍。 成本 = Prompt Tokens ×
-                  输入单价 + Completion Tokens × 输出单价。
+                  输出 Token 单价通常为输入的 2-4 倍。 成本 = Prompt Tokens × 输入单价 + Completion
+                  Tokens × 输出单价。
                 </p>
               </div>
             </div>
             <div className="mt-3 p-3 rounded-xl bg-twilight-50/50 text-xs text-twilight-400">
               💡 提示：以上统计基于后端{" "}
-              <code className="px-1 rounded bg-white/50 text-twilight-500">
-                /messages/stats
-              </code>{" "}
+              <code className="px-1 rounded bg-white/50 text-twilight-500">/messages/stats</code>{" "}
               接口返回的累计数据， 实际成本以 LLM 供应商账单为准。
             </div>
           </GlassCard>

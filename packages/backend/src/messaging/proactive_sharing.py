@@ -18,17 +18,18 @@
     或由 WorldEngine 在特定事件触发：
     await sharing_service.send_routine_share(character_id, "morning_greeting")
 """
+
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
+from sqlalchemy import func, select
 from structlog import get_logger
 
 from src.config import settings
 from src.db.models import ActionRecord, Character, CharacterState
-from sqlalchemy import select, desc, func
 from src.db.repositories import (
     CharacterRepository,
     ConversationRepository,
@@ -41,8 +42,14 @@ logger = get_logger(__name__)
 
 # 触发分享的 Action 类型白名单（仅这些 action 完成后评估分享意图)
 SHAREABLE_ACTION_IDS = {
-    "buy_item", "receive_gift", "meet_friend", "achieve_goal",
-    "finish_work", "play_game", "read_book", "travel",
+    "buy_item",
+    "receive_gift",
+    "meet_friend",
+    "achieve_goal",
+    "finish_work",
+    "play_game",
+    "read_book",
+    "travel",
 }
 
 # 触发分享的情绪状态
@@ -266,11 +273,10 @@ class ProactiveSharingService:
         若距现在不足 SHARE_COOLDOWN_SECONDS 则冷却中。
         """
         from datetime import timedelta
-        from sqlalchemy import text as sql_text
 
-        from src.db.models import Message, Conversation
+        from src.db.models import Conversation, Message
 
-        cutoff = datetime.now(timezone.utc) - timedelta(seconds=settings.share_cooldown_seconds)
+        cutoff = datetime.now(UTC) - timedelta(seconds=settings.share_cooldown_seconds)
 
         # 按 share_id 去重查询最近一次分享时间
         stmt = (
@@ -291,14 +297,12 @@ class ProactiveSharingService:
 
     async def _get_today_share_count(self, character_id: UUID) -> int:
         """获取今日该角色的主动分享次数（按 share_id 去重）"""
-        from datetime import datetime, timezone
+        from datetime import datetime
 
-        from src.db.models import Message, Conversation
+        from src.db.models import Conversation, Message
 
         # 今日 UTC 0 点
-        today_start = datetime.now(timezone.utc).replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
+        today_start = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
 
         # 按 share_id 去重计数（一次分享投递给多个用户只算一次）
         stmt = (
@@ -348,6 +352,7 @@ class ProactiveSharingService:
                 world_state = await self.redis.hgetall("world:state")
                 if world_state:
                     import json
+
                     world_time_raw = world_state.get("world_time", "")
                     try:
                         world_time = json.loads(world_time_raw)
@@ -460,8 +465,9 @@ class ProactiveSharingService:
             return 0
 
         from uuid import uuid4
+
         share_id = str(uuid4())  # 同一次分享的唯一 ID，所有投递共享
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         delivered = 0
 
         for conv in conversations:
@@ -504,6 +510,7 @@ class ProactiveSharingService:
                 # 创建通知中心记录
                 try:
                     from src.runtime import create_notification
+
                     await create_notification(
                         user_id=conv.user_id,
                         notif_type="share",

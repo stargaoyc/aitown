@@ -15,12 +15,12 @@
 """
 
 from collections.abc import Callable
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 
-class ActionCategory(str, Enum):
+class ActionCategory(StrEnum):
     """Action 分类"""
 
     MOVE = "move"

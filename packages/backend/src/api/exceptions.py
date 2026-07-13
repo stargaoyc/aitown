@@ -5,6 +5,7 @@
 """
 
 import uuid
+
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
 from structlog import get_logger

@@ -7,6 +7,7 @@
    引用 memory_episodes(id, character_id) ON DELETE CASCADE。
    PostgreSQL 12+ 支持分区表作为外键父表。
 """
+
 from datetime import datetime
 from uuid import UUID
 
@@ -23,21 +24,17 @@ class ReflectionSource(Base):
     一条反思由多条记忆归纳而来，此表记录关联关系。
     删除记忆时，复合外键的 ON DELETE CASCADE 会自动清理关联行。
     """
+
     __tablename__ = "reflection_sources"
 
     reflection_id: Mapped[UUID] = mapped_column(
-        ForeignKey("reflections.id", ondelete="CASCADE"),
-        primary_key=True, comment="反思 ID"
+        ForeignKey("reflections.id", ondelete="CASCADE"), primary_key=True, comment="反思 ID"
     )
-    memory_id: Mapped[UUID] = mapped_column(
-        primary_key=True, comment="记忆 ID"
-    )
+    memory_id: Mapped[UUID] = mapped_column(primary_key=True, comment="记忆 ID")
     memory_character_id: Mapped[UUID] = mapped_column(
         primary_key=True, comment="记忆所属角色 ID（分区键，复合外键组成部分）"
     )
-    created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), server_default="now()", comment="创建时间"
-    )
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default="now()", comment="创建时间")
 
     __table_args__ = (
         # 复合外键：引用 memory_episodes(id, character_id) ON DELETE CASCADE

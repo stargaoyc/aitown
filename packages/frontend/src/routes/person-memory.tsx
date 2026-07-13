@@ -70,11 +70,7 @@ function PersonMemoryPage() {
   const { data: charactersData, isLoading: charsLoading } = useCharacters();
   const characters = charactersData?.data ?? [];
 
-  const {
-    data: memoriesData,
-    isLoading,
-    error,
-  } = usePersonMemoriesList(selectedCharacter, 100);
+  const { data: memoriesData, isLoading, error } = usePersonMemoriesList(selectedCharacter, 100);
   const memories = memoriesData?.data ?? [];
 
   // 前端搜索过滤
@@ -92,8 +88,7 @@ function PersonMemoryPage() {
   // 统计
   const stats = useMemo(() => {
     const totalHeat = memories.reduce((sum, m) => sum + (m.heat || 0), 0);
-    const avgHeat =
-      memories.length > 0 ? Math.round(totalHeat / memories.length) : 0;
+    const avgHeat = memories.length > 0 ? Math.round(totalHeat / memories.length) : 0;
     const hotUsers = memories.filter((m) => m.heat >= 20).length;
     return {
       total: memories.length,
@@ -114,33 +109,16 @@ function PersonMemoryPage() {
 
       {/* 顶部统计 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard
-          title="记忆用户数"
-          value={stats.total}
-          icon="👤"
-          color="sakura"
-        />
-        <StatCard
-          title="平均热度"
-          value={stats.avgHeat}
-          icon="🔥"
-          color="twilight"
-        />
-        <StatCard
-          title="热络用户"
-          value={stats.hotUsers}
-          icon="❤️"
-          color="sky"
-        />
+        <StatCard title="记忆用户数" value={stats.total} icon="👤" color="sakura" />
+        <StatCard title="平均热度" value={stats.avgHeat} icon="🔥" color="twilight" />
+        <StatCard title="热络用户" value={stats.hotUsers} icon="❤️" color="sky" />
       </div>
 
       {/* 控制栏 */}
       <GlassCard hover={false}>
         <div className="grid md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm text-twilight-500 font-medium mb-2">
-              选择角色
-            </label>
+            <label className="block text-sm text-twilight-500 font-medium mb-2">选择角色</label>
             {charsLoading ? (
               <div className="text-sm text-twilight-400">加载角色中...</div>
             ) : (
@@ -159,9 +137,7 @@ function PersonMemoryPage() {
             )}
           </div>
           <div>
-            <label className="block text-sm text-twilight-500 font-medium mb-2">
-              搜索用户记忆
-            </label>
+            <label className="block text-sm text-twilight-500 font-medium mb-2">搜索用户记忆</label>
             <AnimeInput
               placeholder="搜索用户 ID、内容、平台..."
               value={searchQuery}
@@ -173,26 +149,14 @@ function PersonMemoryPage() {
       </GlassCard>
 
       {!selectedCharacter && (
-        <EmptyState
-          icon="👆"
-          title="请先选择一个角色"
-          subtitle="选择角色后将展示其对用户的记忆"
-        />
+        <EmptyState icon="👆" title="请先选择一个角色" subtitle="选择角色后将展示其对用户的记忆" />
       )}
 
-      {selectedCharacter && isLoading && (
-        <LoadingSpinner text="正在加载用户记忆..." />
-      )}
-      {selectedCharacter && !isLoading && error && (
-        <ErrorDisplay error={error} />
-      )}
+      {selectedCharacter && isLoading && <LoadingSpinner text="正在加载用户记忆..." />}
+      {selectedCharacter && !isLoading && error && <ErrorDisplay error={error} />}
 
       {selectedCharacter && !isLoading && !error && memories.length === 0 && (
-        <EmptyState
-          icon="💭"
-          title="暂无用户记忆"
-          subtitle="用户与角色互动后将自动生成记忆"
-        />
+        <EmptyState icon="💭" title="暂无用户记忆" subtitle="用户与角色互动后将自动生成记忆" />
       )}
 
       {selectedCharacter &&
@@ -200,21 +164,12 @@ function PersonMemoryPage() {
         !error &&
         memories.length > 0 &&
         filteredMemories.length === 0 && (
-          <EmptyState
-            icon="🔍"
-            title="未匹配到记忆"
-            subtitle="尝试更换搜索关键词"
-          />
+          <EmptyState icon="🔍" title="未匹配到记忆" subtitle="尝试更换搜索关键词" />
         )}
 
       {/* 记忆列表 */}
       {filteredMemories.length > 0 && (
-        <motion.div
-          variants={container}
-          initial="hidden"
-          animate="show"
-          className="space-y-4"
-        >
+        <motion.div variants={container} initial="hidden" animate="show" className="space-y-4">
           {filteredMemories.map((memory: PersonMemoryEntry, idx: number) => {
             const heatInfo = getHeatLevel(memory.heat || 0);
             return (
@@ -254,13 +209,10 @@ function PersonMemoryPage() {
 
                   {(memory.created_at || memory.updated_at) && (
                     <div className="text-xs text-twilight-400 flex items-center gap-3 pt-1 border-t border-sakura-200/30">
-                      {memory.created_at && (
-                        <span>创建：{formatTime(memory.created_at)}</span>
+                      {memory.created_at && <span>创建：{formatTime(memory.created_at)}</span>}
+                      {memory.updated_at && memory.updated_at !== memory.created_at && (
+                        <span>更新：{formatTime(memory.updated_at)}</span>
                       )}
-                      {memory.updated_at &&
-                        memory.updated_at !== memory.created_at && (
-                          <span>更新：{formatTime(memory.updated_at)}</span>
-                        )}
                     </div>
                   )}
                 </GlassCard>
@@ -278,13 +230,8 @@ function PersonMemoryPage() {
             <div>
               <div className="font-medium text-twilight-500 mb-1">记忆说明</div>
               <ul className="space-y-1">
-                <li>
-                  • 角色对每个用户维护独立的记忆，含偏好、关系进展、共同话题
-                </li>
-                <li>
-                  • 热度机制：每次交互热度
-                  +1，长期不交互不衰减（按交互频率排序）
-                </li>
+                <li>• 角色对每个用户维护独立的记忆，含偏好、关系进展、共同话题</li>
+                <li>• 热度机制：每次交互热度 +1，长期不交互不衰减（按交互频率排序）</li>
                 <li>• 热度 ≥ 20 为"熟悉"，≥ 50 为"热络"</li>
                 <li>• 记忆内容由 LLM 根据对话历史自动更新</li>
               </ul>

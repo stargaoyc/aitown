@@ -91,8 +91,7 @@ function summarizePayload(payload: Record<string, unknown>): string {
   if (entries.length === 0) return "（无附加数据）";
   // 取前 3 个键值对拼接
   const parts = entries.slice(0, 3).map(([k, v]) => {
-    const val =
-      typeof v === "object" && v !== null ? JSON.stringify(v) : String(v);
+    const val = typeof v === "object" && v !== null ? JSON.stringify(v) : String(v);
     const short = val.length > 40 ? `${val.slice(0, 40)}...` : val;
     return `${k}: ${short}`;
   });
@@ -116,15 +115,11 @@ function EventCard({ ev }: { ev: WorldEventEntry }) {
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div className="flex items-center gap-2">
           <span className="text-lg">{conf.icon}</span>
-          <span
-            className={`px-2 py-0.5 rounded-full text-xs font-medium border ${conf.color}`}
-          >
+          <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${conf.color}`}>
             {conf.label}
           </span>
           {ev.event_key && ev.event_key !== "default" && (
-            <span className="text-xs text-twilight-400 font-mono">
-              {ev.event_key}
-            </span>
+            <span className="text-xs text-twilight-400 font-mono">{ev.event_key}</span>
           )}
         </div>
         <div className="flex items-center gap-2">
@@ -219,38 +214,17 @@ function EventsPage() {
 
       {/* 顶部统计 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard
-          title="事件总数"
-          value={events.length}
-          icon="📊"
-          color="sakura"
-        />
-        <StatCard
-          title="Tick 数"
-          value={groupedByTick.length}
-          icon="⏱️"
-          color="sky"
-        />
-        <StatCard
-          title="已筛选"
-          value={filteredEvents.length}
-          icon="🔍"
-          color="twilight"
-        />
-        <StatCard
-          title="类型数"
-          value={Object.keys(typeCounts).length}
-          icon="🏷️"
-          color="sakura"
-        />
+        <StatCard title="事件总数" value={events.length} icon="📊" color="sakura" />
+        <StatCard title="Tick 数" value={groupedByTick.length} icon="⏱️" color="sky" />
+        <StatCard title="已筛选" value={filteredEvents.length} icon="🔍" color="twilight" />
+        <StatCard title="类型数" value={Object.keys(typeCounts).length} icon="🏷️" color="sakura" />
       </div>
 
       {/* 类型筛选标签 */}
       <GlassCard hover={false}>
         <div className="flex flex-wrap gap-2">
           {filterTabs.map((tab) => {
-            const count =
-              tab.key === "all" ? events.length : (typeCounts[tab.key] ?? 0);
+            const count = tab.key === "all" ? events.length : (typeCounts[tab.key] ?? 0);
             const active = typeFilter === tab.key;
             return (
               <button
@@ -281,42 +255,22 @@ function EventsPage() {
       {error && <ErrorDisplay error={error} />}
 
       {!isLoading && !error && events.length === 0 && (
-        <EmptyState
-          icon="⏱️"
-          title="暂无世界事件"
-          subtitle="世界引擎运行后将在此产生事件记录"
-        />
+        <EmptyState icon="⏱️" title="暂无世界事件" subtitle="世界引擎运行后将在此产生事件记录" />
       )}
 
-      {!isLoading &&
-        !error &&
-        events.length > 0 &&
-        filteredEvents.length === 0 && (
-          <EmptyState
-            icon="🔍"
-            title="该类型暂无事件"
-            subtitle="尝试切换为「全部」查看"
-          />
-        )}
+      {!isLoading && !error && events.length > 0 && filteredEvents.length === 0 && (
+        <EmptyState icon="🔍" title="该类型暂无事件" subtitle="尝试切换为「全部」查看" />
+      )}
 
       {/* 时间线（按 Tick 分组） */}
       {groupedByTick.length > 0 && (
-        <motion.div
-          variants={container}
-          initial="hidden"
-          animate="show"
-          className="relative"
-        >
+        <motion.div variants={container} initial="hidden" animate="show" className="relative">
           {/* 垂直时间轴线 */}
           <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-gradient-to-b from-sakura-300 via-twilight-300 to-sky-soft-300" />
 
           <div className="space-y-6">
             {groupedByTick.map(([tickId, tickEvents]) => (
-              <motion.div
-                key={tickId}
-                variants={item}
-                className="relative pl-14"
-              >
+              <motion.div key={tickId} variants={item} className="relative pl-14">
                 {/* Tick 节点 */}
                 <div className="absolute left-0 top-2 w-11 h-11 rounded-2xl bg-gradient-to-br from-sakura-400 to-twilight-400 flex items-center justify-center text-white font-bold text-sm shadow-lg border-2 border-white/60">
                   <Layers className="w-5 h-5" />
@@ -325,9 +279,7 @@ function EventsPage() {
                 <div className="space-y-3">
                   {/* Tick 标题 */}
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-twilight-600">
-                      Tick #{tickId}
-                    </span>
+                    <span className="font-semibold text-twilight-600">Tick #{tickId}</span>
                     <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-twilight-100 text-twilight-500 border border-twilight-200/50">
                       {tickEvents.length} 个事件
                     </span>

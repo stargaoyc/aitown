@@ -10,8 +10,9 @@
 - LLM 评分（可选）：环境变量 MEMORY_LLM_SCORING_ENABLED=true 启用，
   LLM 在生成记忆的同时进行打分，更精准但增加 LLM 调用成本。
 """
+
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from structlog import get_logger
@@ -153,10 +154,10 @@ class EpisodeService:
         episode = MemoryEpisode(
             character_id=character_id,
             content=content,
-            embedding=None,          # 异步 worker 生成
-            materialized=False,      # 标记为未向量化
+            embedding=None,  # 异步 worker 生成
+            materialized=False,  # 标记为未向量化
             importance=final_importance,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             action_id=action_id,
             location=location,
         )

@@ -8,6 +8,7 @@
 - OneBot: ONEBOT_DEFAULT_CHARACTER_ID
 - Lark:   LARK_APP_ID, LARK_APP_SECRET, LARK_DEFAULT_CHARACTER_ID
 """
+
 from src.adapters.lark import LarkAdapter
 from src.adapters.onebot import OneBotAdapter
 

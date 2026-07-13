@@ -3,7 +3,8 @@
 覆盖 JWT 生成与解码，使用测试密钥构造 JWTHandler 实例，
 不依赖全局 settings。
 """
-from datetime import datetime, timedelta, timezone
+
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fastapi import HTTPException
@@ -12,7 +13,6 @@ from jose import jwt as jose_jwt
 from src.auth.jwt_handler import JWTHandler
 from src.auth.jwt_handler import create_token as module_create_token
 from src.auth.jwt_handler import decode_token as module_decode_token
-
 
 # 测试用密钥与算法（不依赖全局 settings）
 _TEST_SECRET = "test-secret-key-for-unit-tests"
@@ -65,7 +65,7 @@ def test_decode_token_returns_payload(handler):
 
 
 def test_decode_token_expired_raises_401(handler):
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expired_payload = {
         "sub": "user1",
         "iat": now - timedelta(hours=2),
@@ -78,11 +78,10 @@ def test_decode_token_expired_raises_401(handler):
 
 
 def test_decode_token_invalid_signature_raises_401(handler):
-    token = handler.create_token("user1")
+    handler.create_token("user1")
     # 用错误密钥生成，签名不匹配
     bad_token = jose_jwt.encode(
-        {"sub": "user1", "iat": datetime.now(timezone.utc),
-         "exp": datetime.now(timezone.utc) + timedelta(hours=1)},
+        {"sub": "user1", "iat": datetime.now(UTC), "exp": datetime.now(UTC) + timedelta(hours=1)},
         "wrong-secret",
         algorithm=_ALGORITHM,
     )

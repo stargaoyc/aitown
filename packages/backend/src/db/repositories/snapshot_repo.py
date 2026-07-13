@@ -5,6 +5,7 @@
 - world_snapshots: 完整状态快照（低频，每 1000 Tick 存一次）
 - 冷启动恢复：加载最新快照 → 回放之后的增量事件 → 恢复状态
 """
+
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -63,9 +64,7 @@ class WorldEventRepository(BaseRepository[WorldEvent]):
             for e in events
         ]
         stmt = pg_insert(WorldEvent).values(rows)
-        stmt = stmt.on_conflict_do_nothing(
-            constraint="uq_world_events_tick_type_key"
-        )
+        stmt = stmt.on_conflict_do_nothing(constraint="uq_world_events_tick_type_key")
         result = await self.session.execute(stmt)
         logger.info(
             "world_events_batch_created",
@@ -76,17 +75,11 @@ class WorldEventRepository(BaseRepository[WorldEvent]):
 
     async def get_by_tick(self, tick_id: int) -> list[WorldEvent]:
         """按 Tick 序号获取该 Tick 的所有事件"""
-        stmt = (
-            select(WorldEvent)
-            .where(WorldEvent.tick_id == tick_id)
-            .order_by(WorldEvent.created_at)
-        )
+        stmt = select(WorldEvent).where(WorldEvent.tick_id == tick_id).order_by(WorldEvent.created_at)
         result = await self.session.execute(stmt)
         return list(result.scalars())
 
-    async def get_by_type(
-        self, event_type: str, limit: int = 100
-    ) -> list[WorldEvent]:
+    async def get_by_type(self, event_type: str, limit: int = 100) -> list[WorldEvent]:
         """按事件类型查询最近的事件"""
         stmt = (
             select(WorldEvent)
@@ -97,9 +90,7 @@ class WorldEventRepository(BaseRepository[WorldEvent]):
         result = await self.session.execute(stmt)
         return list(result.scalars())
 
-    async def get_range(
-        self, start_tick: int, end_tick: int
-    ) -> list[WorldEvent]:
+    async def get_range(self, start_tick: int, end_tick: int) -> list[WorldEvent]:
         """查询 Tick 区间内的所有事件（用于回放）"""
         stmt = (
             select(WorldEvent)
@@ -134,11 +125,7 @@ class WorldSnapshotRepository(BaseRepository[WorldSnapshot]):
 
     async def get_latest(self) -> WorldSnapshot | None:
         """获取最新的世界快照（冷启动恢复入口）"""
-        stmt = (
-            select(WorldSnapshot)
-            .order_by(WorldSnapshot.tick_id.desc())
-            .limit(1)
-        )
+        stmt = select(WorldSnapshot).order_by(WorldSnapshot.tick_id.desc()).limit(1)
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
 

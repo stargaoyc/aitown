@@ -1,19 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useRef } from "react";
 import { motion } from "framer-motion";
-import {
-  Upload,
-  FileText,
-  Download,
-  CheckCircle2,
-  XCircle,
-} from "lucide-react";
-import {
-  GlassCard,
-  PageHeader,
-  AnimeButton,
-  EmptyState,
-} from "@/components/ui";
+import { Upload, FileText, Download, CheckCircle2, XCircle } from "lucide-react";
+import { GlassCard, PageHeader, AnimeButton, EmptyState } from "@/components/ui";
 import { useImportCharacter, useImportCharacterBatch } from "@/lib/queries";
 
 export const Route = createFileRoute("/import")({
@@ -175,9 +164,7 @@ function ImportPage() {
             <FileText className="w-5 h-5" />
             YAML 角色卡内容
           </h3>
-          <span className="text-xs text-twilight-400">
-            {yamlText.length} 字符
-          </span>
+          <span className="text-xs text-twilight-400">{yamlText.length} 字符</span>
         </div>
         {yamlText ? (
           <textarea
@@ -204,10 +191,7 @@ function ImportPage() {
       {/* 导入按钮区 */}
       <GlassCard>
         <div className="flex flex-wrap items-center gap-3">
-          <AnimeButton
-            onClick={handleImportSingle}
-            disabled={isPending || !yamlText.trim()}
-          >
+          <AnimeButton onClick={handleImportSingle} disabled={isPending || !yamlText.trim()}>
             {importSingle.isPending ? "⏳ 导入中..." : "✨ 导入单个角色"}
           </AnimeButton>
           <AnimeButton
@@ -217,18 +201,13 @@ function ImportPage() {
           >
             {importBatch.isPending ? "⏳ 批量导入中..." : "📚 批量导入"}
           </AnimeButton>
-          <span className="text-xs text-twilight-400 ml-2">
-            导入后将自动刷新角色列表
-          </span>
+          <span className="text-xs text-twilight-400 ml-2">导入后将自动刷新角色列表</span>
         </div>
       </GlassCard>
 
       {/* 导入结果展示 */}
       {result && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <GlassCard>
             <div
               className={`flex items-start gap-3 ${
@@ -244,9 +223,7 @@ function ImportPage() {
                 <div className="font-semibold">
                   {result.type === "success" ? "导入成功" : "导入失败"}
                 </div>
-                <div className="text-sm mt-1 break-all opacity-80">
-                  {result.message}
-                </div>
+                <div className="text-sm mt-1 break-all opacity-80">{result.message}</div>
               </div>
             </div>
           </GlassCard>
@@ -263,23 +240,16 @@ function ImportPage() {
           <li className="flex items-start gap-2">
             <span className="text-sakura-400 mt-0.5">•</span>
             <span>
-              <strong className="text-twilight-500">单个导入</strong>：YAML
-              中包含单个角色定义，使用{" "}
-              <code className="px-1 rounded bg-sakura-50 text-sakura-600">
-                importCharacter
-              </code>{" "}
+              <strong className="text-twilight-500">单个导入</strong>：YAML 中包含单个角色定义，使用{" "}
+              <code className="px-1 rounded bg-sakura-50 text-sakura-600">importCharacter</code>{" "}
               接口
             </span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-sakura-400 mt-0.5">•</span>
             <span>
-              <strong className="text-twilight-500">批量导入</strong>：YAML
-              中包含多个角色定义（用{" "}
-              <code className="px-1 rounded bg-sakura-50 text-sakura-600">
-                ---
-              </code>{" "}
-              分隔），使用{" "}
+              <strong className="text-twilight-500">批量导入</strong>：YAML 中包含多个角色定义（用{" "}
+              <code className="px-1 rounded bg-sakura-50 text-sakura-600">---</code> 分隔），使用{" "}
               <code className="px-1 rounded bg-sakura-50 text-sakura-600">
                 importCharacterBatch
               </code>{" "}
@@ -289,14 +259,8 @@ function ImportPage() {
           <li className="flex items-start gap-2">
             <span className="text-sakura-400 mt-0.5">•</span>
             <span>
-              支持上传{" "}
-              <code className="px-1 rounded bg-sakura-50 text-sakura-600">
-                .yaml
-              </code>{" "}
-              /{" "}
-              <code className="px-1 rounded bg-sakura-50 text-sakura-600">
-                .yml
-              </code>{" "}
+              支持上传 <code className="px-1 rounded bg-sakura-50 text-sakura-600">.yaml</code> /{" "}
+              <code className="px-1 rounded bg-sakura-50 text-sakura-600">.yml</code>{" "}
               文件，也可直接粘贴文本
             </span>
           </li>

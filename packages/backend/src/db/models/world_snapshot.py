@@ -7,13 +7,14 @@
 
 ⚠️ world_snapshots 在 0001_init 中创建，v2 曾误删，v3 已恢复保留。
 """
+
 from datetime import datetime
 from uuid import UUID
-from uuid6 import uuid7
 
 from sqlalchemy import BigInteger, Index, String
 from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP
 from sqlalchemy.orm import Mapped, mapped_column
+from uuid6 import uuid7
 
 from src.db.base import Base
 
@@ -32,33 +33,18 @@ class WorldSnapshot(Base):
     - resources: 资源状态
     - active_events: 活跃事件列表
     """
+
     __tablename__ = "world_snapshots"
 
-    id: Mapped[UUID] = mapped_column(
-        primary_key=True, default=uuid7, comment="快照 ID"
-    )
-    tick_id: Mapped[int] = mapped_column(
-        BigInteger, comment="快照对应的 Tick 序号"
-    )
-    world_time: Mapped[datetime | None] = mapped_column(
-        TIMESTAMP(timezone=True), comment="虚拟世界时间"
-    )
-    weather: Mapped[str | None] = mapped_column(
-        String(20), comment="天气状态"
-    )
-    locations: Mapped[dict | None] = mapped_column(
-        JSONB, comment="所有场景状态 JSON"
-    )
-    resources: Mapped[dict | None] = mapped_column(
-        JSONB, comment="资源状态 JSON"
-    )
-    active_events: Mapped[dict | None] = mapped_column(
-        JSONB, comment="活跃事件列表 JSON"
-    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7, comment="快照 ID")
+    tick_id: Mapped[int] = mapped_column(BigInteger, comment="快照对应的 Tick 序号")
+    world_time: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), comment="虚拟世界时间")
+    weather: Mapped[str | None] = mapped_column(String(20), comment="天气状态")
+    locations: Mapped[dict | None] = mapped_column(JSONB, comment="所有场景状态 JSON")
+    resources: Mapped[dict | None] = mapped_column(JSONB, comment="资源状态 JSON")
+    active_events: Mapped[dict | None] = mapped_column(JSONB, comment="活跃事件列表 JSON")
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default="now()", comment="快照创建时间"
     )
 
-    __table_args__ = (
-        Index("idx_world_tick", "tick_id"),
-    )
+    __table_args__ = (Index("idx_world_tick", "tick_id"),)

@@ -13,17 +13,18 @@
 - 失败容错：LLM 调用失败时返回默认错误消息，不影响用户会话状态
 - 事务边界：用户消息与角色回复在同一事务内提交，保证一致性
 """
+
 from __future__ import annotations
 
 import re
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from structlog import get_logger
 
-from src.cost_control.budget_manager import BudgetExceeded, get_budget_manager
-from src.cost_control.circuit_breaker import CircuitOpen, get_circuit_breaker
+from src.cost_control.budget_manager import get_budget_manager
+from src.cost_control.circuit_breaker import get_circuit_breaker
 from src.db.models import Character, Conversation, Message
 from src.db.repositories import (
     CharacterRepository,
@@ -41,9 +42,9 @@ _prompt_guard = PromptGuard()
 
 
 # 上下文管理常量
-DEFAULT_HISTORY_LIMIT = 20        # 默认拉取最近 20 条消息构造 history
-CONTEXT_COMPRESS_THRESHOLD = 50   # 会话累计消息超过 50 条时触发压缩
-COMPRESSED_HISTORY_LIMIT = 10     # 压缩后保留最近 10 条原文
+DEFAULT_HISTORY_LIMIT = 20  # 默认拉取最近 20 条消息构造 history
+CONTEXT_COMPRESS_THRESHOLD = 50  # 会话累计消息超过 50 条时触发压缩
+COMPRESSED_HISTORY_LIMIT = 10  # 压缩后保留最近 10 条原文
 
 # 默认错误回复（LLM 失败时返回，避免用户会话阻塞）
 DEFAULT_ERROR_REPLY = "（角色陷入了沉思，未能给出回复，请稍后再试）"
@@ -52,11 +53,30 @@ DEFAULT_ERROR_REPLY = "（角色陷入了沉思，未能给出回复，请稍后
 GROUP_REPLY_PROBABILITY_CAP = 0.7
 
 # 群聊智能回复：常见问候语关键词（命中则直接回复）
-GREETING_KEYWORDS = frozenset({
-    "你好", "您好", "嗨", "哈喽", "hello", "hi", "hey", "早上好",
-    "下午好", "晚上好", "早安", "晚安", "午安", "在吗", "在不在",
-    "有人吗", "你好呀", "你好啊", "哈喽啊", "大家好",
-})
+GREETING_KEYWORDS = frozenset(
+    {
+        "你好",
+        "您好",
+        "嗨",
+        "哈喽",
+        "hello",
+        "hi",
+        "hey",
+        "早上好",
+        "下午好",
+        "晚上好",
+        "早安",
+        "晚安",
+        "午安",
+        "在吗",
+        "在不在",
+        "有人吗",
+        "你好呀",
+        "你好啊",
+        "哈喽啊",
+        "大家好",
+    }
+)
 
 # 匹配 [CQ:xxx,...] 码（OneBot 图片/表情/at 等）
 _CQ_CODE_PATTERN = re.compile(r"\[CQ:[^\]]+\]")
@@ -200,7 +220,7 @@ class MessageService:
                 f"1. 消息与角色完全无关且无趣\n"
                 f"2. 消息是他人之间的私密对话\n"
                 f"3. 消息是纯技术讨论且角色无相关背景\n\n"
-                f"请只输出 JSON：{{\"should_reply\": true/false, \"reason\": \"简短原因\"}}"
+                f'请只输出 JSON：{{"should_reply": true/false, "reason": "简短原因"}}'
             )
 
             result = await self.llm.structured_output(
@@ -286,6 +306,7 @@ class MessageService:
                 pattern=matched_pattern,
             )
             from src.observability.metrics import MESSAGE_PROCESSED_TOTAL
+
             MESSAGE_PROCESSED_TOTAL.labels(platform=platform, status="failed").inc()
             return {
                 "conversation_id": None,
@@ -329,6 +350,7 @@ class MessageService:
             )
             await self.session.commit()
             from src.observability.metrics import MESSAGE_PROCESSED_TOTAL
+
             MESSAGE_PROCESSED_TOTAL.labels(platform=platform, status="failed").inc()
             return {
                 "conversation_id": conversation.id,
@@ -379,6 +401,7 @@ class MessageService:
         await self.session.commit()
 
         from src.observability.metrics import MESSAGE_PROCESSED_TOTAL, MESSAGE_PROCESSING_DURATION
+
         duration = time.perf_counter() - start_perf
         if error:
             MESSAGE_PROCESSED_TOTAL.labels(platform=platform, status="failed").inc()
@@ -409,14 +432,16 @@ class MessageService:
                 llm_client=self.llm,
             )
             # 异步执行，不等待（fire-and-forget）
-            asyncio.create_task(pm_service.update_memory(
-                character_id=character_id,
-                character_name=character.name,
-                user_id=user_id,
-                platform=platform,
-                user_message=content,
-                character_reply=reply_text,
-            ))
+            asyncio.create_task(
+                pm_service.update_memory(
+                    character_id=character_id,
+                    character_name=character.name,
+                    user_id=user_id,
+                    platform=platform,
+                    user_message=content,
+                    character_reply=reply_text,
+                )
+            )
         except Exception:
             pass  # 记忆更新失败不影响主流程
 
@@ -472,6 +497,7 @@ class MessageService:
                 world_state = await self.redis.hgetall("world:state")
                 if world_state:
                     import json
+
                     world_time_raw = world_state.get("world_time", "")
                     try:
                         world_time = json.loads(world_time_raw)
@@ -480,11 +506,7 @@ class MessageService:
                     except (json.JSONDecodeError, TypeError):
                         world_time = world_time_raw
                     weather = world_state.get("weather", "sunny")
-                    world_section = (
-                        f"[世界状态]\n"
-                        f"虚拟时间: {world_time}\n"
-                        f"天气: {weather}\n\n"
-                    )
+                    world_section = f"[世界状态]\n虚拟时间: {world_time}\n天气: {weather}\n\n"
             except Exception:
                 pass  # Redis 读取失败不影响对话
 
@@ -522,11 +544,13 @@ class MessageService:
             - error 非 None 时 reply_text 为默认错误回复
         """
         # 构造历史文本（最近 N 条）
-        history_text = "\n".join([
-            f"{'用户' if m.sender == 'user' else character.name}: {m.content}"
-            for m in history
-            if m.sender in ("user", "character")
-        ])
+        history_text = "\n".join(
+            [
+                f"{'用户' if m.sender == 'user' else character.name}: {m.content}"
+                for m in history
+                if m.sender in ("user", "character")
+            ]
+        )
 
         try:
             # 构建安全 prompt（用户消息用分隔符包裹，防止角色覆盖）
@@ -636,11 +660,13 @@ class MessageService:
             return
 
         # 构造压缩输入文本
-        history_text = "\n".join([
-            f"{'用户' if m.sender == 'user' else character.name}: {m.content}"
-            for m in reversed(to_compress)  # 时间正序
-            if m.sender in ("user", "character")
-        ])
+        history_text = "\n".join(
+            [
+                f"{'用户' if m.sender == 'user' else character.name}: {m.content}"
+                for m in reversed(to_compress)  # 时间正序
+                if m.sender in ("user", "character")
+            ]
+        )
 
         try:
             compress_prompt = (
@@ -652,7 +678,7 @@ class MessageService:
             # 写入压缩后的 context
             existing_context = conversation.context or {}
             existing_context["summary"] = summary
-            existing_context["compressed_at"] = datetime.now(timezone.utc).isoformat()
+            existing_context["compressed_at"] = datetime.now(UTC).isoformat()
             existing_context["compressed_count"] = len(to_compress)
 
             await self.conversation_repo.update_context(

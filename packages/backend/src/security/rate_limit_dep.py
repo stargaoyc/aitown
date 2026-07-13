@@ -11,6 +11,7 @@ def rate_limit(key_prefix: str, max_requests: int = 60, window_seconds: int = 60
     用法：
         @app.post("/api/v1/messages/send", dependencies=[Depends(rate_limit("msg_send", 60, 60))])
     """
+
     async def dependency(request: Request):
         limiter = get_rate_limiter()
         if not limiter:
@@ -21,6 +22,7 @@ def rate_limit(key_prefix: str, max_requests: int = 60, window_seconds: int = 60
         auth_header = request.headers.get("authorization", "")
         if auth_header.startswith("Bearer "):
             from src.auth import decode_token
+
             try:
                 payload = decode_token(auth_header[7:])
                 user_id = payload.get("sub", client_ip)

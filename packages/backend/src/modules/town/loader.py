@@ -2,13 +2,12 @@
 
 从 YAML 加载场景配置和世界地图，运行时管理场景动态状态。
 """
+
 from __future__ import annotations
 
-import structlog
-from datetime import datetime
 from pathlib import Path
-from typing import Any
 
+import structlog
 import yaml
 from redis.asyncio import Redis
 
@@ -41,9 +40,7 @@ class SceneLoader:
         self._scenes: dict[str, Scene] = {}
         self._world_map: WorldMap = WorldMap()
 
-    async def load_from_files(
-        self, scenes_path: str | Path, map_path: str | Path
-    ) -> None:
+    async def load_from_files(self, scenes_path: str | Path, map_path: str | Path) -> None:
         """从 YAML 文件加载场景和地图
 
         Args:
@@ -51,9 +48,7 @@ class SceneLoader:
             map_path: world-map.yaml 路径
         """
         # 加载场景
-        scenes_raw = yaml.safe_load(
-            Path(scenes_path).read_text(encoding="utf-8")
-        )
+        scenes_raw = yaml.safe_load(Path(scenes_path).read_text(encoding="utf-8"))
         scenes_list = scenes_raw.get("scenes", [])
         self._scenes = {}
         for scene_data in scenes_list:
@@ -62,9 +57,7 @@ class SceneLoader:
         logger.info("加载 %d 个场景", len(self._scenes))
 
         # 加载世界地图
-        map_raw = yaml.safe_load(
-            Path(map_path).read_text(encoding="utf-8")
-        )
+        map_raw = yaml.safe_load(Path(map_path).read_text(encoding="utf-8"))
         self._world_map = WorldMap(adjacency=map_raw.get("adjacency", {}))
         logger.info("加载世界地图: %d 个节点", len(self._world_map.adjacency))
 
@@ -73,17 +66,20 @@ class SceneLoader:
 
     async def _init_redis_state(self) -> None:
         """初始化所有场景的 Redis 状态"""
-        for scene_id, scene in self._scenes.items():
+        for scene_id, _scene in self._scenes.items():
             key = self.SCENE_STATE_KEY.format(scene_id=scene_id)
             # 仅在不存在时初始化（不覆盖已有状态）
             exists = await self.redis.exists(key)
             if not exists:
                 state = SceneRuntimeState(scene_id=scene_id)
-                await self.redis.hset(key, mapping={
-                    "is_open": "1" if state.is_open else "0",
-                    "current_count": "0",
-                    "crowdedness": "0.0",
-                })
+                await self.redis.hset(
+                    key,
+                    mapping={
+                        "is_open": "1" if state.is_open else "0",
+                        "current_count": "0",
+                        "crowdedness": "0.0",
+                    },
+                )
         logger.debug("Redis 场景状态已初始化")
 
     def get_scene(self, scene_id: str) -> Scene | None:
@@ -98,9 +94,7 @@ class SceneLoader:
         """获取移动耗时"""
         return self._world_map.get_travel_time(from_scene, to_scene)
 
-    def is_scene_open(
-        self, scene_id: str, hour: int, is_workday: bool = True
-    ) -> bool:
+    def is_scene_open(self, scene_id: str, hour: int, is_workday: bool = True) -> bool:
         """查询场景是否开放
 
         Args:

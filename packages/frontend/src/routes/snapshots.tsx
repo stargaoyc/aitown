@@ -45,13 +45,7 @@ function summarizeState(state: Record<string, unknown>): string {
   if (keys.length === 0) return "空状态";
   const parts: string[] = [];
   // 常见字段优先展示
-  const priorityKeys = [
-    "tick_id",
-    "world_time",
-    "weather",
-    "active_characters",
-    "characters",
-  ];
+  const priorityKeys = ["tick_id", "world_time", "weather", "active_characters", "characters"];
   for (const key of priorityKeys) {
     if (key in state) {
       const val = state[key];
@@ -107,9 +101,7 @@ function SnapshotCard({ snapshot }: { snapshot: SnapshotEntry }) {
               onClick={() => setExpanded((v) => !v)}
               className="w-full flex items-center justify-between px-3 py-2 text-xs text-twilight-500 hover:bg-white/40 transition-colors"
             >
-              <span className="font-medium">
-                状态数据（JSON，{stateKeys.length} 个字段）
-              </span>
+              <span className="font-medium">状态数据（JSON，{stateKeys.length} 个字段）</span>
               <motion.span animate={{ rotate: expanded ? 180 : 0 }}>
                 <ChevronDown className="w-4 h-4" />
               </motion.span>
@@ -167,18 +159,8 @@ function SnapshotsPage() {
           icon="📸"
           color="sakura"
         />
-        <StatCard
-          title="最新快照 Tick"
-          value={tickStats.latest}
-          icon="🆕"
-          color="sky"
-        />
-        <StatCard
-          title="最早快照 Tick"
-          value={tickStats.earliest}
-          icon="📜"
-          color="twilight"
-        />
+        <StatCard title="最新快照 Tick" value={tickStats.latest} icon="🆕" color="sky" />
+        <StatCard title="最早快照 Tick" value={tickStats.earliest} icon="📜" color="twilight" />
       </div>
 
       {isLoading && <LoadingSpinner text="正在加载世界快照..." />}
@@ -193,12 +175,7 @@ function SnapshotsPage() {
 
       {/* 快照列表 */}
       {snapshots.length > 0 && (
-        <motion.div
-          variants={container}
-          initial="hidden"
-          animate="show"
-          className="space-y-4"
-        >
+        <motion.div variants={container} initial="hidden" animate="show" className="space-y-4">
           {snapshots.map((snapshot) => (
             <SnapshotCard key={snapshot.id} snapshot={snapshot} />
           ))}

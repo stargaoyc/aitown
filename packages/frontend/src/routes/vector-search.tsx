@@ -32,10 +32,7 @@ const item = {
 };
 
 // 来源类型对应的标签样式与文案
-const sourceTypeMap: Record<
-  string,
-  { label: string; color: string; emoji: string }
-> = {
+const sourceTypeMap: Record<string, { label: string; color: string; emoji: string }> = {
   action: {
     label: "行为",
     color: "bg-sky-soft-100 text-sky-soft-600 border-sky-soft-200/50",
@@ -136,9 +133,7 @@ function VectorSearchPage() {
           {/* 角色选择 + 查询输入 */}
           <div className="grid md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-twilight-500 font-medium mb-2">
-                选择角色
-              </label>
+              <label className="block text-sm text-twilight-500 font-medium mb-2">选择角色</label>
               {charsLoading ? (
                 <div className="text-sm text-twilight-400">加载角色中...</div>
               ) : (
@@ -157,9 +152,7 @@ function VectorSearchPage() {
               )}
             </div>
             <div>
-              <label className="block text-sm text-twilight-500 font-medium mb-2">
-                查询文本
-              </label>
+              <label className="block text-sm text-twilight-500 font-medium mb-2">查询文本</label>
               <AnimeInput
                 placeholder="输入自然语言查询，如「昨天和谁一起吃了饭」"
                 value={query}
@@ -179,9 +172,7 @@ function VectorSearchPage() {
                 <Sliders className="w-4 h-4" />
                 top_k（返回结果数）
               </label>
-              <span className="text-sm font-semibold text-sakura-600">
-                {topK}
-              </span>
+              <span className="text-sm font-semibold text-sakura-600">{topK}</span>
             </div>
             <input
               type="range"
@@ -199,16 +190,10 @@ function VectorSearchPage() {
 
           {/* 搜索按钮 */}
           <div className="flex items-center justify-between flex-wrap gap-3">
-            <div>
-              {searchMutation.isSuccess && (
-                <StatusBadge status="ok" label="检索完成" />
-              )}
-            </div>
+            <div>{searchMutation.isSuccess && <StatusBadge status="ok" label="检索完成" />}</div>
             <AnimeButton
               onClick={handleSearch}
-              disabled={
-                !selectedCharacter || !query.trim() || searchMutation.isPending
-              }
+              disabled={!selectedCharacter || !query.trim() || searchMutation.isPending}
             >
               {searchMutation.isPending ? "检索中..." : "🔍 搜索"}
             </AnimeButton>
@@ -219,12 +204,7 @@ function VectorSearchPage() {
       {/* 检索结果统计 */}
       {results.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <StatCard
-            title="结果数"
-            value={results.length}
-            icon="📊"
-            color="sakura"
-          />
+          <StatCard title="结果数" value={results.length} icon="📊" color="sakura" />
           <StatCard
             title="平均相似度"
             value={`${(resultStats.avg * 100).toFixed(1)}%`}
@@ -242,9 +222,7 @@ function VectorSearchPage() {
 
       {/* 加载与错误状态 */}
       {searchMutation.isPending && <LoadingSpinner text="正在向量检索..." />}
-      {searchMutation.isError && (
-        <ErrorDisplay error={searchMutation.error as Error} />
-      )}
+      {searchMutation.isError && <ErrorDisplay error={searchMutation.error as Error} />}
 
       {/* 空状态：未搜索时 */}
       {!searchMutation.isPending &&
@@ -260,21 +238,12 @@ function VectorSearchPage() {
 
       {/* 搜索无结果 */}
       {hasSearched && (
-        <EmptyState
-          icon="🤔"
-          title="未找到相关记忆"
-          subtitle="尝试更换查询文本或选择其他角色"
-        />
+        <EmptyState icon="🤔" title="未找到相关记忆" subtitle="尝试更换查询文本或选择其他角色" />
       )}
 
       {/* 搜索结果列表 */}
       {results.length > 0 && (
-        <motion.div
-          variants={container}
-          initial="hidden"
-          animate="show"
-          className="space-y-4"
-        >
+        <motion.div variants={container} initial="hidden" animate="show" className="space-y-4">
           {results.map((result) => {
             const src = sourceTypeMap[result.source_type] ?? {
               label: result.source_type,
@@ -307,12 +276,8 @@ function VectorSearchPage() {
                   {/* 相似度分数 - 渐变色进度条（高=绿，中=黄，低=红） */}
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs text-twilight-400 font-medium">
-                        相似度
-                      </span>
-                      <span className={`text-xs font-bold ${sc.text}`}>
-                        {simPct}%
-                      </span>
+                      <span className="text-xs text-twilight-400 font-medium">相似度</span>
+                      <span className={`text-xs font-bold ${sc.text}`}>{simPct}%</span>
                     </div>
                     <div className="w-full bg-white/50 rounded-full h-2.5 overflow-hidden shadow-inner border border-white/30">
                       <motion.div
@@ -335,11 +300,7 @@ function VectorSearchPage() {
                         {result.importance} / 10
                       </span>
                     </div>
-                    <ProgressBar
-                      value={result.importance}
-                      max={10}
-                      color="twilight"
-                    />
+                    <ProgressBar value={result.importance} max={10} color="twilight" />
                   </div>
 
                   {/* 反思状态 */}

@@ -1,17 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import {
-  MapPin,
-  Activity,
-  Battery,
-  Utensils,
-  Smile,
-  Wallet,
-  Users,
-  X,
-  Zap,
-} from "lucide-react";
+import { MapPin, Activity, Battery, Utensils, Smile, Wallet, Users, X, Zap } from "lucide-react";
 import {
   GlassCard,
   PageHeader,
@@ -130,12 +120,7 @@ function ComparePage() {
 
       {/* 顶部统计 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard
-          title="活跃角色"
-          value={characters.length}
-          icon="👥"
-          color="sakura"
-        />
+        <StatCard title="活跃角色" value={characters.length} icon="👥" color="sakura" />
         <StatCard
           title="已选对比"
           value={`${selectedIds.length} / ${MAX_SELECTED}`}
@@ -174,8 +159,7 @@ function ComparePage() {
             <div className="flex flex-wrap gap-2">
               {characters.map((char) => {
                 const selected = selectedIds.includes(char.id);
-                const disabled =
-                  !selected && selectedIds.length >= MAX_SELECTED;
+                const disabled = !selected && selectedIds.length >= MAX_SELECTED;
                 return (
                   <motion.button
                     key={char.id}
@@ -246,9 +230,7 @@ function ComparePage() {
                       {char.name[0]}
                     </div>
                     <div className="min-w-0">
-                      <div className="font-semibold text-sakura-600 truncate">
-                        {char.name}
-                      </div>
+                      <div className="font-semibold text-sakura-600 truncate">{char.name}</div>
                       <div className="text-xs text-twilight-400">{char.id}</div>
                     </div>
                   </div>
@@ -296,11 +278,7 @@ function ComparePage() {
                                 {Math.round(val)}%
                               </span>
                             </div>
-                            <ProgressBar
-                              value={val}
-                              max={dim.max}
-                              color={dim.color}
-                            />
+                            <ProgressBar value={val} max={dim.max} color={dim.color} />
                           </div>
                         );
                       })}
@@ -310,9 +288,7 @@ function ComparePage() {
                           <Smile className="w-3 h-3" />
                           情绪
                         </span>
-                        <span className="text-twilight-500 font-semibold">
-                          {state.mood ?? "—"}
-                        </span>
+                        <span className="text-twilight-500 font-semibold">{state.mood ?? "—"}</span>
                       </div>
                       {/* 金钱（非百分比，直接展示数值） */}
                       <div className="flex items-center justify-between text-xs">
@@ -326,9 +302,7 @@ function ComparePage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="text-xs text-twilight-300 italic">
-                      暂无状态数据
-                    </div>
+                    <div className="text-xs text-twilight-300 italic">暂无状态数据</div>
                   )}
 
                   {/* 当前位置对比 */}
@@ -352,14 +326,8 @@ function ComparePage() {
                       {state?.current_action
                         ? typeof state.current_action === "object"
                           ? String(
-                              (state.current_action as Record<string, unknown>)
-                                .action_name ??
-                                (
-                                  state.current_action as Record<
-                                    string,
-                                    unknown
-                                  >
-                                ).action_id ??
+                              (state.current_action as Record<string, unknown>).action_name ??
+                                (state.current_action as Record<string, unknown>).action_id ??
                                 "无",
                             )
                           : JSON.stringify(state.current_action)

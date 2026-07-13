@@ -2,6 +2,7 @@
 
 Character 为静态档案，CharacterState 为 PG 镜像（Redis 为主）。
 """
+
 from uuid import UUID
 
 from sqlalchemy import select, update
@@ -26,9 +27,7 @@ class CharacterRepository(BaseRepository[Character]):
         result = await self.session.execute(stmt)
         return list(result.scalars())
 
-    async def get_character_with_state(
-        self, character_id: UUID
-    ) -> tuple[Character, CharacterState] | None:
+    async def get_character_with_state(self, character_id: UUID) -> tuple[Character, CharacterState] | None:
         """一次性获取角色档案与其实时状态（JOIN 查询）
 
         返回 (Character, CharacterState) 元组；角色或状态不存在时返回 None。
@@ -48,11 +47,7 @@ class CharacterRepository(BaseRepository[Character]):
         """更新角色实时状态字段（任意合法列名通过关键字参数传入）"""
         if not fields:
             return
-        stmt = (
-            update(CharacterState)
-            .where(CharacterState.character_id == character_id)
-            .values(**fields)
-        )
+        stmt = update(CharacterState).where(CharacterState.character_id == character_id).values(**fields)
         await self.session.execute(stmt)
         await self.session.flush()
         logger.info(

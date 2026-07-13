@@ -3,8 +3,7 @@ import { api } from "./api";
 
 export const queryKeys = {
   health: ["health"] as const,
-  characters: (params?: { active_only?: boolean }) =>
-    ["characters", params] as const,
+  characters: (params?: { active_only?: boolean }) => ["characters", params] as const,
   character: (id: string) => ["character", id] as const,
   world: ["world"] as const,
   actions: ["actions"] as const,
@@ -233,13 +232,8 @@ export function useInvokeMcpTool() {
 export function useToggleMcpServer() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({
-      serverName,
-      enabled,
-    }: {
-      serverName: string;
-      enabled: boolean;
-    }) => api.toggleMcpServer(serverName, enabled),
+    mutationFn: ({ serverName, enabled }: { serverName: string; enabled: boolean }) =>
+      api.toggleMcpServer(serverName, enabled),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["mcpServers"] });
       qc.invalidateQueries({ queryKey: ["mcpTools"] });
@@ -337,15 +331,8 @@ export function useNotifications(limit = 50, refetchInterval = 10000) {
 export function useCreateNotification() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({
-      type,
-      title,
-      content,
-    }: {
-      type: string;
-      title: string;
-      content: string;
-    }) => api.createNotification(type, title, content),
+    mutationFn: ({ type, title, content }: { type: string; title: string; content: string }) =>
+      api.createNotification(type, title, content),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["notifications"] });
     },
@@ -394,10 +381,7 @@ export function useClearAllNotifications() {
 
 // ===== 日记系统 =====
 
-export function useDiaries(
-  characterId: string,
-  params?: { period?: string; limit?: number },
-) {
+export function useDiaries(characterId: string, params?: { period?: string; limit?: number }) {
   return useQuery({
     queryKey: ["diaries", characterId, params],
     queryFn: () => api.getDiaries(characterId, params),

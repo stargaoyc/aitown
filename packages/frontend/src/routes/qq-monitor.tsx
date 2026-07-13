@@ -63,9 +63,7 @@ function QqMonitorPage() {
   const messages = data?.data ?? [];
   // 统计用户消息数与角色消息数
   const userCount = messages.filter((m) => m.sender === "user").length;
-  const characterCount = messages.filter(
-    (m) => m.sender === "character",
-  ).length;
+  const characterCount = messages.filter((m) => m.sender === "character").length;
 
   return (
     <div className="space-y-6 animate-fade-in-up">
@@ -86,12 +84,7 @@ function QqMonitorPage() {
           color="twilight"
         />
         <StatCard title="用户消息" value={userCount} icon="👤" color="sky" />
-        <StatCard
-          title="角色消息"
-          value={characterCount}
-          icon="🤖"
-          color="sakura"
-        />
+        <StatCard title="角色消息" value={characterCount} icon="🤖" color="sakura" />
       </div>
 
       {/* 状态栏 */}
@@ -100,9 +93,7 @@ function QqMonitorPage() {
           <div className="flex items-center gap-2 text-twilight-500">
             <MessageCircle className="w-5 h-5 text-sakura-500" />
             <span className="font-semibold">消息流</span>
-            <span className="text-xs text-twilight-400">
-              （最近 {messages.length} 条）
-            </span>
+            <span className="text-xs text-twilight-400">（最近 {messages.length} 条）</span>
           </div>
           <StatusBadge status="ok" label="自动刷新中" />
         </div>
@@ -120,19 +111,12 @@ function QqMonitorPage() {
 
       {/* 消息列表 */}
       {messages.length > 0 && (
-        <motion.div
-          variants={container}
-          initial="hidden"
-          animate="show"
-          className="space-y-3"
-        >
+        <motion.div variants={container} initial="hidden" animate="show" className="space-y-3">
           {messages.map((msg) => {
             const isUser = msg.sender === "user";
             return (
               <motion.div key={msg.message_id} variants={item}>
-                <div
-                  className={`flex ${isUser ? "justify-start" : "justify-end"}`}
-                >
+                <div className={`flex ${isUser ? "justify-start" : "justify-end"}`}>
                   <div
                     className={`flex items-start gap-3 max-w-[85%] ${
                       isUser ? "flex-row" : "flex-row-reverse"
@@ -146,11 +130,7 @@ function QqMonitorPage() {
                           : "bg-gradient-to-br from-sakura-300 to-sakura-500 text-white"
                       }`}
                     >
-                      {isUser ? (
-                        <User className="w-5 h-5" />
-                      ) : (
-                        <Bot className="w-5 h-5" />
-                      )}
+                      {isUser ? <User className="w-5 h-5" /> : <Bot className="w-5 h-5" />}
                     </div>
                     {/* 气泡 */}
                     <div
@@ -180,8 +160,7 @@ function QqMonitorPage() {
                         )}
                       </div>
                       <div className="text-sm break-words whitespace-pre-wrap">
-                        {cleanCQCodes(msg.content) ||
-                          "（空消息或含特殊格式码）"}
+                        {cleanCQCodes(msg.content) || "（空消息或含特殊格式码）"}
                       </div>
                       <div className="flex items-center gap-2 mt-2">
                         <Clock className="w-3 h-3 text-twilight-300" />
@@ -189,9 +168,7 @@ function QqMonitorPage() {
                           {formatRelativeTime(msg.created_at)}
                         </span>
                         {msg.tokens != null && (
-                          <span className="text-xs text-twilight-300">
-                            · {msg.tokens} tokens
-                          </span>
+                          <span className="text-xs text-twilight-300">· {msg.tokens} tokens</span>
                         )}
                         {msg.cost != null && msg.cost > 0 && (
                           <span className="text-xs text-twilight-300">

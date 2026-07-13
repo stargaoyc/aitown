@@ -135,19 +135,16 @@ export const api = {
     }>,
 
   getCharacters: (params?: { limit?: number; active_only?: boolean }) => {
-    const qs = params
-      ? "?" + new URLSearchParams(params as Record<string, string>).toString()
-      : "";
+    const qs = params ? "?" + new URLSearchParams(params as Record<string, string>).toString() : "";
     return request<{ data: Character[]; total: number }>(`/characters${qs}`);
   },
   getCharacter: (id: string) =>
-    request<{ character: Character; state: Partial<CharacterState> }>(
-      `/characters/${id}`,
-    ).then((res): Character => ({ ...res.character, state: res.state })),
+    request<{ character: Character; state: Partial<CharacterState> }>(`/characters/${id}`).then(
+      (res): Character => ({ ...res.character, state: res.state }),
+    ),
 
   getWorld: () => request<WorldState>("/world"),
-  getWorldEvents: (tickId: number) =>
-    request<{ data: unknown[] }>(`/world/events/${tickId}`),
+  getWorldEvents: (tickId: number) => request<{ data: unknown[] }>(`/world/events/${tickId}`),
 
   getActions: () => request<{ data: Action[] }>("/actions"),
   getMemories: (characterId: string, limit = 20) =>
@@ -172,9 +169,7 @@ export const api = {
       }),
     }),
   getHistory: (characterId: string, limit = 20) =>
-    request<{ data: Message[] }>(
-      `/characters/${characterId}/messages?limit=${limit}`,
-    ),
+    request<{ data: Message[] }>(`/characters/${characterId}/messages?limit=${limit}`),
   getConversations: () => request<{ data: Conversation[] }>("/conversations"),
 
   forceTick: () => request("/admin/tick", { method: "POST" }),
@@ -219,16 +214,12 @@ export const api = {
         {} as Record<string, string>,
       ),
     ).toString();
-    return request<{ data: WorldEventEntry[]; total: number }>(
-      `/world/events?${qs}`,
-    );
+    return request<{ data: WorldEventEntry[]; total: number }>(`/world/events?${qs}`);
   },
 
   // 反思
   getReflections: (characterId: string) =>
-    request<{ data: ReflectionEntry[] }>(
-      `/characters/${characterId}/reflections`,
-    ),
+    request<{ data: ReflectionEntry[] }>(`/characters/${characterId}/reflections`),
 
   // 规划
   getPlans: (characterId: string) =>
@@ -246,15 +237,11 @@ export const api = {
 
   // QQ 消息监控
   getOnebotMessages: (limit = 50) =>
-    request<{ data: OnebotMessageEntry[]; total: number }>(
-      `/admin/onebot/messages?limit=${limit}`,
-    ),
+    request<{ data: OnebotMessageEntry[]; total: number }>(`/admin/onebot/messages?limit=${limit}`),
 
   // 主动分享历史
   getProactiveShares: (limit = 50) =>
-    request<{ data: ShareEntry[]; total: number }>(
-      `/admin/proactive-shares?limit=${limit}`,
-    ),
+    request<{ data: ShareEntry[]; total: number }>(`/admin/proactive-shares?limit=${limit}`),
 
   // 向量检索测试
   vectorSearch: (characterId: string, query: string, topK = 10) =>
@@ -265,19 +252,11 @@ export const api = {
 
   // 世界快照
   getWorldSnapshots: (limit = 20) =>
-    request<{ data: SnapshotEntry[]; total: number }>(
-      `/admin/world/snapshots?limit=${limit}`,
-    ),
+    request<{ data: SnapshotEntry[]; total: number }>(`/admin/world/snapshots?limit=${limit}`),
 
   // 消息统计
-  getMessageStats: (params?: {
-    character_id?: string;
-    start_date?: string;
-    end_date?: string;
-  }) => {
-    const qs = params
-      ? "?" + new URLSearchParams(params as Record<string, string>).toString()
-      : "";
+  getMessageStats: (params?: { character_id?: string; start_date?: string; end_date?: string }) => {
+    const qs = params ? "?" + new URLSearchParams(params as Record<string, string>).toString() : "";
     return request<MessageStats>(`/messages/stats${qs}`);
   },
 
@@ -300,11 +279,7 @@ export const api = {
       online: number;
       offline: number;
     }>("/mcp/servers/health"),
-  invokeMcpTool: (
-    toolName: string,
-    serverName: string,
-    args: Record<string, unknown>,
-  ) =>
+  invokeMcpTool: (toolName: string, serverName: string, args: Record<string, unknown>) =>
     request<{
       success: boolean;
       status_code?: number;
@@ -331,14 +306,11 @@ export const api = {
       lines: String(lines),
       ...(level ? { level } : {}),
     }).toString();
-    return request<{ data: LogEntry[]; total: number; source: string }>(
-      `/admin/logs?${qs}`,
-    );
+    return request<{ data: LogEntry[]; total: number; source: string }>(`/admin/logs?${qs}`);
   },
 
   // 详细指标
-  getDetailedMetrics: () =>
-    request<{ data: DetailedMetrics }>("/admin/metrics-detail"),
+  getDetailedMetrics: () => request<{ data: DetailedMetrics }>("/admin/metrics-detail"),
 
   // 运行时配置
   getConfig: () =>
@@ -354,15 +326,14 @@ export const api = {
       total: number;
     }>("/admin/config"),
   updateConfig: (updates: Record<string, unknown>) =>
-    request<{ success: boolean; updated: number; data: unknown[] }>(
-      "/admin/config",
-      { method: "PUT", body: JSON.stringify(updates) },
-    ),
+    request<{ success: boolean; updated: number; data: unknown[] }>("/admin/config", {
+      method: "PUT",
+      body: JSON.stringify(updates),
+    }),
   resetConfig: (key: string) =>
-    request<{ success: boolean; key: string; reset_to: unknown }>(
-      `/admin/config/${key}`,
-      { method: "DELETE" },
-    ),
+    request<{ success: boolean; key: string; reset_to: unknown }>(`/admin/config/${key}`, {
+      method: "DELETE",
+    }),
 
   // 通知中心
   getNotifications: (limit = 50, unreadOnly = false) => {
@@ -397,10 +368,7 @@ export const api = {
     request<{ success: boolean }>("/notifications", { method: "DELETE" }),
 
   // ===== 日记系统 =====
-  getDiaries: (
-    characterId: string,
-    params?: { period?: string; limit?: number },
-  ) => {
+  getDiaries: (characterId: string, params?: { period?: string; limit?: number }) => {
     const qs = new URLSearchParams(
       Object.entries(params || {}).reduce(
         (acc, [k, v]) => {
@@ -548,10 +516,7 @@ export interface MessageStats {
   total_messages: number;
   total_tokens: number;
   total_cost: number;
-  by_character?: Record<
-    string,
-    { messages: number; tokens: number; cost: number }
-  >;
+  by_character?: Record<string, { messages: number; tokens: number; cost: number }>;
   by_day?: Record<string, { messages: number; tokens: number; cost: number }>;
 }
 
@@ -625,10 +590,7 @@ export interface DetailedMetrics {
     redis_connected?: number;
   };
   http: {
-    requests?: Record<
-      string,
-      { total: number; by_status: Record<string, number> }
-    >;
+    requests?: Record<string, { total: number; by_status: Record<string, number> }>;
   };
 }
 

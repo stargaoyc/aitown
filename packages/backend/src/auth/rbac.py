@@ -13,6 +13,7 @@ def require_role(*roles: str):
         async def delete_character(id: UUID, user=Depends(require_role("admin", "operator"))):
             ...
     """
+
     async def dependency(request: Request):
         # 从请求头获取 token
         auth_header = request.headers.get("authorization", "")
@@ -28,8 +29,7 @@ def require_role(*roles: str):
         user_role = payload.get("role", "viewer")
         if user_role not in roles:
             raise HTTPException(
-                status_code=403,
-                detail=f"Insufficient permissions. Required: {roles}, have: {user_role}"
+                status_code=403, detail=f"Insufficient permissions. Required: {roles}, have: {user_role}"
             )
 
         return {"username": payload.get("sub"), "role": user_role}

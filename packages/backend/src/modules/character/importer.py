@@ -2,12 +2,13 @@
 
 从 YAML 文件加载角色卡，校验后写入 PG + Redis。
 """
+
 from __future__ import annotations
 
-import structlog
 from pathlib import Path
 from typing import Any
 
+import structlog
 import yaml
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -118,9 +119,7 @@ class CharacterImporter:
         logger.info("角色导入完成: %s (%s)", card.name, character.id)
         return character
 
-    async def _cache_state_to_redis(
-        self, character_id, state: CharacterState
-    ) -> None:
+    async def _cache_state_to_redis(self, character_id, state: CharacterState) -> None:
         """将角色状态缓存到 Redis
 
         Redis 结构：

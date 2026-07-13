@@ -3,6 +3,7 @@
 覆盖 APIKey 的生成、验证、撤销。
 使用全新 APIKeyManager 实例避免状态污染。
 """
+
 import pytest
 
 from src.auth.api_keys import APIKeyManager

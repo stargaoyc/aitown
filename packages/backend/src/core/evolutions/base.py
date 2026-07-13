@@ -3,6 +3,7 @@
 定义所有演化器（Evolution）的统一契约。World Engine 在每个 Tick 依次调用
 注册的演化器，读取其返回的字段并合并回 `world:state` 主哈希。
 """
+
 import json
 from abc import ABC, abstractmethod
 

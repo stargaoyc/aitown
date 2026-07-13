@@ -51,8 +51,7 @@ export function AnimeBackground() {
       <div
         className="absolute inset-0 opacity-[0.03]"
         style={{
-          backgroundImage:
-            "radial-gradient(circle, #ff8fab 1px, transparent 1px)",
+          backgroundImage: "radial-gradient(circle, #ff8fab 1px, transparent 1px)",
           backgroundSize: "40px 40px",
         }}
       />

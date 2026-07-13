@@ -101,13 +101,7 @@ function PlansPage() {
   const { data: charactersData, isLoading: charsLoading } = useCharacters();
   const characters = charactersData?.data ?? [];
 
-  const {
-    data: plansData,
-    isLoading,
-    error,
-    refetch,
-    isFetching,
-  } = usePlans(selectedCharacter);
+  const { data: plansData, isLoading, error, refetch, isFetching } = usePlans(selectedCharacter);
   const plans = plansData?.data ?? [];
 
   // 按状态过滤
@@ -145,39 +139,17 @@ function PlansPage() {
 
       {/* 顶部统计 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard
-          title="计划总数"
-          value={stats.total}
-          icon="📋"
-          color="sakura"
-        />
-        <StatCard
-          title="进行中"
-          value={stats.active}
-          icon="⚡"
-          color="sakura"
-        />
-        <StatCard
-          title="已完成"
-          value={stats.completed}
-          icon="✅"
-          color="sky"
-        />
-        <StatCard
-          title="待开始"
-          value={stats.pending}
-          icon="⏳"
-          color="twilight"
-        />
+        <StatCard title="计划总数" value={stats.total} icon="📋" color="sakura" />
+        <StatCard title="进行中" value={stats.active} icon="⚡" color="sakura" />
+        <StatCard title="已完成" value={stats.completed} icon="✅" color="sky" />
+        <StatCard title="待开始" value={stats.pending} icon="⏳" color="twilight" />
       </div>
 
       {/* 控制栏：角色选择 + 刷新 */}
       <GlassCard hover={false}>
         <div className="flex flex-col md:flex-row gap-4 md:items-end">
           <div className="flex-1">
-            <label className="block text-sm text-twilight-500 font-medium mb-2">
-              选择角色
-            </label>
+            <label className="block text-sm text-twilight-500 font-medium mb-2">选择角色</label>
             {charsLoading ? (
               <div className="text-sm text-twilight-400">加载角色中...</div>
             ) : (
@@ -201,9 +173,7 @@ function PlansPage() {
             disabled={!selectedCharacter || isFetching}
           >
             <span className="flex items-center gap-1.5">
-              <RefreshCw
-                className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`}
-              />
+              <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
               刷新
             </span>
           </AnimeButton>
@@ -211,36 +181,21 @@ function PlansPage() {
       </GlassCard>
 
       {!selectedCharacter && (
-        <EmptyState
-          icon="👆"
-          title="请先选择一个角色"
-          subtitle="选择角色后将展示其计划列表"
-        />
+        <EmptyState icon="👆" title="请先选择一个角色" subtitle="选择角色后将展示其计划列表" />
       )}
 
-      {selectedCharacter && isLoading && (
-        <LoadingSpinner text="正在加载计划列表..." />
-      )}
-      {selectedCharacter && !isLoading && error && (
-        <ErrorDisplay error={error} />
-      )}
+      {selectedCharacter && isLoading && <LoadingSpinner text="正在加载计划列表..." />}
+      {selectedCharacter && !isLoading && error && <ErrorDisplay error={error} />}
 
       {selectedCharacter && !isLoading && !error && plans.length === 0 && (
-        <EmptyState
-          icon="📋"
-          title="暂无计划记录"
-          subtitle="该角色还没有制定任何计划"
-        />
+        <EmptyState icon="📋" title="暂无计划记录" subtitle="该角色还没有制定任何计划" />
       )}
 
       {/* 状态筛选标签 */}
       {selectedCharacter && !isLoading && !error && plans.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {filterTabs.map((tab) => {
-            const count =
-              tab.key === "all"
-                ? stats.total
-                : stats[tab.key as keyof typeof stats];
+            const count = tab.key === "all" ? stats.total : stats[tab.key as keyof typeof stats];
             const active = statusFilter === tab.key;
             return (
               <button
@@ -311,9 +266,7 @@ function PlansPage() {
                         <Flag className="w-3 h-3" />
                         优先级
                       </span>
-                      <span className="font-semibold text-sakura-600">
-                        {priority}
-                      </span>
+                      <span className="font-semibold text-sakura-600">{priority}</span>
                     </div>
                     <ProgressBar value={priority} max={10} color="sakura" />
                   </div>
@@ -322,15 +275,9 @@ function PlansPage() {
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-twilight-400">执行进度</span>
-                      <span className="font-semibold text-twilight-500">
-                        {progress}%
-                      </span>
+                      <span className="font-semibold text-twilight-500">{progress}%</span>
                     </div>
-                    <ProgressBar
-                      value={progress}
-                      max={100}
-                      color={conf.barColor}
-                    />
+                    <ProgressBar value={progress} max={100} color={conf.barColor} />
                   </div>
                 </GlassCard>
               </motion.div>
@@ -347,9 +294,7 @@ function PlansPage() {
             <div>
               <div className="font-medium text-twilight-500 mb-1">计划说明</div>
               <ul className="space-y-1">
-                <li>
-                  • 状态：⚡进行中（绿色）、✅已完成（蓝色）、⏳待开始（黄色）
-                </li>
+                <li>• 状态：⚡进行中（绿色）、✅已完成（蓝色）、⏳待开始（黄色）</li>
                 <li>• 优先级范围 1-10，数值越高表示越紧急</li>
                 <li>• 使用上方标签可按状态筛选计划</li>
               </ul>

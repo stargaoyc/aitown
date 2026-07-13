@@ -2,6 +2,7 @@
 
 覆盖 DurationCalculator 的修正因子计算与最终耗时计算逻辑。
 """
+
 import pytest
 
 from src.modules.duration.calculator import (
@@ -10,7 +11,6 @@ from src.modules.duration.calculator import (
     DurationModifiers,
     Weather,
 )
-
 
 # ---------------------------------------------------------------------------
 # _weather_multiplier

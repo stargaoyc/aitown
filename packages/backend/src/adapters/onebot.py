@@ -30,6 +30,7 @@
     # 关闭阶段（lifespan yield 之后）
     await onebot_adapter.stop()
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -503,9 +504,7 @@ class OneBotAdapter:
                 return
             else:
                 # 智能回复模式：读取所有群消息，决策是否回复
-                should, reason = await self._should_reply_in_group(
-                    raw_message, user_id, onebot_ws
-                )
+                should, reason = await self._should_reply_in_group(raw_message, user_id, onebot_ws)
                 if not should:
                     logger.info(
                         "onebot_group_smart_skip",

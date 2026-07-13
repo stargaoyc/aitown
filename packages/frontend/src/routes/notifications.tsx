@@ -88,8 +88,7 @@ const mockTemplates: {
   {
     type: "share",
     title: "角色主动分享了动态",
-    content:
-      "樱花酱主动向你分享了一张图书馆窗外的夕阳照片，并附言「今天的天空好美呀~」",
+    content: "樱花酱主动向你分享了一张图书馆窗外的夕阳照片，并附言「今天的天空好美呀~」",
   },
   {
     type: "system",
@@ -161,13 +160,11 @@ function NotificationsPage() {
   const notifications = data?.data ?? [];
   const unreadCount = data?.unread ?? 0;
   const totalCount = data?.total ?? 0;
-  const byType = (type: NotificationType) =>
-    notifications.filter((n) => n.type === type).length;
+  const byType = (type: NotificationType) => notifications.filter((n) => n.type === type).length;
 
   // 添加模拟通知（通过后端 API 创建）
   const handleAddMock = () => {
-    const template =
-      mockTemplates[Math.floor(Math.random() * mockTemplates.length)];
+    const template = mockTemplates[Math.floor(Math.random() * mockTemplates.length)];
     if (!template) return;
     createNotif.mutate({
       type: template.type,
@@ -186,30 +183,10 @@ function NotificationsPage() {
 
       {/* 顶部统计卡片 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard
-          title="通知总数"
-          value={totalCount}
-          icon="🔔"
-          color="sakura"
-        />
-        <StatCard
-          title="未读通知"
-          value={unreadCount}
-          icon="📬"
-          color="twilight"
-        />
-        <StatCard
-          title="系统告警"
-          value={byType("system")}
-          icon="⚠️"
-          color="sky"
-        />
-        <StatCard
-          title="角色异常"
-          value={byType("character")}
-          icon="💔"
-          color="sakura"
-        />
+        <StatCard title="通知总数" value={totalCount} icon="🔔" color="sakura" />
+        <StatCard title="未读通知" value={unreadCount} icon="📬" color="twilight" />
+        <StatCard title="系统告警" value={byType("system")} icon="⚠️" color="sky" />
+        <StatCard title="角色异常" value={byType("character")} icon="💔" color="sakura" />
       </div>
 
       {/* 操作工具栏 */}
@@ -218,18 +195,14 @@ function NotificationsPage() {
           <div className="flex items-center gap-2">
             <Bell className="w-5 h-5 text-sakura-500" />
             <span className="font-semibold text-twilight-500">通知列表</span>
-            {unreadCount > 0 && (
-              <StatusBadge status="warning" label={`${unreadCount} 条未读`} />
-            )}
+            {unreadCount > 0 && <StatusBadge status="warning" label={`${unreadCount} 条未读`} />}
             <button
               onClick={() => refetch()}
               disabled={isFetching}
               className="ml-1 p-1 rounded-lg text-twilight-400 hover:bg-sakura-100/60 hover:text-sakura-600 transition-colors"
               title="刷新"
             >
-              <RefreshCw
-                className={`w-3.5 h-3.5 ${isFetching ? "animate-spin" : ""}`}
-              />
+              <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? "animate-spin" : ""}`} />
             </button>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
@@ -285,23 +258,15 @@ function NotificationsPage() {
 
       {/* 通知列表 */}
       {totalCount > 0 && (
-        <motion.div
-          variants={container}
-          initial="hidden"
-          animate="show"
-          className="space-y-3"
-        >
+        <motion.div variants={container} initial="hidden" animate="show" className="space-y-3">
           {notifications.map((notif) => {
-            const cfg =
-              typeConfig[notif.type as NotificationType] ?? typeConfig.system;
+            const cfg = typeConfig[notif.type as NotificationType] ?? typeConfig.system;
             const Icon = cfg.icon;
             return (
               <motion.div key={notif.id} variants={item}>
                 <GlassCard
                   hover
-                  className={`space-y-2 ${
-                    !notif.read ? "ring-2 ring-sakura-300/40" : ""
-                  }`}
+                  className={`space-y-2 ${!notif.read ? "ring-2 ring-sakura-300/40" : ""}`}
                 >
                   <div className="flex items-start gap-3">
                     {/* 类型图标 */}
@@ -314,15 +279,10 @@ function NotificationsPage() {
                     {/* 通知内容 */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h4
-                          className={`font-semibold ${cfg.color} text-sm md:text-base`}
-                        >
+                        <h4 className={`font-semibold ${cfg.color} text-sm md:text-base`}>
                           {notif.title}
                         </h4>
-                        <StatusBadge
-                          status={cfg.badge.status}
-                          label={cfg.badge.label}
-                        />
+                        <StatusBadge status={cfg.badge.status} label={cfg.badge.label} />
                         {!notif.read && (
                           <span className="w-2 h-2 rounded-full bg-sakura-500 animate-pulse" />
                         )}

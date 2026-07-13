@@ -8,6 +8,7 @@ Repository 模式封装数据访问逻辑，业务层通过 Repository 操作数
         char_repo = CharacterRepository(session)
         characters = await char_repo.get_active_characters()
 """
+
 from src.db.repositories.action_repo import ActionRepository
 from src.db.repositories.base import BaseRepository
 from src.db.repositories.character_repo import CharacterRepository

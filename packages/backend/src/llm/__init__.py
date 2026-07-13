@@ -15,6 +15,7 @@
 - embed(text): 文本嵌入
 - embed_multimodal(text, image_url): 多模态嵌入
 """
+
 from src.llm.client import LLMClient
 from src.llm.prompts import PromptTemplates
 

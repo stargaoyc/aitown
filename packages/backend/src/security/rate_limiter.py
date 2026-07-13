@@ -10,10 +10,10 @@
 - 消息发送频率控制（防刷屏）
 - LLM 调用频率控制（成本保护）
 """
+
 from __future__ import annotations
 
 from redis.asyncio import Redis
-
 from structlog import get_logger
 
 logger = get_logger(__name__)

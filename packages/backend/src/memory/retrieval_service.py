@@ -2,6 +2,7 @@
 
 使用 MemoryRepository.search_hybrid() 实现语义 + 重要性 + 时间衰减排序
 """
+
 from uuid import UUID
 
 from structlog import get_logger

@@ -27,6 +27,7 @@
     # 关闭阶段（lifespan yield 之后）
     await lark_adapter.stop()
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -142,9 +143,7 @@ class LarkAdapter:
             "lark_adapter_started",
             endpoint="/api/v1/lark/webhook",
             credentials_configured=bool(self._app_id and self._app_secret),
-            default_character_id=str(_get_default_character_id())
-            if _get_default_character_id()
-            else None,
+            default_character_id=str(_get_default_character_id()) if _get_default_character_id() else None,
         )
 
     async def stop(self) -> None:

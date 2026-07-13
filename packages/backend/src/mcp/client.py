@@ -11,6 +11,7 @@
     tools = await client.list_tools()
     result = await client.call_tool("weather", "get_current_weather", {"city": "东京"})
 """
+
 from __future__ import annotations
 
 import os
@@ -78,6 +79,7 @@ MCP_SERVERS: list[dict[str, Any]] = [
 def _get_redis():
     """延迟获取全局 Redis 客户端（避免循环导入）"""
     from src.runtime import get_redis
+
     return get_redis()
 
 
@@ -97,10 +99,7 @@ async def get_enabled_servers() -> set[str]:
         raw = await r.hgetall(MCP_ENABLED_KEY)
         if not raw:
             return {cfg["name"] for cfg in MCP_SERVERS}
-        return {
-            name for name, enabled in raw.items()
-            if str(enabled).lower() in ("true", "1", "yes")
-        }
+        return {name for name, enabled in raw.items() if str(enabled).lower() in ("true", "1", "yes")}
     except Exception:
         logger.warning("mcp_enabled_read_failed", exc_info=True)
         return {cfg["name"] for cfg in MCP_SERVERS}
@@ -144,13 +143,15 @@ class MCPClient:
             if cfg["name"] not in enabled:
                 continue
             for tool_name, tool_info in cfg["tools"].items():
-                tools.append({
-                    "server": cfg["name"],
-                    "tool": tool_name,
-                    "description": tool_info["desc"],
-                    "params": tool_info["params"],
-                    "full_name": f"{cfg['name']}.{tool_name}",
-                })
+                tools.append(
+                    {
+                        "server": cfg["name"],
+                        "tool": tool_name,
+                        "description": tool_info["desc"],
+                        "params": tool_info["params"],
+                        "full_name": f"{cfg['name']}.{tool_name}",
+                    }
+                )
         return tools
 
     async def format_tools_for_prompt(self) -> str:
@@ -160,7 +161,7 @@ class MCPClient:
             return "（暂无可用工具，可在设置页启用 MCP 插件）"
         lines = []
         for t in tools:
-            params_str = ", ".join(f'{k}: {v}' for k, v in t["params"].items())
+            params_str = ", ".join(f"{k}: {v}" for k, v in t["params"].items())
             lines.append(f"- {t['full_name']}({params_str}): {t['description']}")
         return "\n".join(lines)
 

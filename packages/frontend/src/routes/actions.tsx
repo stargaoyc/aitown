@@ -57,9 +57,7 @@ function colorForActionId(actionId: string): string {
     hash = (hash * 31 + actionId.charCodeAt(i)) | 0;
   }
   return (
-    actionColorPalette[Math.abs(hash) % actionColorPalette.length] ??
-    actionColorPalette[0] ??
-    ""
+    actionColorPalette[Math.abs(hash) % actionColorPalette.length] ?? actionColorPalette[0] ?? ""
   );
 }
 
@@ -103,16 +101,9 @@ function ActionLogItem({
               {actionId}
             </span>
             {actionName && (
-              <span className="text-sm font-semibold text-twilight-600">
-                {actionName}
-              </span>
+              <span className="text-sm font-semibold text-twilight-600">{actionName}</span>
             )}
-            {status && (
-              <StatusBadge
-                status={status}
-                label={status === "ok" ? "成功" : "失败"}
-              />
-            )}
+            {status && <StatusBadge status={status} label={status === "ok" ? "成功" : "失败"} />}
           </div>
           <span className="text-xs text-twilight-400 flex items-center gap-1">
             <Clock className="w-3 h-3" />
@@ -126,9 +117,7 @@ function ActionLogItem({
             <Activity className="w-3.5 h-3.5 text-sakura-400" />
             <span>
               持续时间：
-              <span className="font-semibold text-twilight-500 ml-1">
-                {duration}
-              </span>
+              <span className="font-semibold text-twilight-500 ml-1">{duration}</span>
               {typeof duration === "number" && duration >= 60
                 ? ` 分钟（约 ${(duration / 60).toFixed(1)} 小时）`
                 : " 秒"}
@@ -174,11 +163,7 @@ function ActionsPage() {
   const { data: charactersData, isLoading: charsLoading } = useCharacters();
   const characters = charactersData?.data ?? [];
 
-  const {
-    data: actionsData,
-    isLoading,
-    error,
-  } = useCharacterActions(selectedCharacter, 100);
+  const { data: actionsData, isLoading, error } = useCharacterActions(selectedCharacter, 100);
   const actions = actionsData?.data ?? [];
 
   // 唯一 action_id 数量
@@ -196,32 +181,15 @@ function ActionsPage() {
 
       {/* 顶部统计 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard
-          title="行为总数"
-          value={actions.length}
-          icon="📝"
-          color="sakura"
-        />
-        <StatCard
-          title="行为类型"
-          value={uniqueActionCount}
-          icon="🎯"
-          color="sky"
-        />
-        <StatCard
-          title="角色数"
-          value={characters.length}
-          icon="👥"
-          color="twilight"
-        />
+        <StatCard title="行为总数" value={actions.length} icon="📝" color="sakura" />
+        <StatCard title="行为类型" value={uniqueActionCount} icon="🎯" color="sky" />
+        <StatCard title="角色数" value={characters.length} icon="👥" color="twilight" />
       </div>
 
       {/* 角色选择器 */}
       <GlassCard hover={false}>
         <div>
-          <label className="block text-sm text-twilight-500 font-medium mb-2">
-            选择角色
-          </label>
+          <label className="block text-sm text-twilight-500 font-medium mb-2">选择角色</label>
           {charsLoading ? (
             <div className="text-sm text-twilight-400">加载角色中...</div>
           ) : (
@@ -242,36 +210,19 @@ function ActionsPage() {
       </GlassCard>
 
       {!selectedCharacter && (
-        <EmptyState
-          icon="👆"
-          title="请先选择一个角色"
-          subtitle="选择角色后将展示其行为日志"
-        />
+        <EmptyState icon="👆" title="请先选择一个角色" subtitle="选择角色后将展示其行为日志" />
       )}
 
-      {selectedCharacter && isLoading && (
-        <LoadingSpinner text="正在加载行为日志..." />
-      )}
-      {selectedCharacter && !isLoading && error && (
-        <ErrorDisplay error={error} />
-      )}
+      {selectedCharacter && isLoading && <LoadingSpinner text="正在加载行为日志..." />}
+      {selectedCharacter && !isLoading && error && <ErrorDisplay error={error} />}
 
       {selectedCharacter && !isLoading && !error && actions.length === 0 && (
-        <EmptyState
-          icon="📝"
-          title="暂无行为日志"
-          subtitle="该角色还没有执行任何行为记录"
-        />
+        <EmptyState icon="📝" title="暂无行为日志" subtitle="该角色还没有执行任何行为记录" />
       )}
 
       {/* 行为日志列表 */}
       {actions.length > 0 && (
-        <motion.div
-          variants={container}
-          initial="hidden"
-          animate="show"
-          className="space-y-3"
-        >
+        <motion.div variants={container} initial="hidden" animate="show" className="space-y-3">
           {actions.map((action, idx) => (
             <ActionLogItem
               key={action.id ?? idx}

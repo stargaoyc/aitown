@@ -2,6 +2,7 @@
 
 使用 unittest.mock.AsyncMock 模拟 Redis，不连接真实 Redis。
 """
+
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest

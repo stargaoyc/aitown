@@ -5,13 +5,14 @@
 - character: 角色回复
 - system: 系统消息
 """
+
 from datetime import datetime
 from uuid import UUID
-from uuid6 import uuid7
 
 from sqlalchemy import CheckConstraint, ForeignKey, Index, Integer, Numeric, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from uuid6 import uuid7
 
 from src.db.base import Base
 
@@ -23,24 +24,19 @@ class Conversation(Base):
     context: 对话上下文（最近 N 条消息摘要，用于 LLM 回复）
     updated_at: 触发器自动维护（v4 新增）
     """
+
     __tablename__ = "conversations"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
-    character_id: Mapped[UUID] = mapped_column(
-        ForeignKey("characters.id", ondelete="CASCADE"), comment="角色 ID"
-    )
+    character_id: Mapped[UUID] = mapped_column(ForeignKey("characters.id", ondelete="CASCADE"), comment="角色 ID")
     user_id: Mapped[str] = mapped_column(String(100), comment="用户标识")
     platform: Mapped[str] = mapped_column(
         String(20),
         comment="来源平台（web/qq/lark/internal）",
     )
     context: Mapped[dict | None] = mapped_column(JSONB, comment="对话上下文")
-    last_message_at: Mapped[datetime | None] = mapped_column(
-        TIMESTAMP(timezone=True), comment="最后消息时间"
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), server_default="now()", comment="创建时间"
-    )
+    last_message_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), comment="最后消息时间")
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default="now()", comment="创建时间")
     # v4 新增：触发器自动维护
     updated_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default="now()", comment="更新时间（触发器自动维护）"
@@ -76,20 +72,17 @@ class Message(Base):
     cost: 本次调用费用（USD）
     extra_data: 附加信息（回复延迟、平台特定字段等）
     """
+
     __tablename__ = "messages"
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7)
-    conversation_id: Mapped[UUID] = mapped_column(
-        ForeignKey("conversations.id", ondelete="CASCADE"), comment="会话 ID"
-    )
+    conversation_id: Mapped[UUID] = mapped_column(ForeignKey("conversations.id", ondelete="CASCADE"), comment="会话 ID")
     sender: Mapped[str] = mapped_column(String(20), comment="发送者（user/character/system）")
     content: Mapped[str] = mapped_column(Text, comment="消息内容")
     tokens: Mapped[int | None] = mapped_column(Integer, comment="LLM token 消耗")
     cost: Mapped[float | None] = mapped_column(Numeric(10, 6), comment="调用费用（USD）")
     extra_data: Mapped[dict | None] = mapped_column(JSONB, comment="附加信息（延迟、平台字段等）")
-    created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), server_default="now()", comment="创建时间"
-    )
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default="now()", comment="创建时间")
 
     conversation: Mapped[Conversation] = relationship(back_populates="messages")
 

@@ -1,14 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import {
-  BookOpen,
-  Clock,
-  Calendar,
-  Sparkles,
-  Search,
-  Flame,
-} from "lucide-react";
+import { BookOpen, Clock, Calendar, Sparkles, Search, Flame } from "lucide-react";
 import {
   GlassCard,
   PageHeader,
@@ -163,39 +156,17 @@ function DiariesPage() {
 
       {/* 顶部统计 */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatCard
-          title="日记总数"
-          value={stats.total}
-          icon="📖"
-          color="sakura"
-        />
-        <StatCard
-          title="日报"
-          value={stats.byPeriod.day || 0}
-          icon="📅"
-          color="sky"
-        />
-        <StatCard
-          title="周报"
-          value={stats.byPeriod.week || 0}
-          icon="🗓️"
-          color="twilight"
-        />
-        <StatCard
-          title="月报"
-          value={stats.byPeriod.month || 0}
-          icon="📆"
-          color="sakura"
-        />
+        <StatCard title="日记总数" value={stats.total} icon="📖" color="sakura" />
+        <StatCard title="日报" value={stats.byPeriod.day || 0} icon="📅" color="sky" />
+        <StatCard title="周报" value={stats.byPeriod.week || 0} icon="🗓️" color="twilight" />
+        <StatCard title="月报" value={stats.byPeriod.month || 0} icon="📆" color="sakura" />
       </div>
 
       {/* 控制栏 */}
       <GlassCard hover={false}>
         <div className="grid md:grid-cols-3 gap-4">
           <div>
-            <label className="block text-sm text-twilight-500 font-medium mb-2">
-              选择角色
-            </label>
+            <label className="block text-sm text-twilight-500 font-medium mb-2">选择角色</label>
             {charsLoading ? (
               <div className="text-sm text-twilight-400">加载角色中...</div>
             ) : (
@@ -214,9 +185,7 @@ function DiariesPage() {
             )}
           </div>
           <div>
-            <label className="block text-sm text-twilight-500 font-medium mb-2">
-              周期筛选
-            </label>
+            <label className="block text-sm text-twilight-500 font-medium mb-2">周期筛选</label>
             <select
               value={periodFilter}
               onChange={(e) => setPeriodFilter(e.target.value)}
@@ -230,9 +199,7 @@ function DiariesPage() {
             </select>
           </div>
           <div>
-            <label className="block text-sm text-twilight-500 font-medium mb-2">
-              搜索日记
-            </label>
+            <label className="block text-sm text-twilight-500 font-medium mb-2">搜索日记</label>
             <AnimeInput
               placeholder="搜索标题、正文、情绪..."
               value={searchQuery}
@@ -246,9 +213,7 @@ function DiariesPage() {
         {selectedCharacter && (
           <div className="mt-4 pt-4 border-t border-sakura-200/40">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm text-twilight-500 font-medium mr-2">
-                生成日记：
-              </span>
+              <span className="text-sm text-twilight-500 font-medium mr-2">生成日记：</span>
               {(["day", "week", "month", "year"] as const).map((p) => {
                 const info = getPeriodInfo(p);
                 return (
@@ -280,19 +245,11 @@ function DiariesPage() {
       </GlassCard>
 
       {!selectedCharacter && (
-        <EmptyState
-          icon="👆"
-          title="请先选择一个角色"
-          subtitle="选择角色后将展示其日记记录"
-        />
+        <EmptyState icon="👆" title="请先选择一个角色" subtitle="选择角色后将展示其日记记录" />
       )}
 
-      {selectedCharacter && isLoading && (
-        <LoadingSpinner text="正在加载日记..." />
-      )}
-      {selectedCharacter && !isLoading && error && (
-        <ErrorDisplay error={error} />
-      )}
+      {selectedCharacter && isLoading && <LoadingSpinner text="正在加载日记..." />}
+      {selectedCharacter && !isLoading && error && <ErrorDisplay error={error} />}
 
       {selectedCharacter && !isLoading && !error && diaries.length === 0 && (
         <EmptyState
@@ -307,21 +264,12 @@ function DiariesPage() {
         !error &&
         diaries.length > 0 &&
         filteredDiaries.length === 0 && (
-          <EmptyState
-            icon="🔍"
-            title="未匹配到日记"
-            subtitle="尝试更换搜索关键词"
-          />
+          <EmptyState icon="🔍" title="未匹配到日记" subtitle="尝试更换搜索关键词" />
         )}
 
       {/* 日记列表 */}
       {filteredDiaries.length > 0 && (
-        <motion.div
-          variants={container}
-          initial="hidden"
-          animate="show"
-          className="space-y-4"
-        >
+        <motion.div variants={container} initial="hidden" animate="show" className="space-y-4">
           {filteredDiaries.map((diary: DiaryEntry, idx: number) => {
             const periodInfo = getPeriodInfo(diary.period);
             return (
@@ -359,8 +307,7 @@ function DiariesPage() {
                   {diary.diary_end_date && (
                     <div className="text-xs text-twilight-400 flex items-center gap-1 pt-1 border-t border-sakura-200/30">
                       <Calendar className="w-3 h-3" />
-                      记录区间：{formatDate(diary.diary_end_date)} ~{" "}
-                      {formatDate(diary.diary_date)}
+                      记录区间：{formatDate(diary.diary_end_date)} ~ {formatDate(diary.diary_date)}
                     </div>
                   )}
                 </GlassCard>
@@ -378,9 +325,7 @@ function DiariesPage() {
             <div>
               <div className="font-medium text-twilight-500 mb-1">日记说明</div>
               <ul className="space-y-1">
-                <li>
-                  • 日记基于角色记忆（memory_episodes）由 LLM 生成叙事性归档
-                </li>
+                <li>• 日记基于角色记忆（memory_episodes）由 LLM 生成叙事性归档</li>
                 <li>• 不替代 Episode 真相源，是角色视角的二次叙事</li>
                 <li>• 至少需要 3 条记忆才能生成日记</li>
                 <li>• 生成日记会消耗 LLM 调用配额</li>

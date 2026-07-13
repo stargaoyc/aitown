@@ -6,6 +6,7 @@
 初始虚拟时间可通过环境变量 `WORLD_INITIAL_TIME` 配置（ISO 格式），
 未配置时默认使用当前现实日期的 08:00，让虚拟时间与现实时间保持同步。
 """
+
 from datetime import datetime, timedelta
 
 from redis.asyncio import Redis
@@ -80,12 +81,16 @@ class TimeEvolution(WorldEvolution):
         existing = await redis.hgetall(TIME_KEY)
         if not existing:
             initial = _get_initial_world_time()
-            await self.hset_json(redis, TIME_KEY, {
-                "world_time": initial.isoformat(),
-                "tick_id": 0,
-                "day_phase": compute_day_phase(initial.hour),
-                "season": compute_season(initial.month),
-            })
+            await self.hset_json(
+                redis,
+                TIME_KEY,
+                {
+                    "world_time": initial.isoformat(),
+                    "tick_id": 0,
+                    "day_phase": compute_day_phase(initial.hour),
+                    "season": compute_season(initial.month),
+                },
+            )
             logger.info("time_evolution_initialized", world_time=initial.isoformat())
 
     async def evolve(self, redis: Redis, tick_id: int, world_state: dict) -> dict:

@@ -7,6 +7,7 @@
 
 所有函数在 Langfuse 未配置时静默降级（no-op）。
 """
+
 from __future__ import annotations
 
 from structlog import get_logger

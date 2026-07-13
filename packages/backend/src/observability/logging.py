@@ -7,10 +7,10 @@
   sqlalchemy 等第三方库日志同样携带 trace_id，全链路可关联
 - 日志同时输出到 stderr 和文件（data/logs/backend.log），供 Alloy 采集到 Loki
 """
+
 from __future__ import annotations
 
 import logging
-import os
 import sys
 from pathlib import Path
 from typing import Any

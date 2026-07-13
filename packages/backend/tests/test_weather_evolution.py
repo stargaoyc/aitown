@@ -2,7 +2,6 @@
 
 覆盖 WeatherEvolution 的静态方法与数据结构完整性。
 """
-import pytest
 
 from src.core.evolutions.weather_evolution import (
     SEASON_WEIGHTS,
@@ -10,7 +9,6 @@ from src.core.evolutions.weather_evolution import (
     WEATHER_TYPES,
     WeatherEvolution,
 )
-
 
 # ---------------------------------------------------------------------------
 # 数据结构完整性
@@ -61,7 +59,7 @@ def test_weather_impact_covers_all_types():
 
 def test_weather_impact_has_required_fields():
     """每个天气影响矩阵包含 move_multiplier 与 outdoor_fail_bonus"""
-    for w, impact in WEATHER_IMPACT.items():
+    for _w, impact in WEATHER_IMPACT.items():
         assert "move_multiplier" in impact
         assert "outdoor_fail_bonus" in impact
         assert isinstance(impact["move_multiplier"], float)

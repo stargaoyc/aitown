@@ -27,6 +27,7 @@
         duration=1.5,
     )
 """
+
 from __future__ import annotations
 
 import functools
@@ -81,11 +82,7 @@ def setup_langfuse() -> Langfuse | None:
         )
         return None
 
-    if (
-        not settings.langfuse_host
-        or not settings.langfuse_public_key
-        or not settings.langfuse_secret_key
-    ):
+    if not settings.langfuse_host or not settings.langfuse_public_key or not settings.langfuse_secret_key:
         logger.warning(
             "langfuse_not_configured",
             message="langfuse host/public_key/secret_key not set, skipping initialization",

@@ -4,6 +4,7 @@
 进行价格波动（供不应求涨价，供过于求降价）。
 状态存储于 Redis Hash: `world:state:resources`（field: good_id → JSON{inventory, price, base_price}）。
 """
+
 import random
 
 from redis.asyncio import Redis
@@ -44,8 +45,7 @@ class ResourceEvolution(WorldEvolution):
         existing = await redis.hgetall(RESOURCES_KEY)
         if not existing:
             mapping = {
-                gid: {"inventory": g["base_inventory"], "price": g["base_price"]}
-                for gid, g in self.goods.items()
+                gid: {"inventory": g["base_inventory"], "price": g["base_price"]} for gid, g in self.goods.items()
             }
             await self.hset_json(redis, RESOURCES_KEY, mapping)
             logger.info("resource_evolution_initialized", goods=list(self.goods.keys()))

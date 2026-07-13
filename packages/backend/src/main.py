@@ -20,20 +20,25 @@ API 路由：
 
 import asyncio
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Literal
 from uuid import UUID
 
-from fastapi import Body, Depends, FastAPI, HTTPException, Request, UploadFile, File
+from fastapi import Body, Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from redis.asyncio import Redis
 from structlog import get_logger
 
 from src.actions import ActionRegistry, register_all
-from src.auth import auth_dependency, create_token, get_current_user
+from src.adapters import OneBotAdapter
+from src.api.mcp import _MCP_SERVERS_CONFIG
+from src.api.mcp import router as mcp_router
+from src.api.memory import router as memory_ext_router
+from src.api.notifications import router as notifications_router
+from src.auth import create_token
 from src.auth.rbac import require_role
-from src.config import settings, Settings
+from src.config import Settings, settings
 from src.core import WorldEngine
 from src.cost_control.budget_manager import set_budget_manager
 from src.cost_control.circuit_breaker import set_circuit_breaker
@@ -49,20 +54,16 @@ from src.db.repositories import (
 )
 from src.db.session import db
 from src.llm import LLMClient, PromptTemplates
-from src.memory import EpisodeService, ReflectionService, RetrievalService
 from src.memory.embedding_worker import EmbeddingWorker
 from src.messaging import MessageService, WebSocketManager
 from src.messaging.websocket import router as ws_router
-from src.api.notifications import router as notifications_router
-from src.api.mcp import router as mcp_router, _MCP_SERVERS_CONFIG
-from src.api.memory import router as memory_ext_router
 from src.modules import (
     CharacterImporter,
     DurationCalculator,
     MovementSystem,
     RelationGraph,
-    ScheduleSystem,
     SceneLoader,
+    ScheduleSystem,
 )
 from src.observability import (
     setup_langfuse,
@@ -74,7 +75,6 @@ from src.observability.sanitizer import sanitize_url
 from src.scheduler import PartitionScheduler
 from src.security.rate_limit_dep import rate_limit
 from src.security.rate_limiter import RateLimiter
-from src.adapters import OneBotAdapter
 
 # 尝试导入 CharacterTickEngine（可能尚未创建）
 try:
@@ -153,16 +153,19 @@ async def lifespan(app: FastAPI):
         logger.info("redis_connected", url=sanitize_url(settings.redis_url))
         # 设置 Prometheus Redis 连接状态指标
         from src.observability.metrics import REDIS_CONNECTED
+
         REDIS_CONNECTED.set(1)
     except Exception as e:
         logger.error("redis_connection_failed", error=str(e), exc_info=True)
         from src.observability.metrics import REDIS_CONNECTED
+
         REDIS_CONNECTED.set(0)
         raise
 
     # 1.2 加载运行时配置覆盖（从 Redis 读取，覆盖 settings 对象）
     try:
         import json
+
         raw_overrides = await redis.get("config:overrides")
         if raw_overrides:
             overrides = json.loads(raw_overrides)  # type: ignore[arg-type]
@@ -193,8 +196,10 @@ async def lifespan(app: FastAPI):
 
     # 1.5 预创建分区（确保月初写入不报错）
     try:
-        from src.db.session import db
         from sqlalchemy import text
+
+        from src.db.session import db
+
         async with db.session() as session:
             await session.execute(text("SELECT pre_create_partitions(3);"))
             await session.commit()
@@ -340,6 +345,7 @@ async def lifespan(app: FastAPI):
 
     # 刷新 Langfuse 缓冲区，确保追踪数据已发送
     from src.observability.langfuse_tracing import flush_langfuse
+
     flush_langfuse()
 
     # 停止 OneBot 适配器
@@ -393,7 +399,7 @@ async def _character_tick_loop() -> None:
     logger.info("character_tick_loop_started", interval=settings.character_tick_seconds)
 
     backoff_multiplier = 1  # 限流退避倍数
-    max_backoff = 10        # 最大退避倍数
+    max_backoff = 10  # 最大退避倍数
 
     while True:
         try:
@@ -413,6 +419,7 @@ async def _character_tick_loop() -> None:
 
             # 更新活跃角色数 Gauge
             from src.observability.metrics import ACTIVE_CHARACTERS
+
             ACTIVE_CHARACTERS.set(len(characters))
 
             logger.info("character_tick_batch_start", count=len(characters), backoff=backoff_multiplier)
@@ -428,6 +435,7 @@ async def _character_tick_loop() -> None:
                     error_str = str(e)
                     # 记录 Character Tick 错误指标
                     from src.observability.metrics import CHARACTER_TICK_ERRORS
+
                     CHARACTER_TICK_ERRORS.labels(character_id=str(char.id)).inc()
                     # 检测 LLM 限流 (429)，立即停止当前批次并退避
                     if "429" in error_str or "RateLimitError" in error_str:
@@ -572,18 +580,22 @@ class AuthMiddleware:
 
 async def _send_401(send: Send) -> None:
     body = b'{"detail":"Not authenticated"}'
-    await send({
-        "type": "http.response.start",
-        "status": 401,
-        "headers": [
-            [b"content-type", b"application/json"],
-            [b"content-length", str(len(body)).encode()],
-        ],
-    })
-    await send({
-        "type": "http.response.body",
-        "body": body,
-    })
+    await send(
+        {
+            "type": "http.response.start",
+            "status": 401,
+            "headers": [
+                [b"content-type", b"application/json"],
+                [b"content-length", str(len(body)).encode()],
+            ],
+        }
+    )
+    await send(
+        {
+            "type": "http.response.body",
+            "body": body,
+        }
+    )
 
 
 app.add_middleware(AuthMiddleware)
@@ -611,6 +623,7 @@ logger.info("observability_initialized")
 
 # 注册全局异常处理器
 from src.api.exceptions import register_exception_handlers
+
 register_exception_handlers(app)
 logger.info("exception_handlers_registered")
 
@@ -669,7 +682,9 @@ async def login(body: dict):
         raise HTTPException(status_code=400, detail="username and password are required")
 
     # 校验账号密码
-    if not secrets.compare_digest(username, settings.admin_username) or not secrets.compare_digest(password, settings.admin_password):
+    if not secrets.compare_digest(username, settings.admin_username) or not secrets.compare_digest(
+        password, settings.admin_password
+    ):
         logger.warning("auth_login_failed", username=username)
         raise HTTPException(status_code=401, detail="Invalid username or password")
 
@@ -1154,19 +1169,27 @@ async def reset_world_time(
     if new_time:
         try:
             from datetime import datetime
+
             parsed = datetime.fromisoformat(new_time)
             from src.core.evolutions.time_evolution import TIME_KEY, compute_day_phase, compute_season
-            await redis.hset(TIME_KEY, mapping={  # type: ignore[arg-type]
-                "world_time": parsed.isoformat(),
-                "tick_id": "0",
-                "day_phase": compute_day_phase(parsed.hour),
-                "season": compute_season(parsed.month),
-            })
+
+            await redis.hset(
+                TIME_KEY,
+                mapping={  # type: ignore[arg-type]
+                    "world_time": parsed.isoformat(),
+                    "tick_id": "0",
+                    "day_phase": compute_day_phase(parsed.hour),
+                    "season": compute_season(parsed.month),
+                },
+            )
             # 同步到主哈希
-            await redis.hset("world:state", mapping={  # type: ignore[arg-type]
-                "world_time": parsed.isoformat(),
-                "tick_id": "0",
-            })
+            await redis.hset(
+                "world:state",
+                mapping={  # type: ignore[arg-type]
+                    "world_time": parsed.isoformat(),
+                    "tick_id": "0",
+                },
+            )
             logger.info("world_time_reset", old_time=old_time, new_time=parsed.isoformat(), source="api_specified")
             return {
                 "message": "World time reset successfully",
@@ -1176,7 +1199,9 @@ async def reset_world_time(
         except (ValueError, TypeError):
             raise HTTPException(status_code=400, detail=f"Invalid time format: {new_time}")
 
-    logger.info("world_time_reset", old_time=old_time, new_time="(will reinitialize on next tick)", source="api_default")
+    logger.info(
+        "world_time_reset", old_time=old_time, new_time="(will reinitialize on next tick)", source="api_default"
+    )
     return {
         "message": "World time cleared. Will reinitialize on next tick using WORLD_INITIAL_TIME env or current date.",
         "old_time": old_time,
@@ -1197,6 +1222,7 @@ async def get_admin_status():
             time_state = await redis.hgetall("world:state:time")
             if time_state:
                 import json
+
                 wt_raw = time_state.get("world_time", "")
                 try:
                     parsed = json.loads(wt_raw)
@@ -1337,9 +1363,7 @@ async def import_characters_batch(
 
     return {
         "message": f"批量导入完成: {len(characters)} 个角色",
-        "characters": [
-            {"id": str(c.id), "name": c.name} for c in characters
-        ],
+        "characters": [{"id": str(c.id), "name": c.name} for c in characters],
         "total": len(characters),
     }
 
@@ -1436,9 +1460,7 @@ async def move_character(character_id: str, to_scene: str, hour: int | None = No
             hour = 8
 
     # 执行移动
-    result = await movement_system.execute_move(
-        str(cid), from_scene, to_scene, hour=hour
-    )
+    result = await movement_system.execute_move(str(cid), from_scene, to_scene, hour=hour)
 
     if not result.success:
         raise HTTPException(status_code=400, detail=result.reason)
@@ -1559,9 +1581,7 @@ async def record_interaction(
     async with db.session() as session:
         graph = RelationGraph(session, redis)
         try:
-            snap_a, snap_b = await graph.update_on_interaction(
-                cid, tid, strength_delta, notes
-            )
+            snap_a, snap_b = await graph.update_on_interaction(cid, tid, strength_delta, notes)
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
 
@@ -1602,12 +1622,8 @@ async def calculate_duration(
     if not duration_calculator:
         raise HTTPException(status_code=503, detail="Duration calculator not initialized")
 
-    modifiers = duration_calculator.compute_modifiers(
-        weather, is_outdoor, crowdedness, stamina, mood
-    )
-    actual = duration_calculator.calculate_duration(
-        base_duration, weather, is_outdoor, crowdedness, stamina, mood
-    )
+    modifiers = duration_calculator.compute_modifiers(weather, is_outdoor, crowdedness, stamina, mood)
+    actual = duration_calculator.calculate_duration(base_duration, weather, is_outdoor, crowdedness, stamina, mood)
 
     return {
         "base_duration": base_duration,
@@ -1798,11 +1814,7 @@ async def list_conversations(
 
             from src.db.models import Conversation as _Conv
 
-            stmt = (
-                _select(_Conv)
-                .order_by(_Conv.last_message_at.desc().nullslast())
-                .limit(limit)
-            )
+            stmt = _select(_Conv).order_by(_Conv.last_message_at.desc().nullslast()).limit(limit)
             result = await session.execute(stmt)
             conversations = list(result.scalars())
 
@@ -1838,9 +1850,12 @@ async def get_message_stats(
     Returns:
         累计消息数、token 数与 cost（USD），含按角色/按日期分组
     """
-    from sqlalchemy import func as _func, select as _select
+    from sqlalchemy import func as _func
+    from sqlalchemy import select as _select
 
-    from src.db.models import Character as _Char, Conversation as _Conv, Message as _Msg
+    from src.db.models import Character as _Char
+    from src.db.models import Conversation as _Conv
+    from src.db.models import Message as _Msg
 
     async with db.session() as session:
         # 总计
@@ -1854,9 +1869,7 @@ async def get_message_stats(
                 cid = UUID(character_id)
             except ValueError:
                 raise HTTPException(status_code=400, detail="Invalid UUID format")
-            base = base.join(_Conv, _Msg.conversation_id == _Conv.id).where(
-                _Conv.character_id == cid
-            )
+            base = base.join(_Conv, _Msg.conversation_id == _Conv.id).where(_Conv.character_id == cid)
 
         result = await session.execute(base)
         row = result.one()
@@ -2006,12 +2019,14 @@ async def list_modules():
 
     # 计算 MCP Server 模块状态
     for cfg in _MCP_SERVERS_CONFIG:
-        modules.append({
-            "name": cfg["name"],
-            "type": "mcp",
-            "status": "configured",
-            "description": cfg["description"],
-        })
+        modules.append(
+            {
+                "name": cfg["name"],
+                "type": "mcp",
+                "status": "configured",
+                "description": cfg["description"],
+            }
+        )
 
     return {
         "data": modules,
@@ -2072,10 +2087,8 @@ async def get_character_state_history(character_id: UUID, limit: int = 50):
 
         # 回退：历史表暂无数据时返回当前状态（至少一个点）
         from src.db.models import CharacterState
-        cur_stmt = (
-            select(CharacterState)
-            .where(CharacterState.character_id == character_id)
-        )
+
+        cur_stmt = select(CharacterState).where(CharacterState.character_id == character_id)
         cur_result = await session.execute(cur_stmt)
         state = cur_result.scalar_one_or_none()
 
@@ -2260,9 +2273,9 @@ async def get_proactive_shares(limit: int = 50):
     Returns:
         分享记录列表
     """
-    from sqlalchemy import desc, select, text, func
+    from sqlalchemy import desc, select, text
 
-    from src.db.models import Message, Conversation
+    from src.db.models import Conversation, Message
 
     async with db.session() as session:
         # 使用 DISTINCT ON 按 share_id 去重，每个 share_id 只取第一条
@@ -2376,11 +2389,7 @@ async def get_world_snapshots(limit: int = 20):
     from src.db.models import WorldSnapshot
 
     async with db.session() as session:
-        stmt = (
-            select(WorldSnapshot)
-            .order_by(desc(WorldSnapshot.tick_id))
-            .limit(limit)
-        )
+        stmt = select(WorldSnapshot).order_by(desc(WorldSnapshot.tick_id)).limit(limit)
         result = await session.execute(stmt)
         snapshots = list(result.scalars())
 
@@ -2423,7 +2432,6 @@ async def get_recent_logs(
         日志条目列表（按时间倒序，每条为 JSON 解析后的 dict）
     """
     import json
-    from pathlib import Path
 
     from src.observability.logging import _ensure_log_dir
 
@@ -2436,7 +2444,7 @@ async def get_recent_logs(
             return {"data": [], "total": 0, "source": str(log_file)}
 
         # 读取最后 N 行（高效方式：从文件末尾向前读取）
-        with open(str(log_file), "r", encoding="utf-8") as f:
+        with open(str(log_file), encoding="utf-8") as f:
             # 读取所有行并取最后 N 行（文件不大时足够）
             all_lines = f.readlines()
             recent_lines = all_lines[-lines:] if len(all_lines) > lines else all_lines
@@ -2482,7 +2490,6 @@ async def get_detailed_metrics():
     - 系统状态（活跃角色数/Redis 状态）
     - HTTP 请求指标（请求数/耗时，按 path 分组）
     """
-    import re
     from collections import defaultdict
 
     from prometheus_client.parser import text_string_to_metric_families
@@ -2581,9 +2588,9 @@ async def get_detailed_metrics():
                     result["http"].setdefault("requests", {})
                     result["http"]["requests"].setdefault(path, {"total": 0, "by_status": {}})
                     result["http"]["requests"][path]["total"] += int(value)
-                    result["http"]["requests"][path]["by_status"][status] = (
-                        result["http"]["requests"][path]["by_status"].get(status, 0) + int(value)
-                    )
+                    result["http"]["requests"][path]["by_status"][status] = result["http"]["requests"][path][
+                        "by_status"
+                    ].get(status, 0) + int(value)
 
         # 转换 defaultdict 为普通 dict
         if "by_character" in result["characters"]:
@@ -2592,15 +2599,9 @@ async def get_detailed_metrics():
             result["characters"]["errors_by_character"] = dict(result["characters"]["errors_by_character"])
 
         # 计算汇总
-        result["characters"]["tick_total"] = sum(
-            result["characters"].get("by_character", {}).values()
-        )
-        result["llm"]["tokens_total"] = sum(
-            sum(t.values()) for t in result["llm"].get("tokens", {}).values()
-        )
-        result["llm"]["calls_total"] = sum(
-            sum(c.values()) for c in result["llm"].get("calls", {}).values()
-        )
+        result["characters"]["tick_total"] = sum(result["characters"].get("by_character", {}).values())
+        result["llm"]["tokens_total"] = sum(sum(t.values()) for t in result["llm"].get("tokens", {}).values())
+        result["llm"]["calls_total"] = sum(sum(c.values()) for c in result["llm"].get("calls", {}).values())
 
         return {"data": result}
     except Exception as e:
@@ -2665,14 +2666,16 @@ async def get_runtime_config():
     for key, typ in _RUNTIME_CONFIG_KEYS.items():
         default_val = getattr(settings, key, None)
         current_val = overrides.get(key, default_val)
-        result.append({
-            "key": key,
-            "label": _CONFIG_LABELS.get(key, key),
-            "type": typ.__name__,
-            "default": default_val,
-            "current": current_val,
-            "overridden": key in overrides,
-        })
+        result.append(
+            {
+                "key": key,
+                "label": _CONFIG_LABELS.get(key, key),
+                "type": typ.__name__,
+                "default": default_val,
+                "current": current_val,
+                "overridden": key in overrides,
+            }
+        )
 
     return {"data": result, "total": len(result)}
 

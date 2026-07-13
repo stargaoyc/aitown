@@ -9,6 +9,7 @@
 - 文本: 字符串或 {"type": "text", "text": "..."}
 - 图像: {"type": "image_url", "image_url": {"url": "https://..."}}
 """
+
 import asyncio
 import time
 from typing import Any
@@ -129,10 +130,7 @@ class LLMClient:
         """
         content: list[dict[str, Any]] = [{"type": "text", "text": text}]
         if image_url:
-            content.append({
-                "type": "image_url",
-                "image_url": {"url": image_url}
-            })
+            content.append({"type": "image_url", "image_url": {"url": image_url}})
 
         response = await self._embedding_client.embeddings.create(
             model=settings.model_embedding,
@@ -175,8 +173,12 @@ class LLMClient:
 
             # 提取 token 用量（LangChain response_metadata）
             from src.observability.metrics import (
-                LLM_CALL_TOTAL, LLM_CALL_DURATION, LLM_TOKENS_USED, LLM_COST_TOTAL,
+                LLM_CALL_DURATION,
+                LLM_CALL_TOTAL,
+                LLM_COST_TOTAL,
+                LLM_TOKENS_USED,
             )
+
             LLM_CALL_TOTAL.labels(model=model, status="success").inc()
             LLM_CALL_DURATION.labels(model=model).observe(elapsed)
             meta = response.response_metadata or {}
@@ -188,10 +190,11 @@ class LLMClient:
                 LLM_TOKENS_USED.labels(model=model, type="prompt").inc(prompt_tokens)
                 LLM_TOKENS_USED.labels(model=model, type="completion").inc(completion_tokens)
                 # 粗略费用估算：agnes-2.0-flash 约 $0.5/M input, $1.5/M output
-                estimated_cost = (prompt_tokens * 0.0000005 + completion_tokens * 0.0000015)
+                estimated_cost = prompt_tokens * 0.0000005 + completion_tokens * 0.0000015
                 LLM_COST_TOTAL.inc(estimated_cost)
 
             from src.observability.langfuse_tracing import trace_llm_call
+
             trace_llm_call(
                 model=model,
                 prompt=prompt,
@@ -202,6 +205,7 @@ class LLMClient:
             return content if isinstance(content, str) else str(content)
         except Exception:
             from src.observability.metrics import LLM_CALL_TOTAL
+
             LLM_CALL_TOTAL.labels(model=model, status="failed").inc()
             raise
 
@@ -242,12 +246,16 @@ class LLMClient:
             logger.debug(
                 "multimodal_chat_completed",
                 content_types=[c.get("type", "text") for c in content],
-                response_length=len(resp_content)
+                response_length=len(resp_content),
             )
             elapsed = time.perf_counter() - start_perf
             from src.observability.metrics import (
-                LLM_CALL_TOTAL, LLM_CALL_DURATION, LLM_TOKENS_USED, LLM_COST_TOTAL,
+                LLM_CALL_DURATION,
+                LLM_CALL_TOTAL,
+                LLM_COST_TOTAL,
+                LLM_TOKENS_USED,
             )
+
             LLM_CALL_TOTAL.labels(model=effective_model, status="success").inc()
             LLM_CALL_DURATION.labels(model=effective_model).observe(elapsed)
             meta = response.response_metadata or {}
@@ -258,9 +266,10 @@ class LLMClient:
             if total_tokens > 0:
                 LLM_TOKENS_USED.labels(model=effective_model, type="prompt").inc(prompt_tokens)
                 LLM_TOKENS_USED.labels(model=effective_model, type="completion").inc(completion_tokens)
-                estimated_cost = (prompt_tokens * 0.0000005 + completion_tokens * 0.0000015)
+                estimated_cost = prompt_tokens * 0.0000005 + completion_tokens * 0.0000015
                 LLM_COST_TOTAL.inc(estimated_cost)
             from src.observability.langfuse_tracing import trace_llm_call
+
             trace_llm_call(
                 model=effective_model,
                 prompt=str(content),
@@ -271,6 +280,7 @@ class LLMClient:
             return resp_content if isinstance(resp_content, str) else str(resp_content)
         except Exception:
             from src.observability.metrics import LLM_CALL_TOTAL
+
             LLM_CALL_TOTAL.labels(model=effective_model, status="failed").inc()
             raise
 
@@ -502,8 +512,12 @@ class LLMClient:
             logger.debug("structured_output_completed", result_type=type(result).__name__)
             elapsed = time.perf_counter() - start_perf
             from src.observability.metrics import (
-                LLM_CALL_TOTAL, LLM_CALL_DURATION, LLM_TOKENS_USED, LLM_COST_TOTAL,
+                LLM_CALL_DURATION,
+                LLM_CALL_TOTAL,
+                LLM_COST_TOTAL,
+                LLM_TOKENS_USED,
             )
+
             LLM_CALL_TOTAL.labels(model=model, status="success").inc()
             LLM_CALL_DURATION.labels(model=model).observe(elapsed)
             # structured_output 的 result 是 Pydantic 模型，无 response_metadata
@@ -513,9 +527,10 @@ class LLMClient:
             total_tokens = est_prompt_tokens + est_completion_tokens
             LLM_TOKENS_USED.labels(model=model, type="prompt").inc(est_prompt_tokens)
             LLM_TOKENS_USED.labels(model=model, type="completion").inc(est_completion_tokens)
-            estimated_cost = (est_prompt_tokens * 0.0000005 + est_completion_tokens * 0.0000015)
+            estimated_cost = est_prompt_tokens * 0.0000005 + est_completion_tokens * 0.0000015
             LLM_COST_TOTAL.inc(estimated_cost)
             from src.observability.langfuse_tracing import trace_llm_call
+
             result_str = result.model_dump_json() if isinstance(result, BaseModel) else str(result)
             trace_llm_call(
                 model=model,
@@ -529,6 +544,7 @@ class LLMClient:
             return result
         except Exception:
             from src.observability.metrics import LLM_CALL_TOTAL
+
             LLM_CALL_TOTAL.labels(model=model, status="failed").inc()
             raise
 
@@ -563,7 +579,7 @@ class LLMClient:
         logger.debug(
             "multimodal_structured_output_completed",
             content_types=[c.get("type", "text") for c in content],
-            result_type=type(result).__name__
+            result_type=type(result).__name__,
         )
         if isinstance(result, BaseModel):
             return result.model_dump()
@@ -571,11 +587,7 @@ class LLMClient:
 
     # === 内部工具 ===
 
-    def _schema_to_pydantic(
-        self,
-        schema: dict[str, Any],
-        model_name: str = "DynamicModel"
-    ) -> type[BaseModel]:
+    def _schema_to_pydantic(self, schema: dict[str, Any], model_name: str = "DynamicModel") -> type[BaseModel]:
         """将 JSON Schema 转换为 Pydantic 模型"""
         properties = schema.get("properties", {})
         required = schema.get("required", [])

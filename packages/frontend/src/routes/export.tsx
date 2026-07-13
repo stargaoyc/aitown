@@ -115,9 +115,7 @@ function ExportPage() {
   // 执行导出
   const handleExport = () => {
     if (messages.length === 0 || !characterId) return;
-    const safeName =
-      selectedCharacter?.name?.replace(/[^\w\u4e00-\u9fa5-]/g, "_") ??
-      characterId;
+    const safeName = selectedCharacter?.name?.replace(/[^\w\u4e00-\u9fa5-]/g, "_") ?? characterId;
     const timestamp = new Date().toISOString().slice(0, 10);
 
     if (format === "json") {
@@ -132,21 +130,10 @@ function ExportPage() {
         null,
         2,
       );
-      downloadFile(
-        content,
-        `chat-${safeName}-${timestamp}.json`,
-        "application/json",
-      );
+      downloadFile(content, `chat-${safeName}-${timestamp}.json`, "application/json");
     } else {
-      const content = toMarkdown(
-        messages,
-        selectedCharacter?.name ?? characterId,
-      );
-      downloadFile(
-        content,
-        `chat-${safeName}-${timestamp}.md`,
-        "text/markdown",
-      );
+      const content = toMarkdown(messages, selectedCharacter?.name ?? characterId);
+      downloadFile(content, `chat-${safeName}-${timestamp}.md`, "text/markdown");
     }
   };
 
@@ -175,9 +162,7 @@ function ExportPage() {
               disabled={charsLoading}
               className="w-full px-4 py-3 rounded-xl bg-white/60 border border-sakura-200/60 text-twilight-700 focus:outline-none focus:ring-2 focus:ring-sakura-400/50 focus:border-transparent focus:bg-white/80 transition-all disabled:opacity-50"
             >
-              <option value="">
-                {charsLoading ? "加载角色中..." : "请选择角色"}
-              </option>
+              <option value="">{charsLoading ? "加载角色中..." : "请选择角色"}</option>
               {characters.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}（{c.id}）
@@ -225,20 +210,14 @@ function ExportPage() {
 
         {/* 导出按钮 */}
         <div className="mt-4 flex items-center gap-3 flex-wrap">
-          <AnimeButton
-            onClick={handleExport}
-            disabled={!characterId || messages.length === 0}
-          >
+          <AnimeButton onClick={handleExport} disabled={!characterId || messages.length === 0}>
             <span className="flex items-center gap-2">
               <Download className="w-4 h-4" />
               导出 {format === "json" ? "JSON" : "Markdown"} 文件
             </span>
           </AnimeButton>
           {characterId && messages.length > 0 && (
-            <StatusBadge
-              status="ok"
-              label={`共 ${messages.length} 条消息可导出`}
-            />
+            <StatusBadge status="ok" label={`共 ${messages.length} 条消息可导出`} />
           )}
         </div>
       </GlassCard>
@@ -253,9 +232,7 @@ function ExportPage() {
       )}
 
       {/* 加载与错误状态 */}
-      {characterId && isLoading && (
-        <LoadingSpinner text="正在加载聊天记录..." />
-      )}
+      {characterId && isLoading && <LoadingSpinner text="正在加载聊天记录..." />}
       {characterId && error && <ErrorDisplay error={error} />}
 
       {/* 统计卡片 */}
@@ -265,19 +242,9 @@ function ExportPage() {
           animate={{ opacity: 1, y: 0 }}
           className="grid grid-cols-1 md:grid-cols-3 gap-4"
         >
-          <StatCard
-            title="总消息数"
-            value={stats.total}
-            icon="💬"
-            color="sakura"
-          />
+          <StatCard title="总消息数" value={stats.total} icon="💬" color="sakura" />
           <StatCard title="用户消息" value={stats.user} icon="👤" color="sky" />
-          <StatCard
-            title="角色消息"
-            value={stats.character}
-            icon="🤖"
-            color="twilight"
-          />
+          <StatCard title="角色消息" value={stats.character} icon="🤖" color="twilight" />
         </motion.div>
       )}
 
@@ -331,11 +298,7 @@ function ExportPage() {
             <span>
               时间范围：{formatTime(messages[0]?.created_at ?? "")}
               {messages.length > 1 && (
-                <>
-                  {" "}
-                  ~{" "}
-                  {formatTime(messages[messages.length - 1]?.created_at ?? "")}
-                </>
+                <> ~ {formatTime(messages[messages.length - 1]?.created_at ?? "")}</>
               )}
             </span>
           </div>

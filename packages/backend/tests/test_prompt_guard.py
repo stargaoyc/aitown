@@ -3,14 +3,18 @@
 覆盖 Prompt 注入检测、输入消毒、消息包装、安全 prompt 构建，
 以及模块级便捷函数。
 """
+
 import pytest
 
 from src.security.prompt_guard import (
     PromptGuard,
+)
+from src.security.prompt_guard import (
     check_injection as module_check_injection,
+)
+from src.security.prompt_guard import (
     sanitize_user_input as module_sanitize_user_input,
 )
-
 
 # ---------------------------------------------------------------------------
 # check_injection - 注入模式检测

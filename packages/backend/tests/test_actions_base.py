@@ -2,10 +2,8 @@
 
 覆盖 clamp_resource 与 apply_cost_fields 的边界值与组合场景。
 """
-import pytest
 
 from src.actions.base import Action, ActionCategory, apply_cost_fields, clamp_resource
-
 
 # ---------------------------------------------------------------------------
 # clamp_resource

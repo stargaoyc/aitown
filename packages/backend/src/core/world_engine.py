@@ -33,7 +33,6 @@ from src.db.models import WorldEvent, WorldSnapshot
 from src.db.repositories import WorldEventRepository, WorldSnapshotRepository
 from src.db.session import db
 from src.observability.metrics import (
-    ACTIVE_CHARACTERS,
     REDIS_CONNECTED,
     WORLD_TICK_DURATION,
     WORLD_TICK_ERRORS,
@@ -357,51 +356,61 @@ class WorldEngine:
             # 时间事件（虚拟时间变化时写入）
             world_time_str = str(time_state.get("world_time", ""))
             if world_time_str and world_time_str != str(last.get("time", "")):
-                events.append(WorldEvent(
-                    tick_id=self.tick_id,
-                    event_type="time",
-                    event_key="default",
-                    payload={"virtual_time": world_time_str, "tick_id": self.tick_id},
-                ))
+                events.append(
+                    WorldEvent(
+                        tick_id=self.tick_id,
+                        event_type="time",
+                        event_key="default",
+                        payload={"virtual_time": world_time_str, "tick_id": self.tick_id},
+                    )
+                )
 
             # 天气事件（天气变化时写入）
             weather_str = str(weather)  # weather 已是字符串
             if weather_str and weather_str != str(last.get("weather", "")):
-                events.append(WorldEvent(
-                    tick_id=self.tick_id,
-                    event_type="weather",
-                    event_key="default",
-                    payload={"weather": weather_str},
-                ))
+                events.append(
+                    WorldEvent(
+                        tick_id=self.tick_id,
+                        event_type="weather",
+                        event_key="default",
+                        payload={"weather": weather_str},
+                    )
+                )
 
             # 场景事件（场景状态变化时写入）
             scenes_json = json.dumps(scenes_state, sort_keys=True, default=str)
             if scenes_state and scenes_json != last.get("_scenes_json"):
-                events.append(WorldEvent(
-                    tick_id=self.tick_id,
-                    event_type="scene",
-                    event_key="default",
-                    payload=scenes_state,
-                ))
+                events.append(
+                    WorldEvent(
+                        tick_id=self.tick_id,
+                        event_type="scene",
+                        event_key="default",
+                        payload=scenes_state,
+                    )
+                )
 
             # 资源事件（资源状态变化时写入）
             resources_json = json.dumps(resources_state, sort_keys=True, default=str)
             if resources_state and resources_json != last.get("_resources_json"):
-                events.append(WorldEvent(
-                    tick_id=self.tick_id,
-                    event_type="resource",
-                    event_key="default",
-                    payload=resources_state,
-                ))
+                events.append(
+                    WorldEvent(
+                        tick_id=self.tick_id,
+                        event_type="resource",
+                        event_key="default",
+                        payload=resources_state,
+                    )
+                )
 
             # 特殊事件（有活跃事件时始终写入）
             if events_state:
-                events.append(WorldEvent(
-                    tick_id=self.tick_id,
-                    event_type="event",
-                    event_key="default",
-                    payload=list(events_state.values()),
-                ))
+                events.append(
+                    WorldEvent(
+                        tick_id=self.tick_id,
+                        event_type="event",
+                        event_key="default",
+                        payload=list(events_state.values()),
+                    )
+                )
 
             if events:
                 async with db.session() as session:

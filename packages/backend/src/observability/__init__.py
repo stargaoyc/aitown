@@ -1,4 +1,11 @@
 """可观测性模块 - 结构化日志 + OTel Trace + Prometheus Metrics + Langfuse"""
+
+from src.observability.langfuse_integration import (
+    get_langfuse,
+    record_llm_trace,
+    setup_langfuse,
+    trace_llm_call,
+)
 from src.observability.logging import (
     add_trace_context,
     bind_context,
@@ -6,31 +13,25 @@ from src.observability.logging import (
     setup_logging,
 )
 from src.observability.metrics import (
-    setup_metrics,
-    WORLD_TICK_DURATION,
-    WORLD_TICK_TOTAL,
-    WORLD_TICK_ERRORS,
-    CHARACTER_TICK_DURATION,
-    CHARACTER_TICK_TOTAL,
-    CHARACTER_TICK_ERRORS,
-    ACTION_EXECUTION_TOTAL,
     ACTION_EXECUTION_DURATION,
-    LLM_CALL_TOTAL,
+    ACTION_EXECUTION_TOTAL,
+    ACTIVE_CHARACTERS,
+    CHARACTER_TICK_DURATION,
+    CHARACTER_TICK_ERRORS,
+    CHARACTER_TICK_TOTAL,
+    DB_QUERY_DURATION,
     LLM_CALL_DURATION,
-    LLM_TOKENS_USED,
+    LLM_CALL_TOTAL,
     LLM_COST_TOTAL,
+    LLM_TOKENS_USED,
     MESSAGE_PROCESSED_TOTAL,
     MESSAGE_PROCESSING_DURATION,
-    DB_QUERY_DURATION,
-    ACTIVE_CHARACTERS,
     REDIS_CONNECTED,
+    WORLD_TICK_DURATION,
+    WORLD_TICK_ERRORS,
     WORLD_TICK_ID,
-)
-from src.observability.langfuse_integration import (
-    get_langfuse,
-    record_llm_trace,
-    setup_langfuse,
-    trace_llm_call,
+    WORLD_TICK_TOTAL,
+    setup_metrics,
 )
 from src.observability.tracing import get_tracer, setup_tracing, trace_span
 

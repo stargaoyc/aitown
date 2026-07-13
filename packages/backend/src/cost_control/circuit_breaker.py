@@ -12,10 +12,11 @@ Redis Key: ``llm:circuit_breaker`` (Hash)
 
 多实例共享：所有实例读写同一 Redis key，状态全局一致。
 """
+
 from __future__ import annotations
 
 import time
-from enum import Enum
+from enum import StrEnum
 
 from redis.asyncio import Redis
 from structlog import get_logger
@@ -25,7 +26,7 @@ logger = get_logger(__name__)
 _CB_KEY = "llm:circuit_breaker"
 
 
-class CircuitState(str, Enum):
+class CircuitState(StrEnum):
     """熔断器状态"""
 
     CLOSED = "CLOSED"
@@ -51,10 +52,7 @@ class CircuitOpen(Exception):
         self.state = state
         self.failure_count = failure_count
         self.last_failure_time = last_failure_time
-        super().__init__(
-            f"Circuit breaker OPEN: failures={failure_count} "
-            f"last_failure_ts={last_failure_time}"
-        )
+        super().__init__(f"Circuit breaker OPEN: failures={failure_count} last_failure_ts={last_failure_time}")
 
 
 class CircuitBreaker:

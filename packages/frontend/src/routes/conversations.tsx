@@ -101,16 +101,12 @@ function ConversationsPage() {
   // 过滤后的会话列表
   const filteredConversations = useMemo(() => {
     const sorted = [...conversations].sort(
-      (a, b) =>
-        new Date(b.last_message_at).getTime() -
-        new Date(a.last_message_at).getTime(),
+      (a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime(),
     );
     if (filter === "all") return sorted;
     if (filter === "qq") {
       return sorted.filter(
-        (c) =>
-          c.platform.toLowerCase() === "qq" ||
-          c.platform.toLowerCase() === "onebot",
+        (c) => c.platform.toLowerCase() === "qq" || c.platform.toLowerCase() === "onebot",
       );
     }
     // web
@@ -120,13 +116,9 @@ function ConversationsPage() {
   // 统计：总会话数、QQ 会话数、Web 会话数
   const stats = useMemo(() => {
     const qq = conversations.filter(
-      (c) =>
-        c.platform.toLowerCase() === "qq" ||
-        c.platform.toLowerCase() === "onebot",
+      (c) => c.platform.toLowerCase() === "qq" || c.platform.toLowerCase() === "onebot",
     ).length;
-    const web = conversations.filter(
-      (c) => c.platform.toLowerCase() === "web",
-    ).length;
+    const web = conversations.filter((c) => c.platform.toLowerCase() === "web").length;
     return { total: conversations.length, qq, web };
   }, [conversations]);
 
@@ -142,28 +134,16 @@ function ConversationsPage() {
 
       {/* 顶部统计 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard
-          title="总会话数"
-          value={stats.total}
-          icon="🗨️"
-          color="sakura"
-        />
+        <StatCard title="总会话数" value={stats.total} icon="🗨️" color="sakura" />
         <StatCard title="QQ 会话" value={stats.qq} icon="💬" color="sky" />
-        <StatCard
-          title="Web 会话"
-          value={stats.web}
-          icon="🌐"
-          color="twilight"
-        />
+        <StatCard title="Web 会话" value={stats.web} icon="🌐" color="twilight" />
       </div>
 
       {/* 平台过滤标签 */}
       <GlassCard hover={false}>
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-twilight-500 font-medium">
-              平台筛选
-            </span>
+            <span className="text-sm text-twilight-500 font-medium">平台筛选</span>
             <div className="flex gap-1">
               {platformFilters.map((f) => {
                 const active = filter === f.key;
@@ -203,16 +183,9 @@ function ConversationsPage() {
       )}
 
       {/* 过滤后无结果 */}
-      {!isLoading &&
-        !error &&
-        conversations.length > 0 &&
-        filteredConversations.length === 0 && (
-          <EmptyState
-            icon="🔍"
-            title="未匹配到会话"
-            subtitle="尝试切换平台筛选条件"
-          />
-        )}
+      {!isLoading && !error && conversations.length > 0 && filteredConversations.length === 0 && (
+        <EmptyState icon="🔍" title="未匹配到会话" subtitle="尝试切换平台筛选条件" />
+      )}
 
       {/* 会话列表 */}
       {filteredConversations.length > 0 && (

@@ -55,13 +55,15 @@ class ActionRegistry:
         """
         # Redis/JSON 反序列化后数值字段可能为字符串，统一转为 int
         _NUMERIC_FIELDS = {
-            "stamina", "satiety", "social_energy", "phone_battery", "money",
-            "energy", "hunger",
+            "stamina",
+            "satiety",
+            "social_energy",
+            "phone_battery",
+            "money",
+            "energy",
+            "hunger",
         }
-        state = {
-            k: int(v) if k in _NUMERIC_FIELDS and isinstance(v, (str, float)) else v
-            for k, v in state.items()
-        }
+        state = {k: int(v) if k in _NUMERIC_FIELDS and isinstance(v, (str, float)) else v for k, v in state.items()}
 
         current_scene = scene if scene is not None else state.get("location")
         candidates: list[Action] = []

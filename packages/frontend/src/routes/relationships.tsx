@@ -73,11 +73,7 @@ function RelationshipsPage() {
   const { data: charactersData, isLoading: charsLoading } = useCharacters();
   const characters = charactersData?.data ?? [];
 
-  const {
-    data: relationsData,
-    isLoading,
-    error,
-  } = useRelations(selectedCharacter);
+  const { data: relationsData, isLoading, error } = useRelations(selectedCharacter);
   const relations = relationsData?.data ?? [];
 
   // 当前角色名（用于中心节点）
@@ -89,8 +85,7 @@ function RelationshipsPage() {
     const center = { x: 200, y: 200 };
     const radius = 135;
     const nodes = relations.map((rel, i) => {
-      const angle =
-        (2 * Math.PI * i) / Math.max(1, relations.length) - Math.PI / 2;
+      const angle = (2 * Math.PI * i) / Math.max(1, relations.length) - Math.PI / 2;
       return {
         rel,
         x: center.x + radius * Math.cos(angle),
@@ -103,12 +98,8 @@ function RelationshipsPage() {
   // 平均信任度 / 亲密度（后端使用 strength 字段，映射为 trust 和 intimacy）
   const avg = useMemo(() => {
     if (relations.length === 0) return { trust: 0, intimacy: 0 };
-    const t =
-      relations.reduce((s, r) => s + (r.strength ?? r.trust ?? 0), 0) /
-      relations.length;
-    const i =
-      relations.reduce((s, r) => s + (r.strength ?? r.intimacy ?? 0), 0) /
-      relations.length;
+    const t = relations.reduce((s, r) => s + (r.strength ?? r.trust ?? 0), 0) / relations.length;
+    const i = relations.reduce((s, r) => s + (r.strength ?? r.intimacy ?? 0), 0) / relations.length;
     return { trust: Math.round(t), intimacy: Math.round(i) };
   }, [relations]);
 
@@ -124,27 +115,15 @@ function RelationshipsPage() {
 
       {/* 顶部统计 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard
-          title="关系总数"
-          value={relations.length}
-          icon="🔗"
-          color="sakura"
-        />
+        <StatCard title="关系总数" value={relations.length} icon="🔗" color="sakura" />
         <StatCard title="平均信任度" value={avg.trust} icon="🛡️" color="sky" />
-        <StatCard
-          title="平均亲密度"
-          value={avg.intimacy}
-          icon="💗"
-          color="twilight"
-        />
+        <StatCard title="平均亲密度" value={avg.intimacy} icon="💗" color="twilight" />
       </div>
 
       {/* 角色选择器 */}
       <GlassCard hover={false}>
         <div>
-          <label className="block text-sm text-twilight-500 font-medium mb-2">
-            选择角色
-          </label>
+          <label className="block text-sm text-twilight-500 font-medium mb-2">选择角色</label>
           {charsLoading ? (
             <div className="text-sm text-twilight-400">加载角色中...</div>
           ) : (
@@ -165,26 +144,14 @@ function RelationshipsPage() {
       </GlassCard>
 
       {!selectedCharacter && (
-        <EmptyState
-          icon="👆"
-          title="请先选择一个角色"
-          subtitle="选择角色后将展示其关系图谱"
-        />
+        <EmptyState icon="👆" title="请先选择一个角色" subtitle="选择角色后将展示其关系图谱" />
       )}
 
-      {selectedCharacter && isLoading && (
-        <LoadingSpinner text="正在加载关系图谱..." />
-      )}
-      {selectedCharacter && !isLoading && error && (
-        <ErrorDisplay error={error} />
-      )}
+      {selectedCharacter && isLoading && <LoadingSpinner text="正在加载关系图谱..." />}
+      {selectedCharacter && !isLoading && error && <ErrorDisplay error={error} />}
 
       {selectedCharacter && !isLoading && !error && relations.length === 0 && (
-        <EmptyState
-          icon="🌱"
-          title="暂无关系记录"
-          subtitle="该角色还没有建立任何社交关系"
-        />
+        <EmptyState icon="🌱" title="暂无关系记录" subtitle="该角色还没有建立任何社交关系" />
       )}
 
       {/* 关系图谱 + 详情列表 */}
@@ -223,8 +190,7 @@ function RelationshipsPage() {
                   {graph.nodes.map((node, i) => {
                     const strength = node.rel.strength ?? node.rel.trust ?? 0;
                     const color = trustColor(strength);
-                    const label =
-                      node.rel.target_name ?? node.rel.target_id ?? "?";
+                    const label = node.rel.target_name ?? node.rel.target_id ?? "?";
                     return (
                       <g key={`node-${i}`}>
                         <circle
@@ -275,24 +241,15 @@ function RelationshipsPage() {
               {/* 图例 */}
               <div className="flex flex-wrap items-center justify-center gap-4 mt-3 text-xs text-twilight-400">
                 <span className="flex items-center gap-1">
-                  <span
-                    className="inline-block w-4 h-0.5"
-                    style={{ background: "#34d399" }}
-                  />
+                  <span className="inline-block w-4 h-0.5" style={{ background: "#34d399" }} />
                   高信任
                 </span>
                 <span className="flex items-center gap-1">
-                  <span
-                    className="inline-block w-4 h-0.5"
-                    style={{ background: "#fbbf24" }}
-                  />
+                  <span className="inline-block w-4 h-0.5" style={{ background: "#fbbf24" }} />
                   中信任
                 </span>
                 <span className="flex items-center gap-1">
-                  <span
-                    className="inline-block w-4 h-0.5"
-                    style={{ background: "#f87171" }}
-                  />
+                  <span className="inline-block w-4 h-0.5" style={{ background: "#f87171" }} />
                   低信任
                 </span>
                 <span className="text-twilight-300">| 线条越粗亲密度越高</span>
@@ -301,18 +258,11 @@ function RelationshipsPage() {
           </motion.div>
 
           {/* 关系详情列表 */}
-          <motion.div
-            variants={container}
-            initial="hidden"
-            animate="show"
-            className="space-y-3"
-          >
+          <motion.div variants={container} initial="hidden" animate="show" className="space-y-3">
             {relations.map((rel: RelationEntry, i) => {
-              const relType =
-                rel.relationship_type ?? rel.relation_type ?? "stranger";
+              const relType = rel.relationship_type ?? rel.relation_type ?? "stranger";
               const typeColor =
-                relationTypeColors[relType] ??
-                "bg-gray-100 text-gray-500 border-gray-200/50";
+                relationTypeColors[relType] ?? "bg-gray-100 text-gray-500 border-gray-200/50";
               const strength = rel.strength ?? rel.trust ?? 0;
               return (
                 <motion.div key={`${rel.target_id}-${i}`} variants={item}>
@@ -320,10 +270,7 @@ function RelationshipsPage() {
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                       <div className="flex items-center gap-2">
                         <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sakura-200 to-twilight-200 flex items-center justify-center text-white font-bold text-sm">
-                          {(rel.target_name ?? rel.target_id ?? "?").slice(
-                            0,
-                            1,
-                          )}
+                          {(rel.target_name ?? rel.target_id ?? "?").slice(0, 1)}
                         </div>
                         <div>
                           <div className="font-semibold text-twilight-600 text-sm">
@@ -345,9 +292,7 @@ function RelationshipsPage() {
                           <Shield className="w-3 h-3" />
                           关系强度
                         </span>
-                        <span className="font-semibold text-sky-soft-600">
-                          {strength}
-                        </span>
+                        <span className="font-semibold text-sky-soft-600">{strength}</span>
                       </div>
                       <ProgressBar value={strength} max={100} color="sky" />
                     </div>
@@ -363,11 +308,7 @@ function RelationshipsPage() {
                           {rel.intimacy ?? strength}
                         </span>
                       </div>
-                      <ProgressBar
-                        value={rel.intimacy ?? strength}
-                        max={100}
-                        color="sakura"
-                      />
+                      <ProgressBar value={rel.intimacy ?? strength} max={100} color="sakura" />
                     </div>
                   </GlassCard>
                 </motion.div>

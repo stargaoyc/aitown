@@ -10,9 +10,10 @@
 - 配置从 src.config.settings 读取（jwt_secret / jwt_algorithm / jwt_expire_hours）
 - 模块级便捷函数委托给单例 _handler，便于在路由中直接 import 使用
 """
+
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from fastapi import HTTPException
@@ -42,7 +43,7 @@ class JWTHandler:
         Returns:
             编码后的 JWT 字符串
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         payload: dict[str, Any] = {
             "sub": user_id,
             "iat": now,

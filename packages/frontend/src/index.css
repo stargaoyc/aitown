@@ -1,4 +1,4 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
 /* =========================================================
    AI Town — 现代二次元风格设计系统（Tailwind CSS v4）
@@ -70,7 +70,8 @@
 
 body {
   margin: 0;
-  font-family: 'Inter', 'HarmonyOS Sans', 'Source Han Sans CN', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-family:
+    "Inter", "HarmonyOS Sans", "Source Han Sans CN", "PingFang SC", "Microsoft YaHei", sans-serif;
   background: linear-gradient(135deg, #ffe8ef 0%, #e0f5ff 50%, #ede7ff 100%);
   background-attachment: fixed;
   min-height: 100vh;
@@ -89,7 +90,7 @@ body {
    ========================================================= */
 
 body::before {
-  content: '';
+  content: "";
   position: fixed;
   inset: 0;
   background-image:
@@ -167,7 +168,8 @@ body::before {
 }
 
 @keyframes float {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0px);
   }
   50% {
@@ -196,7 +198,8 @@ body::before {
 }
 
 @keyframes pulse-glow {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 20px rgba(255, 143, 171, 0.3);
   }
   50% {
@@ -205,7 +208,8 @@ body::before {
 }
 
 @keyframes swing {
-  0%, 100% {
+  0%,
+  100% {
     transform: rotate(-3deg);
   }
   50% {
@@ -214,7 +218,8 @@ body::before {
 }
 
 @keyframes twinkle {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.3;
     transform: scale(0.8);
   }
@@ -242,25 +247,90 @@ body::before {
 }
 
 .petal::after {
-  content: '';
+  content: "";
   position: absolute;
   inset: 2px;
   border-radius: 50% 0 50% 50%;
   background: linear-gradient(135deg, rgba(255, 232, 239, 0.6), transparent);
 }
 
-.petal:nth-child(1) { left: 5%; animation-duration: 14s; animation-delay: 0s; transform: scale(0.8); }
-.petal:nth-child(2) { left: 12%; animation-duration: 18s; animation-delay: 2s; transform: scale(1.1); background: linear-gradient(135deg, rgba(177, 156, 217, 0.8), rgba(123, 95, 209, 0.6)); }
-.petal:nth-child(3) { left: 20%; animation-duration: 16s; animation-delay: 5s; transform: scale(0.9); }
-.petal:nth-child(4) { left: 28%; animation-duration: 20s; animation-delay: 1s; transform: scale(1.2); background: linear-gradient(135deg, rgba(126, 200, 227, 0.8), rgba(59, 168, 199, 0.6)); }
-.petal:nth-child(5) { left: 38%; animation-duration: 15s; animation-delay: 7s; transform: scale(0.7); }
-.petal:nth-child(6) { left: 45%; animation-duration: 19s; animation-delay: 3s; transform: scale(1); }
-.petal:nth-child(7) { left: 55%; animation-duration: 17s; animation-delay: 6s; transform: scale(0.85); background: linear-gradient(135deg, rgba(255, 163, 181, 0.85), rgba(177, 156, 217, 0.6)); }
-.petal:nth-child(8) { left: 62%; animation-duration: 21s; animation-delay: 4s; transform: scale(1.15); }
-.petal:nth-child(9) { left: 70%; animation-duration: 13s; animation-delay: 8s; transform: scale(0.75); background: linear-gradient(135deg, rgba(126, 200, 227, 0.75), rgba(255, 122, 148, 0.55)); }
-.petal:nth-child(10) { left: 78%; animation-duration: 18s; animation-delay: 2.5s; transform: scale(1.05); }
-.petal:nth-child(11) { left: 85%; animation-duration: 16s; animation-delay: 5.5s; transform: scale(0.95); background: linear-gradient(135deg, rgba(177, 156, 217, 0.8), rgba(255, 163, 181, 0.6)); }
-.petal:nth-child(12) { left: 92%; animation-duration: 22s; animation-delay: 1.5s; transform: scale(1.1); }
+.petal:nth-child(1) {
+  left: 5%;
+  animation-duration: 14s;
+  animation-delay: 0s;
+  transform: scale(0.8);
+}
+.petal:nth-child(2) {
+  left: 12%;
+  animation-duration: 18s;
+  animation-delay: 2s;
+  transform: scale(1.1);
+  background: linear-gradient(135deg, rgba(177, 156, 217, 0.8), rgba(123, 95, 209, 0.6));
+}
+.petal:nth-child(3) {
+  left: 20%;
+  animation-duration: 16s;
+  animation-delay: 5s;
+  transform: scale(0.9);
+}
+.petal:nth-child(4) {
+  left: 28%;
+  animation-duration: 20s;
+  animation-delay: 1s;
+  transform: scale(1.2);
+  background: linear-gradient(135deg, rgba(126, 200, 227, 0.8), rgba(59, 168, 199, 0.6));
+}
+.petal:nth-child(5) {
+  left: 38%;
+  animation-duration: 15s;
+  animation-delay: 7s;
+  transform: scale(0.7);
+}
+.petal:nth-child(6) {
+  left: 45%;
+  animation-duration: 19s;
+  animation-delay: 3s;
+  transform: scale(1);
+}
+.petal:nth-child(7) {
+  left: 55%;
+  animation-duration: 17s;
+  animation-delay: 6s;
+  transform: scale(0.85);
+  background: linear-gradient(135deg, rgba(255, 163, 181, 0.85), rgba(177, 156, 217, 0.6));
+}
+.petal:nth-child(8) {
+  left: 62%;
+  animation-duration: 21s;
+  animation-delay: 4s;
+  transform: scale(1.15);
+}
+.petal:nth-child(9) {
+  left: 70%;
+  animation-duration: 13s;
+  animation-delay: 8s;
+  transform: scale(0.75);
+  background: linear-gradient(135deg, rgba(126, 200, 227, 0.75), rgba(255, 122, 148, 0.55));
+}
+.petal:nth-child(10) {
+  left: 78%;
+  animation-duration: 18s;
+  animation-delay: 2.5s;
+  transform: scale(1.05);
+}
+.petal:nth-child(11) {
+  left: 85%;
+  animation-duration: 16s;
+  animation-delay: 5.5s;
+  transform: scale(0.95);
+  background: linear-gradient(135deg, rgba(177, 156, 217, 0.8), rgba(255, 163, 181, 0.6));
+}
+.petal:nth-child(12) {
+  left: 92%;
+  animation-duration: 22s;
+  animation-delay: 1.5s;
+  transform: scale(1.1);
+}
 
 /* =========================================================
    实用类

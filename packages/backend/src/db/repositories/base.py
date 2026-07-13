@@ -3,7 +3,8 @@
 所有具体 Repository 继承此类，复用 get_by_id / add / list_all 等通用方法。
 使用泛型 ModelT 约束每个子类操作的 ORM 模型类型。
 """
-from typing import Generic, TypeVar
+
+from typing import TypeVar
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 ModelT = TypeVar("ModelT")
 
 
-class BaseRepository(Generic[ModelT]):
+class BaseRepository[ModelT]:
     """基础 Repository - 提供通用 CRUD"""
 
     def __init__(self, session: AsyncSession, model: type[ModelT]):

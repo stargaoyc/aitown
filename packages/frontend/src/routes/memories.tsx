@@ -29,10 +29,7 @@ const item = {
 };
 
 // 来源类型对应的标签样式与文案
-const sourceTypeMap: Record<
-  string,
-  { label: string; color: string; emoji: string }
-> = {
+const sourceTypeMap: Record<string, { label: string; color: string; emoji: string }> = {
   action: {
     label: "行为",
     color: "bg-sky-soft-100 text-sky-soft-600 border-sky-soft-200/50",
@@ -69,11 +66,7 @@ function MemoriesPage() {
   const { data: charactersData, isLoading: charsLoading } = useCharacters();
   const characters = charactersData?.data ?? [];
 
-  const {
-    data: memoriesData,
-    isLoading,
-    error,
-  } = useMemories(selectedCharacter, 100);
+  const { data: memoriesData, isLoading, error } = useMemories(selectedCharacter, 100);
   const memories = memoriesData?.data ?? [];
 
   // 前端过滤：搜索 + 重要性筛选
@@ -81,14 +74,9 @@ function MemoriesPage() {
     return memories
       .filter((m) => m.importance >= minImportance)
       .filter((m) =>
-        searchQuery.trim()
-          ? m.content.toLowerCase().includes(searchQuery.toLowerCase())
-          : true,
+        searchQuery.trim() ? m.content.toLowerCase().includes(searchQuery.toLowerCase()) : true,
       )
-      .sort(
-        (a, b) =>
-          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
-      );
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [memories, minImportance, searchQuery]);
 
   // 渲染重要性星级（1-10）
@@ -99,9 +87,7 @@ function MemoriesPage() {
           <Star
             key={i}
             className={`w-3 h-3 ${
-              i < importance
-                ? "text-amber-400 fill-amber-400"
-                : "text-twilight-200"
+              i < importance ? "text-amber-400 fill-amber-400" : "text-twilight-200"
             }`}
           />
         ))}
@@ -122,24 +108,9 @@ function MemoriesPage() {
 
       {/* 顶部统计 */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard
-          title="记忆总数"
-          value={memories.length}
-          icon="📚"
-          color="sakura"
-        />
-        <StatCard
-          title="筛选后"
-          value={filteredMemories.length}
-          icon="🔍"
-          color="sky"
-        />
-        <StatCard
-          title="角色数"
-          value={characters.length}
-          icon="👥"
-          color="twilight"
-        />
+        <StatCard title="记忆总数" value={memories.length} icon="📚" color="sakura" />
+        <StatCard title="筛选后" value={filteredMemories.length} icon="🔍" color="sky" />
+        <StatCard title="角色数" value={characters.length} icon="👥" color="twilight" />
       </div>
 
       {/* 控制栏：角色选择 + 搜索 + 重要性筛选 */}
@@ -148,9 +119,7 @@ function MemoriesPage() {
           {/* 角色选择 + 搜索 */}
           <div className="grid md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-twilight-500 font-medium mb-2">
-                选择角色
-              </label>
+              <label className="block text-sm text-twilight-500 font-medium mb-2">选择角色</label>
               {charsLoading ? (
                 <div className="text-sm text-twilight-400">加载角色中...</div>
               ) : (
@@ -187,9 +156,7 @@ function MemoriesPage() {
                 <Filter className="w-4 h-4" />
                 最低重要性
               </label>
-              <span className="text-sm font-semibold text-sakura-600">
-                {minImportance} / 10
-              </span>
+              <span className="text-sm font-semibold text-sakura-600">{minImportance} / 10</span>
             </div>
             <input
               type="range"
@@ -207,37 +174,19 @@ function MemoriesPage() {
       </GlassCard>
 
       {!selectedCharacter && (
-        <EmptyState
-          icon="👆"
-          title="请先选择一个角色"
-          subtitle="选择角色后将展示其记忆时间线"
-        />
+        <EmptyState icon="👆" title="请先选择一个角色" subtitle="选择角色后将展示其记忆时间线" />
       )}
 
-      {selectedCharacter && isLoading && (
-        <LoadingSpinner text="正在加载记忆..." />
-      )}
+      {selectedCharacter && isLoading && <LoadingSpinner text="正在加载记忆..." />}
       {selectedCharacter && error && <ErrorDisplay error={error} />}
 
-      {selectedCharacter &&
-        !isLoading &&
-        !error &&
-        filteredMemories.length === 0 && (
-          <EmptyState
-            icon="🧠"
-            title="暂无记忆数据"
-            subtitle="该角色还没有符合条件的记忆记录"
-          />
-        )}
+      {selectedCharacter && !isLoading && !error && filteredMemories.length === 0 && (
+        <EmptyState icon="🧠" title="暂无记忆数据" subtitle="该角色还没有符合条件的记忆记录" />
+      )}
 
       {/* 时间线 */}
       {filteredMemories.length > 0 && (
-        <motion.div
-          variants={container}
-          initial="hidden"
-          animate="show"
-          className="relative"
-        >
+        <motion.div variants={container} initial="hidden" animate="show" className="relative">
           {/* 垂直时间轴线 */}
           <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-gradient-to-b from-sakura-300 via-twilight-300 to-sky-soft-300" />
 
@@ -249,11 +198,7 @@ function MemoriesPage() {
                 emoji: "📝",
               };
               return (
-                <motion.div
-                  key={memory.id}
-                  variants={item}
-                  className="relative pl-14"
-                >
+                <motion.div key={memory.id} variants={item} className="relative pl-14">
                   {/* 时间轴节点 */}
                   <div
                     className={`absolute left-2 top-4 w-7 h-7 rounded-full flex items-center justify-center text-sm shadow-md border-2 border-white/60 ${
@@ -309,10 +254,7 @@ function MemoriesPage() {
               <ul className="space-y-1">
                 <li>• 记忆按时间倒序排列，最新记忆在最上方</li>
                 <li>• 重要性范围为 1-10，数值越高表示越关键</li>
-                <li>
-                  •
-                  来源类型：⚡行为（action）、💬对话（conversation）、💭反思（reflection）
-                </li>
+                <li>• 来源类型：⚡行为（action）、💬对话（conversation）、💭反思（reflection）</li>
                 <li>• 使用搜索框可按内容关键词过滤记忆</li>
               </ul>
             </div>

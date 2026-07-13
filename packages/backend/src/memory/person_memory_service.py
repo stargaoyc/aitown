@@ -2,6 +2,7 @@
 
 管理角色对每个用户的独立记忆，每次用户交互后更新记忆。
 """
+
 from uuid import UUID
 
 from structlog import get_logger
@@ -43,13 +44,14 @@ class PersonMemoryService:
             记忆记录字典，或 None（无记忆）
         """
         from sqlalchemy import text
+
         async with self.session_factory() as session:
             result = await session.execute(
                 text("""
                     SELECT * FROM person_memories
                     WHERE character_id = :cid AND user_id = :uid
                 """),
-                {"cid": str(character_id), "uid": user_id}
+                {"cid": str(character_id), "uid": user_id},
             )
             row = result.fetchone()
             return dict(row) if row else None
@@ -130,14 +132,12 @@ class PersonMemoryService:
         - 不存在则插入新记录，热度初始化为 1
         """
         from sqlalchemy import text
+
         async with self.session_factory() as session:
             # 检查是否存在
             result = await session.execute(
-                text(
-                    "SELECT id, heat FROM person_memories "
-                    "WHERE character_id = :cid AND user_id = :uid"
-                ),
-                {"cid": str(character_id), "uid": user_id}
+                text("SELECT id, heat FROM person_memories WHERE character_id = :cid AND user_id = :uid"),
+                {"cid": str(character_id), "uid": user_id},
             )
             row = result.fetchone()
 
@@ -150,7 +150,7 @@ class PersonMemoryService:
                             last_interaction_at = NOW(), updated_at = NOW()
                         WHERE character_id = :cid AND user_id = :uid
                     """),
-                    {"content": content, "cid": str(character_id), "uid": user_id}
+                    {"content": content, "cid": str(character_id), "uid": user_id},
                 )
             else:
                 # 插入
@@ -166,7 +166,7 @@ class PersonMemoryService:
                         "uid": user_id,
                         "platform": platform,
                         "content": content,
-                    }
+                    },
                 )
             await session.commit()
 

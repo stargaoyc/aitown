@@ -6,6 +6,7 @@
 - Video Gen（agnes-video-v2.0）: /v1/videos（仅创建任务，不轮询）
 - Embedding（nvidia/llama-nemotron-embed-vl-1b-v2:free）: OpenRouter 多模态格式
 """
+
 import asyncio
 import time
 from datetime import datetime
@@ -13,6 +14,7 @@ from typing import Any
 
 import httpx
 from openai import AsyncOpenAI
+
 from src.config import settings
 
 
@@ -53,13 +55,18 @@ async def test_chat_image_understanding(client: AsyncOpenAI, model: str, name: s
     try:
         response = await client.chat.completions.create(
             model=model,
-            messages=[{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": "请用一句话描述这张图片。"},
-                    {"type": "image_url", "image_url": {"url": "https://live.staticflickr.com/3851/14825276609_098cac593d_b.jpg"}},
-                ],
-            }],
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": "请用一句话描述这张图片。"},
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": "https://live.staticflickr.com/3851/14825276609_098cac593d_b.jpg"},
+                        },
+                    ],
+                }
+            ],
             max_tokens=50,
             timeout=30.0,
         )
@@ -209,12 +216,17 @@ async def test_embedding_multimodal(client: AsyncOpenAI, model: str, name: str) 
     try:
         response = await client.embeddings.create(
             model=model,
-            input=[{
-                "content": [
-                    {"type": "text", "text": "What is in this image?"},
-                    {"type": "image_url", "image_url": {"url": "https://live.staticflickr.com/3851/14825276609_098cac593d_b.jpg"}}
-                ]
-            }],  # type: ignore[arg-type]
+            input=[
+                {
+                    "content": [
+                        {"type": "text", "text": "What is in this image?"},
+                        {
+                            "type": "image_url",
+                            "image_url": {"url": "https://live.staticflickr.com/3851/14825276609_098cac593d_b.jpg"},
+                        },
+                    ]
+                }
+            ],  # type: ignore[arg-type]
             encoding_format="float",
             extra_headers={
                 "HTTP-Referer": "https://github.com/ai-town",

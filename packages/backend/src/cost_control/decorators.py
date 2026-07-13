@@ -19,6 +19,7 @@
 4. 成功：``record_success()`` + 从返回值提取 tokens/cost 调用 ``record_usage()``
 5. 失败（抛异常）：``record_failure()`` 并重新抛出原异常
 """
+
 from __future__ import annotations
 
 import functools
@@ -79,9 +80,7 @@ def with_cost_control(
             # 1. 熔断检查
             if not await circuit_breaker.can_execute():
                 state, failure_count, last_failure_time = await circuit_breaker.snapshot()
-                state_str = (
-                    state.value if isinstance(state, CircuitState) else str(state)
-                )
+                state_str = state.value if isinstance(state, CircuitState) else str(state)
                 logger.warning(
                     "circuit_open_blocked",
                     function=func.__qualname__,

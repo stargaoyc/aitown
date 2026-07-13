@@ -3,13 +3,14 @@
 管理角色间的关系，包括首次互动初始化、关系更新、关系查询。
 基于有向图模型：A→B 和 B→A 是两条独立记录。
 """
+
 from __future__ import annotations
 
-import structlog
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
+import structlog
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,7 +27,7 @@ class RelationSnapshot:
     character_id: UUID
     target_id: UUID
     relationship_type: str
-    strength: int          # 关系强度 0-100
+    strength: int  # 关系强度 0-100
     last_interaction_at: datetime | None
     notes: str | None
 
@@ -66,9 +67,7 @@ class RelationGraph:
         self.redis = redis
         self.repo = RelationRepository(session)
 
-    async def ensure_relation(
-        self, char_a: UUID, char_b: UUID
-    ) -> tuple[Relation, Relation]:
+    async def ensure_relation(self, char_a: UUID, char_b: UUID) -> tuple[Relation, Relation]:
         """确保两个角色间存在双向关系记录
 
         如果不存在则创建默认关系（stranger, strength=20）。
@@ -112,13 +111,14 @@ class RelationGraph:
         # 确保关系存在
         rel_ab, rel_ba = await self.ensure_relation(char_a, char_b)
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # 更新 A→B
         new_strength_ab = self._clamp(rel_ab.strength + strength_delta, 0, 100)
         new_type_ab = self._determine_type(new_strength_ab)
         await self.repo.update_relation(
-            char_a, char_b,
+            char_a,
+            char_b,
             strength=new_strength_ab,
             relationship_type=new_type_ab,
             last_interaction_at=now,
@@ -129,7 +129,8 @@ class RelationGraph:
         new_strength_ba = self._clamp(rel_ba.strength + strength_delta, 0, 100)
         new_type_ba = self._determine_type(new_strength_ba)
         await self.repo.update_relation(
-            char_b, char_a,
+            char_b,
+            char_a,
             strength=new_strength_ba,
             relationship_type=new_type_ba,
             last_interaction_at=now,
@@ -150,7 +151,9 @@ class RelationGraph:
         if new_type_ab != rel_ab.relationship_type:
             logger.info(
                 "关系升级: %s -> %s: %s",
-                char_a, char_b, new_type_ab,
+                char_a,
+                char_b,
+                new_type_ab,
             )
 
         return (
@@ -158,14 +161,10 @@ class RelationGraph:
             self._to_snapshot(rel_ba),
         )
 
-    async def get_relation(
-        self, character_id: UUID, target_id: UUID
-    ) -> RelationSnapshot | None:
+    async def get_relation(self, character_id: UUID, target_id: UUID) -> RelationSnapshot | None:
         """查询单向关系快照（优先 Redis）"""
         # 先查 Redis
-        key = self.RELATION_KEY.format(
-            character_id=character_id, target_id=target_id
-        )
+        key = self.RELATION_KEY.format(character_id=character_id, target_id=target_id)
         cached = await self.redis.hgetall(key)
         if cached:
             notes_raw = cached.get("notes")
@@ -183,9 +182,7 @@ class RelationGraph:
         await self._cache_relation(rel)
         return self._to_snapshot(rel)
 
-    async def get_all_relations(
-        self, character_id: UUID
-    ) -> list[RelationSnapshot]:
+    async def get_all_relations(self, character_id: UUID) -> list[RelationSnapshot]:
         """获取角色的所有出向关系"""
         relations = await self.repo.get_relations(character_id)
         return [self._to_snapshot(r) for r in relations]
@@ -203,11 +200,14 @@ class RelationGraph:
             character_id=relation.character_id,
             target_id=relation.target_id,
         )
-        await self.redis.hset(key, mapping={
-            "relationship_type": relation.relationship_type,
-            "strength": str(relation.strength),
-            "notes": relation.notes or "",
-        })
+        await self.redis.hset(
+            key,
+            mapping={
+                "relationship_type": relation.relationship_type,
+                "strength": str(relation.strength),
+                "notes": relation.notes or "",
+            },
+        )
 
     @staticmethod
     def _to_snapshot(relation: Relation) -> RelationSnapshot:

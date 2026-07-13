@@ -37,11 +37,7 @@ function CharactersListPage() {
       {isLoading && <SkeletonList count={4} />}
       {error && <ErrorDisplay error={error} />}
       {data && data.data.length === 0 && (
-        <EmptyState
-          icon="👻"
-          title="还没有角色"
-          subtitle="导入角色卡后将显示在这里"
-        />
+        <EmptyState icon="👻" title="还没有角色" subtitle="导入角色卡后将显示在这里" />
       )}
 
       {data && data.data.length > 0 && (
@@ -53,10 +49,7 @@ function CharactersListPage() {
         >
           {data.data.map((char) => (
             <motion.div key={char.id} variants={cardItem}>
-              <Link
-                to="/characters/$characterId"
-                params={{ characterId: char.id }}
-              >
+              <Link to="/characters/$characterId" params={{ characterId: char.id }}>
                 <GlassCard className="!p-0 cursor-pointer group" hover>
                   <div className="p-5 flex items-center gap-4">
                     <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-sakura-300 via-sakura-400 to-twilight-300 flex items-center justify-center text-white font-bold text-xl shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-transform">

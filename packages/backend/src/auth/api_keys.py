@@ -10,10 +10,11 @@
 - 单进程 asyncio 模型下无需加锁
 - 单例模式：模块级 manager 实例供全局使用
 """
+
 from __future__ import annotations
 
 import secrets
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from structlog import get_logger
@@ -47,7 +48,7 @@ class APIKeyManager:
         self._keys[key] = {
             "user_id": user_id,
             "scopes": scopes or [],
-            "created_at": datetime.now(timezone.utc),
+            "created_at": datetime.now(UTC),
         }
         logger.info("api_key_generated", user_id=user_id, scopes=scopes)
         return key

@@ -3,6 +3,7 @@
 根据虚拟日期触发节日事件，事件持续 N 天后自动结束。
 状态存储于 Redis Hash: `world:state:events`（field: event_id → JSON{id, name, description, start_date, end_date}）。
 """
+
 from datetime import datetime, timedelta
 
 from redis.asyncio import Redis
@@ -77,7 +78,8 @@ class EventEvolution(WorldEvolution):
 
         # 2. 清理已结束事件（end_date 早于今天）
         ended = [
-            eid for eid, ev in current.items()
+            eid
+            for eid, ev in current.items()
             if "end_date" in ev and datetime.fromisoformat(ev["end_date"]).date() < today
         ]
         for eid in ended:

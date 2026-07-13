@@ -7,6 +7,7 @@
 
 使用 unittest.mock 模拟 Langfuse 客户端，不连接真实 Langfuse 服务器。
 """
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch

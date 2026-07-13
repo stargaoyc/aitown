@@ -2,7 +2,6 @@
 
 覆盖 ActionRegistry 的注册/注销/查询/候选过滤/资源检查逻辑。
 """
-import pytest
 
 from src.actions.base import Action, ActionCategory
 from src.actions.registry import ActionRegistry
@@ -206,17 +205,21 @@ def test_get_candidates_resource_check_money():
 def test_get_candidates_combined_filters():
     """前置条件 + 场景 + 资源三个过滤条件同时生效"""
     reg = ActionRegistry()
-    reg.register(_make_action(
-        "sleep",
-        scene="home",
-        energy_cost=-20,
-        precondition=lambda s: s.get("mood") != "angry",
-    ))
-    reg.register(_make_action(
-        "eat",
-        scene="home",
-        money_cost=10,
-    ))
+    reg.register(
+        _make_action(
+            "sleep",
+            scene="home",
+            energy_cost=-20,
+            precondition=lambda s: s.get("mood") != "angry",
+        )
+    )
+    reg.register(
+        _make_action(
+            "eat",
+            scene="home",
+            money_cost=10,
+        )
+    )
     # 满足全部条件
     ok = reg.get_candidates({"location": "home", "stamina": 50, "money": 100, "mood": "calm"})
     assert {a.id for a in ok} == {"sleep", "eat"}

@@ -21,7 +21,6 @@ import time
 
 from fastapi import FastAPI
 from prometheus_client import Counter, Gauge, Histogram, make_asgi_app
-from starlette.requests import Request
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from structlog import get_logger
 
@@ -174,12 +173,8 @@ class PrometheusMiddleware:
             duration = time.perf_counter() - start_time
             method = scope.get("method", "UNKNOWN")
             path = scope.get("path", "/")
-            HTTP_REQUEST_DURATION.labels(
-                method=method, path=path, status=status_code
-            ).observe(duration)
-            HTTP_REQUEST_TOTAL.labels(
-                method=method, path=path, status=status_code
-            ).inc()
+            HTTP_REQUEST_DURATION.labels(method=method, path=path, status=status_code).observe(duration)
+            HTTP_REQUEST_TOTAL.labels(method=method, path=path, status=status_code).inc()
 
 
 def setup_metrics(app: FastAPI) -> None:

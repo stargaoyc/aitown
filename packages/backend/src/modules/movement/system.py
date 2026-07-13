@@ -2,11 +2,12 @@
 
 处理角色在场景间的移动，包括路径规划和耗时计算。
 """
+
 from __future__ import annotations
 
-import structlog
 from dataclasses import dataclass
-from typing import Any
+
+import structlog
 
 from src.modules.town.loader import SceneLoader
 
@@ -121,14 +122,15 @@ class MovementSystem:
         Returns:
             MovementResult
         """
-        result = await self.calculate_move(
-            from_scene, to_scene, hour, is_workday
-        )
+        result = await self.calculate_move(from_scene, to_scene, hour, is_workday)
 
         if not result.success:
             logger.warning(
                 "移动失败: %s %s->%s, 原因: %s",
-                character_id, from_scene, to_scene, result.reason,
+                character_id,
+                from_scene,
+                to_scene,
+                result.reason,
             )
             return result
 
@@ -141,14 +143,15 @@ class MovementSystem:
 
             logger.info(
                 "角色 %s 从 %s 移动到 %s（耗时 %d 分钟）",
-                character_id, from_scene, to_scene, result.total_minutes,
+                character_id,
+                from_scene,
+                to_scene,
+                result.total_minutes,
             )
 
         return result
 
-    def find_shortest_path(
-        self, from_scene: str, to_scene: str, max_hops: int = 3
-    ) -> tuple[list[str] | None, int]:
+    def find_shortest_path(self, from_scene: str, to_scene: str, max_hops: int = 3) -> tuple[list[str] | None, int]:
         """寻找最短路径（Dijkstra 简化版）
 
         用于无法直达时的路径规划。
@@ -188,8 +191,6 @@ class MovementSystem:
             neighbors = self.scene_loader._world_map.get_neighbors(current)
             for next_scene, time in neighbors.items():
                 if next_scene not in visited:
-                    heapq.heappush(
-                        queue, (total_time + time, path + [next_scene])
-                    )
+                    heapq.heappush(queue, (total_time + time, path + [next_scene]))
 
         return None, 0

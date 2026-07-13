@@ -3,6 +3,7 @@
 记录角色对其他角色的认知，是社交 Action 的依据。
 双向关系需两条记录（A→B 和 B→A）。
 """
+
 from datetime import datetime
 from uuid import UUID
 
@@ -27,19 +28,12 @@ class Relation(Base):
     last_interaction_at: 最后互动时间（用于衰减计算）
     notes: LLM 总结的对该角色的认知
     """
+
     __tablename__ = "relations"
 
-    character_id: Mapped[UUID] = mapped_column(
-        ForeignKey("characters.id", ondelete="CASCADE"), primary_key=True
-    )
-    target_id: Mapped[UUID] = mapped_column(
-        ForeignKey("characters.id", ondelete="CASCADE"), primary_key=True
-    )
+    character_id: Mapped[UUID] = mapped_column(ForeignKey("characters.id", ondelete="CASCADE"), primary_key=True)
+    target_id: Mapped[UUID] = mapped_column(ForeignKey("characters.id", ondelete="CASCADE"), primary_key=True)
     strength: Mapped[int] = mapped_column(Integer, default=20, comment="关系强度 0-100")
-    relationship_type: Mapped[str] = mapped_column(
-        String(30), default="stranger", comment="关系类型"
-    )
-    last_interaction_at: Mapped[datetime | None] = mapped_column(
-        TIMESTAMP(timezone=True), comment="最后互动时间"
-    )
+    relationship_type: Mapped[str] = mapped_column(String(30), default="stranger", comment="关系类型")
+    last_interaction_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), comment="最后互动时间")
     notes: Mapped[str | None] = mapped_column(Text, comment="对该角色的认知笔记")

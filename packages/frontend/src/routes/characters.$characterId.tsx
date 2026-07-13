@@ -12,12 +12,7 @@ import {
   AnimeButton,
   AnimeInput,
 } from "@/components/ui";
-import {
-  useCharacter,
-  useMemories,
-  useMessages,
-  useSendMessage,
-} from "@/lib/queries";
+import { useCharacter, useMemories, useMessages, useSendMessage } from "@/lib/queries";
 import type { Message } from "@/lib/api";
 
 export const Route = createFileRoute("/characters/$characterId")({
@@ -53,12 +48,8 @@ function CharacterDetailPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // 合并服务端消息和乐观更新的消息，按时间排序
-  const allMessages = [
-    ...(messagesData?.data ?? []),
-    ...optimisticMessages,
-  ].sort(
-    (a, b) =>
-      new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+  const allMessages = [...(messagesData?.data ?? []), ...optimisticMessages].sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
   );
 
   useEffect(() => {
@@ -85,15 +76,11 @@ function CharacterDetailPage() {
         onSuccess: () => {
           // 移除乐观消息，服务端会通过 query invalidation 返回完整列表（含角色回复）
           // 不再乐观添加回复，避免与 query 刷新后的数据重复
-          setOptimisticMessages((prev) =>
-            prev.filter((m) => m.id !== optimisticMsg.id),
-          );
+          setOptimisticMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id));
         },
         onError: () => {
           // 发送失败也移除乐观消息
-          setOptimisticMessages((prev) =>
-            prev.filter((m) => m.id !== optimisticMsg.id),
-          );
+          setOptimisticMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id));
         },
       },
     );
@@ -119,12 +106,7 @@ function CharacterDetailPage() {
     : undefined;
 
   return (
-    <motion.div
-      variants={container}
-      initial="hidden"
-      animate="show"
-      className="space-y-6"
-    >
+    <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
       <motion.div variants={item}>
         <Link
           to="/characters"
@@ -145,17 +127,13 @@ function CharacterDetailPage() {
               {character.name[0]}
             </motion.div>
             <div className="flex-1 min-w-0">
-              <h1 className="text-2xl font-bold text-sakura-600">
-                {character.name}
-              </h1>
+              <h1 className="text-2xl font-bold text-sakura-600">{character.name}</h1>
               <p className="text-twilight-400 mt-1">
                 {character.age ? `${character.age}岁 · ` : ""}
                 {character.occupation ?? "未知职业"}
               </p>
               {character.backstory && (
-                <p className="text-sm text-twilight-300 mt-2 line-clamp-2">
-                  {character.backstory}
-                </p>
+                <p className="text-sm text-twilight-300 mt-2 line-clamp-2">{character.backstory}</p>
               )}
             </div>
           </div>
@@ -169,30 +147,12 @@ function CharacterDetailPage() {
               <span>📊</span> 实时状态
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              <StatCard
-                title="位置"
-                value={state.location ?? "未知"}
-                icon="📍"
-              />
-              <StatCard
-                title="情绪"
-                value={state.mood ?? "calm"}
-                icon="😊"
-                color="twilight"
-              />
-              <StatCard
-                title="金钱"
-                value={`¥${state.money}`}
-                icon="💰"
-                color="sky"
-              />
+              <StatCard title="位置" value={state.location ?? "未知"} icon="📍" />
+              <StatCard title="情绪" value={state.mood ?? "calm"} icon="😊" color="twilight" />
+              <StatCard title="金钱" value={`¥${state.money}`} icon="💰" color="sky" />
               <StatCard
                 title="当前行为"
-                value={
-                  state.current_action?.action_name ??
-                  state.current_action?.action_id ??
-                  "无"
-                }
+                value={state.current_action?.action_name ?? state.current_action?.action_id ?? "无"}
                 icon="🎯"
                 color="sakura"
               />
@@ -203,36 +163,28 @@ function CharacterDetailPage() {
                   <span className="text-twilight-400 flex items-center gap-1.5">
                     <RotateCw className="w-3.5 h-3.5" /> 体力
                   </span>
-                  <span className="text-sakura-600 font-medium">
-                    {state.stamina}/100
-                  </span>
+                  <span className="text-sakura-600 font-medium">{state.stamina}/100</span>
                 </div>
                 <ProgressBar value={state.stamina} color="sakura" />
               </div>
               <div>
                 <div className="flex justify-between text-sm mb-1.5">
                   <span className="text-twilight-400">🍽️ 饱腹度</span>
-                  <span className="text-sky-soft-500 font-medium">
-                    {state.satiety}/100
-                  </span>
+                  <span className="text-sky-soft-500 font-medium">{state.satiety}/100</span>
                 </div>
                 <ProgressBar value={state.satiety} color="sky" />
               </div>
               <div>
                 <div className="flex justify-between text-sm mb-1.5">
                   <span className="text-twilight-400">💬 社交能量</span>
-                  <span className="text-twilight-500 font-medium">
-                    {state.social_energy}/100
-                  </span>
+                  <span className="text-twilight-500 font-medium">{state.social_energy}/100</span>
                 </div>
                 <ProgressBar value={state.social_energy} color="twilight" />
               </div>
               <div>
                 <div className="flex justify-between text-sm mb-1.5">
                   <span className="text-twilight-400">📱 手机电量</span>
-                  <span className="text-sakura-600 font-medium">
-                    {state.phone_battery}%
-                  </span>
+                  <span className="text-sakura-600 font-medium">{state.phone_battery}%</span>
                 </div>
                 <ProgressBar value={state.phone_battery} color="sakura" />
               </div>
@@ -248,11 +200,7 @@ function CharacterDetailPage() {
           </h3>
           <div className="space-y-2 mb-4 max-h-64 overflow-y-auto pr-2">
             {allMessages.length === 0 && (
-              <EmptyState
-                icon="💌"
-                title="暂无消息"
-                subtitle="发送第一条消息开始对话吧"
-              />
+              <EmptyState icon="💌" title="暂无消息" subtitle="发送第一条消息开始对话吧" />
             )}
             {allMessages.map((msg) => {
               const displayContent = cleanCQCodes(msg.content);
@@ -301,9 +249,7 @@ function CharacterDetailPage() {
             <Brain className="w-5 h-5" /> 最近记忆
           </h3>
           <div className="space-y-3">
-            {memoriesData?.data?.length === 0 && (
-              <EmptyState icon="💭" title="暂无记忆" />
-            )}
+            {memoriesData?.data?.length === 0 && <EmptyState icon="💭" title="暂无记忆" />}
             {memoriesData?.data?.map((mem) => (
               <motion.div
                 key={mem.id}
@@ -314,9 +260,7 @@ function CharacterDetailPage() {
                   <span className="text-xs text-twilight-400">
                     {new Date(mem.timestamp).toLocaleString("zh-CN")}
                   </span>
-                  <span className="text-xs text-sakura-500 font-semibold">
-                    ⭐ {mem.importance}
-                  </span>
+                  <span className="text-xs text-sakura-500 font-semibold">⭐ {mem.importance}</span>
                 </div>
                 <p className="text-sm text-twilight-500">{mem.content}</p>
               </motion.div>

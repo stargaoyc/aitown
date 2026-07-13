@@ -9,13 +9,14 @@
 支持同一 Tick 同一类型的多条事件（event_key 区分不同实体）。
 服务重启 / Tick 重试时自动跳过已存在的事件。
 """
+
 from datetime import datetime
 from uuid import UUID
-from uuid6 import uuid7
 
-from sqlalchemy import BigInteger, Index, String, Text, UniqueConstraint
+from sqlalchemy import BigInteger, Index, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, TIMESTAMP
 from sqlalchemy.orm import Mapped, mapped_column
+from uuid6 import uuid7
 
 from src.db.base import Base
 
@@ -41,25 +42,17 @@ class WorldEvent(Base):
 
     幂等性：UNIQUE(tick_id, event_type, event_key) 约束保证幂等写入。
     """
+
     __tablename__ = "world_events"
 
-    id: Mapped[UUID] = mapped_column(
-        primary_key=True, default=uuid7, comment="事件 ID"
-    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7, comment="事件 ID")
     tick_id: Mapped[int] = mapped_column(BigInteger, comment="Tick 序号")
-    event_type: Mapped[str] = mapped_column(
-        String(30), comment="事件类型：time/weather/scene/resource/event"
-    )
+    event_type: Mapped[str] = mapped_column(String(30), comment="事件类型：time/weather/scene/resource/event")
     event_key: Mapped[str] = mapped_column(
-        String(100), default="default",
-        comment="事件键（区分同 Tick 同类型不同实体，默认 default）"
+        String(100), default="default", comment="事件键（区分同 Tick 同类型不同实体，默认 default）"
     )
-    payload: Mapped[dict] = mapped_column(
-        JSONB, comment="变更内容（仅差分）"
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), server_default="now()", comment="创建时间"
-    )
+    payload: Mapped[dict] = mapped_column(JSONB, comment="变更内容（仅差分）")
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), server_default="now()", comment="创建时间")
 
     __table_args__ = (
         # 幂等约束：同一 Tick 同一类型同一 key 事件唯一

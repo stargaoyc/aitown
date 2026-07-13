@@ -2,17 +2,18 @@
 
 根据天气、拥挤度、角色状态等动态因素调整 Action 耗时。
 """
+
 from __future__ import annotations
 
-import structlog
 from dataclasses import dataclass
-from enum import Enum
-from typing import Any
+from enum import StrEnum
+
+import structlog
 
 logger = structlog.get_logger(__name__)
 
 
-class Weather(str, Enum):
+class Weather(StrEnum):
     """天气类型"""
 
     SUNNY = "sunny"
@@ -27,8 +28,8 @@ class Weather(str, Enum):
 WEATHER_DURATION_MULTIPLIER: dict[Weather, float] = {
     Weather.SUNNY: 1.0,
     Weather.CLOUDY: 1.0,
-    Weather.RAINY: 1.2,   # 雨天 +20%
-    Weather.SNOWY: 1.3,   # 雪天 +30%
+    Weather.RAINY: 1.2,  # 雨天 +20%
+    Weather.SNOWY: 1.3,  # 雪天 +30%
     Weather.STORMY: 1.5,  # 暴风 +50%
     Weather.FOGGY: 1.15,  # 雾天 +15%
 }
@@ -126,15 +127,11 @@ class DurationCalculator:
         Returns:
             调整后的耗时（向上取整，至少 1 分钟）
         """
-        modifiers = self.compute_modifiers(
-            weather, is_outdoor, crowdedness, stamina, mood
-        )
+        modifiers = self.compute_modifiers(weather, is_outdoor, crowdedness, stamina, mood)
         actual = base_duration * modifiers.total_multiplier()
         return max(1, int(actual + 0.5))  # 四舍五入，最小 1
 
-    def _weather_multiplier(
-        self, weather: str | Weather, is_outdoor: bool
-    ) -> float:
+    def _weather_multiplier(self, weather: str | Weather, is_outdoor: bool) -> float:
         """天气对耗时的影响"""
         if not is_outdoor and WEATHER_AFFECTS_OUTDOOR_ONLY:
             return 1.0  # 室内不受影响

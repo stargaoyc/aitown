@@ -12,6 +12,7 @@
 - LLM 客户端通过 `from src.runtime import get_llm, get_prompts` 获取（启动期为 None）
 - 错误处理：捕获异常并回送 error JSON，不中断连接
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -37,9 +38,9 @@ class WebSocketManager:
     - broadcast(character_id) 会遍历所有匹配该角色的连接
     """
 
-    _instance: "WebSocketManager | None" = None
+    _instance: WebSocketManager | None = None
 
-    def __new__(cls) -> "WebSocketManager":
+    def __new__(cls) -> WebSocketManager:
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance._initialized = False  # type: ignore[attr-defined]
@@ -160,11 +161,7 @@ class WebSocketManager:
         """
         # 收集匹配连接（在锁内复制引用，锁外执行 IO）
         async with self._lock:
-            targets = [
-                (uid, cid, ws)
-                for (uid, cid), ws in self._connections.items()
-                if cid == character_id
-            ]
+            targets = [(uid, cid, ws) for (uid, cid), ws in self._connections.items() if cid == character_id]
 
         if not targets:
             return 0
@@ -345,9 +342,7 @@ async def ws_chat_endpoint(
             # 获取 LLM 全局实例（启动期可能为 None）
             llm_client, prompts_obj = await _get_llm_globals()
             if llm_client is None or prompts_obj is None:
-                await websocket.send_json(
-                    _safe_error("LLM client not initialized, please retry later")
-                )
+                await websocket.send_json(_safe_error("LLM client not initialized, please retry later"))
                 continue
 
             # 调用 MessageService 处理用户消息
@@ -372,9 +367,7 @@ async def ws_chat_endpoint(
                     error=str(e),
                     exc_info=True,
                 )
-                await websocket.send_json(
-                    _safe_error(f"Message handling failed: {str(e)}")
-                )
+                await websocket.send_json(_safe_error(f"Message handling failed: {str(e)}"))
                 continue
 
             # 构造并推送回复

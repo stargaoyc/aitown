@@ -2,6 +2,7 @@
 
 LLM 决策返回 planChanges 时更新此表，计划影响候选 Action 的 precondition 评估。
 """
+
 from uuid import UUID
 
 from sqlalchemy import select, update
@@ -52,6 +53,4 @@ class PlanRepository(BaseRepository[Plan]):
         stmt = update(Plan).where(Plan.id == plan_id).values(**fields)
         await self.session.execute(stmt)
         await self.session.flush()
-        logger.info(
-            "plan_updated", plan_id=str(plan_id), fields=list(fields.keys())
-        )
+        logger.info("plan_updated", plan_id=str(plan_id), fields=list(fields.keys()))

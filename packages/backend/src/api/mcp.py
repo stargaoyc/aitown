@@ -84,15 +84,17 @@ async def list_mcp_servers():
             # 尝试从环境变量读取（settings 中可能未定义该字段）
             endpoint = os.environ.get(cfg["env_key"], f"http://localhost:{cfg['default_port']}")
 
-        servers.append({
-            "name": cfg["name"],
-            "endpoint": endpoint,
-            "type": cfg["type"],
-            "description": cfg["description"],
-            "tools": cfg["tools"],
-            "tool_count": len(cfg["tools"]),
-            "enabled": cfg["name"] in enabled_set,
-        })
+        servers.append(
+            {
+                "name": cfg["name"],
+                "endpoint": endpoint,
+                "type": cfg["type"],
+                "description": cfg["description"],
+                "tools": cfg["tools"],
+                "tool_count": len(cfg["tools"]),
+                "enabled": cfg["name"] in enabled_set,
+            }
+        )
 
     return {
         "data": servers,
@@ -134,10 +136,7 @@ async def get_mcp_server_detail(server_name: str):
         "endpoint": endpoint,
         "type": cfg["type"],
         "description": cfg["description"],
-        "tools": [
-            {"name": tool_name, "server": cfg["name"]}
-            for tool_name in cfg["tools"]
-        ],
+        "tools": [{"name": tool_name, "server": cfg["name"]} for tool_name in cfg["tools"]],
         "tool_count": len(cfg["tools"]),
     }
 
@@ -157,11 +156,13 @@ async def list_all_mcp_tools():
         if cfg["name"] not in enabled_set:
             continue
         for tool_name in cfg["tools"]:
-            tools.append({
-                "name": tool_name,
-                "server": cfg["name"],
-                "server_type": cfg["type"],
-            })
+            tools.append(
+                {
+                    "name": tool_name,
+                    "server": cfg["name"],
+                    "server_type": cfg["type"],
+                }
+            )
 
     return {
         "data": tools,
@@ -314,7 +315,9 @@ async def invoke_mcp_tool(
             return {
                 "success": True,
                 "status_code": invoke_resp.status_code,
-                "result": invoke_resp.json() if invoke_resp.headers.get("content-type", "").startswith("application/json") else invoke_resp.text,
+                "result": invoke_resp.json()
+                if invoke_resp.headers.get("content-type", "").startswith("application/json")
+                else invoke_resp.text,
                 "endpoint": endpoint,
             }
     except httpx.ConnectError:

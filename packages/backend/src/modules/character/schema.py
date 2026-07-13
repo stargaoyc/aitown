@@ -2,15 +2,16 @@
 
 对应前端 Zod schema，用于运行时校验角色卡 YAML。
 """
+
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-class Schedule(str, Enum):
+class Schedule(StrEnum):
     """作息类型
 
     - EARLY_BIRD: 早睡早起，活动高峰 6:00-22:00
@@ -83,8 +84,5 @@ class CharacterCard(BaseModel):
         if "schedule" in v:
             schedule = v["schedule"]
             if schedule not in {s.value for s in Schedule}:
-                raise ValueError(
-                    f"schedule 必须是 {[s.value for s in Schedule]} 之一，"
-                    f"得到: {schedule}"
-                )
+                raise ValueError(f"schedule 必须是 {[s.value for s in Schedule]} 之一，得到: {schedule}")
         return v

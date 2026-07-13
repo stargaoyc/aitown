@@ -35,11 +35,7 @@ function HomePage() {
 
   return (
     <div className="space-y-6 animate-fade-in-up">
-      <PageHeader
-        title="Dashboard"
-        subtitle="二次元 AI 小镇陪伴智能体"
-        icon="🌸"
-      />
+      <PageHeader title="Dashboard" subtitle="二次元 AI 小镇陪伴智能体" icon="🌸" />
 
       <GlassCard>
         <div className="flex items-center justify-between flex-wrap gap-4">
@@ -48,9 +44,7 @@ function HomePage() {
               <Activity className="w-5 h-5 text-sakura-500" />
               系统状态
             </h2>
-            <p className="text-sm text-twilight-400 mt-1">
-              实时监控小镇运行状况
-            </p>
+            <p className="text-sm text-twilight-400 mt-1">实时监控小镇运行状况</p>
           </div>
           <StatusBadge
             status={health.data?.status === "ok" ? "ok" : "error"}
@@ -86,12 +80,7 @@ function HomePage() {
             />
           </motion.div>
           <motion.div variants={item}>
-            <StatCard
-              title="天气"
-              value={world.data?.weather ?? "—"}
-              icon="🌤️"
-              color="twilight"
-            />
+            <StatCard title="天气" value={world.data?.weather ?? "—"} icon="🌤️" color="twilight" />
           </motion.div>
           <motion.div variants={item}>
             <StatCard
@@ -114,22 +103,14 @@ function HomePage() {
           <Link to="/characters">
             <GlassCard className="cursor-pointer h-full group">
               <div className="flex items-start justify-between">
-                <div className="text-4xl mb-3 group-hover:scale-110 transition-transform">
-                  👥
-                </div>
+                <div className="text-4xl mb-3 group-hover:scale-110 transition-transform">👥</div>
                 <div className="w-8 h-8 rounded-full bg-sakura-100 flex items-center justify-center text-sakura-500 opacity-0 group-hover:opacity-100 transition-opacity">
                   →
                 </div>
               </div>
-              <h3 className="font-semibold text-sakura-600 text-lg">
-                角色管理
-              </h3>
-              <p className="text-sm text-twilight-400 mt-1">
-                查看角色状态、对话与记忆
-              </p>
-              <div className="mt-3 text-sakura-400 text-sm font-medium">
-                查看详情 →
-              </div>
+              <h3 className="font-semibold text-sakura-600 text-lg">角色管理</h3>
+              <p className="text-sm text-twilight-400 mt-1">查看角色状态、对话与记忆</p>
+              <div className="mt-3 text-sakura-400 text-sm font-medium">查看详情 →</div>
             </GlassCard>
           </Link>
         </motion.div>
@@ -138,22 +119,14 @@ function HomePage() {
           <Link to="/world">
             <GlassCard className="cursor-pointer h-full group">
               <div className="flex items-start justify-between">
-                <div className="text-4xl mb-3 group-hover:scale-110 transition-transform">
-                  🌍
-                </div>
+                <div className="text-4xl mb-3 group-hover:scale-110 transition-transform">🌍</div>
                 <div className="w-8 h-8 rounded-full bg-sky-soft-100 flex items-center justify-center text-sky-soft-500 opacity-0 group-hover:opacity-100 transition-opacity">
                   →
                 </div>
               </div>
-              <h3 className="font-semibold text-sky-soft-500 text-lg">
-                世界状态
-              </h3>
-              <p className="text-sm text-twilight-400 mt-1">
-                虚拟时间、天气与事件
-              </p>
-              <div className="mt-3 text-sky-soft-400 text-sm font-medium">
-                查看详情 →
-              </div>
+              <h3 className="font-semibold text-sky-soft-500 text-lg">世界状态</h3>
+              <p className="text-sm text-twilight-400 mt-1">虚拟时间、天气与事件</p>
+              <div className="mt-3 text-sky-soft-400 text-sm font-medium">查看详情 →</div>
             </GlassCard>
           </Link>
         </motion.div>
@@ -162,22 +135,14 @@ function HomePage() {
           <Link to="/map">
             <GlassCard className="cursor-pointer h-full group">
               <div className="flex items-start justify-between">
-                <div className="text-4xl mb-3 group-hover:scale-110 transition-transform">
-                  🗺️
-                </div>
+                <div className="text-4xl mb-3 group-hover:scale-110 transition-transform">🗺️</div>
                 <div className="w-8 h-8 rounded-full bg-twilight-100 flex items-center justify-center text-twilight-500 opacity-0 group-hover:opacity-100 transition-opacity">
                   →
                 </div>
               </div>
-              <h3 className="font-semibold text-twilight-500 text-lg">
-                小镇地图
-              </h3>
-              <p className="text-sm text-twilight-400 mt-1">
-                场景热力图与角色分布
-              </p>
-              <div className="mt-3 text-twilight-400 text-sm font-medium">
-                查看详情 →
-              </div>
+              <h3 className="font-semibold text-twilight-500 text-lg">小镇地图</h3>
+              <p className="text-sm text-twilight-400 mt-1">场景热力图与角色分布</p>
+              <div className="mt-3 text-twilight-400 text-sm font-medium">查看详情 →</div>
             </GlassCard>
           </Link>
         </motion.div>

@@ -17,9 +17,10 @@ Redis Key 设计：
     # 仅查询
     usage = await mgr.get_today_usage()
 """
+
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from redis.asyncio import Redis
 from structlog import get_logger
@@ -69,10 +70,7 @@ class BudgetExceeded(Exception):
         self.used = used
         self.budget = budget
         self.remaining = remaining
-        super().__init__(
-            f"Daily LLM budget exceeded: used=${used:.4f} "
-            f"budget=${budget:.4f} remaining=${remaining:.4f}"
-        )
+        super().__init__(f"Daily LLM budget exceeded: used=${used:.4f} budget=${budget:.4f} remaining=${remaining:.4f}")
 
 
 class BudgetManager:
@@ -100,7 +98,7 @@ class BudgetManager:
     @staticmethod
     def _today_key() -> str:
         """返回当日（UTC）的 Redis key"""
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
         return _COST_KEY_TEMPLATE.format(date=today)
 
     async def get_today_usage(self) -> dict:
@@ -249,10 +247,7 @@ def get_budget_manager() -> BudgetManager:
         RuntimeError: 未初始化（未注入 Redis）
     """
     if _budget_manager is None:
-        raise RuntimeError(
-            "BudgetManager not initialized. "
-            "Call set_budget_manager(redis, ...) first."
-        )
+        raise RuntimeError("BudgetManager not initialized. Call set_budget_manager(redis, ...) first.")
     return _budget_manager
 
 

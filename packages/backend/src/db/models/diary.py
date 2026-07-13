@@ -3,13 +3,14 @@
 日记不替代 Episode 真相源，而是角色对一段时间经历的叙事性总结。
 支持 day/week/month/year 四种周期。
 """
+
 from datetime import datetime
 from uuid import UUID
-from uuid6 import uuid7
 
-from sqlalchemy import ForeignKey, Index, Integer, String, Text, func
+from sqlalchemy import ForeignKey, Index, String, Text, func
 from sqlalchemy.dialects.postgresql import TIMESTAMP
 from sqlalchemy.orm import Mapped, mapped_column
+from uuid6 import uuid7
 
 from src.db.base import Base
 
@@ -25,21 +26,16 @@ class CharacterDiary(Base):
     - day: 日报，diary_end_date 为空
     - week/month/year: 周期归档，diary_end_date 标记周期起始
     """
+
     __tablename__ = "character_diaries"
 
-    id: Mapped[UUID] = mapped_column(
-        primary_key=True, default=uuid7, comment="日记 ID（UUID v7）"
-    )
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid7, comment="日记 ID（UUID v7）")
     character_id: Mapped[UUID] = mapped_column(
         ForeignKey("characters.id", ondelete="CASCADE"),
         comment="角色 ID",
     )
-    period: Mapped[str] = mapped_column(
-        String(20), comment="周期类型 day/week/month/year"
-    )
-    diary_date: Mapped[datetime] = mapped_column(
-        TIMESTAMP(timezone=True), comment="日记日期"
-    )
+    period: Mapped[str] = mapped_column(String(20), comment="周期类型 day/week/month/year")
+    diary_date: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), comment="日记日期")
     diary_end_date: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True),
         comment="周期结束日期（day 类型为空，其他为周期起始）",

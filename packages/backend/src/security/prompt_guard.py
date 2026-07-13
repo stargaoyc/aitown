@@ -12,6 +12,7 @@
 2. 消毒（sanitize_user_input）：移除危险内容 + 控制字符 + HTML 转义 + 长度限制
 3. 包装（wrap_user_message / build_safe_prompt）：用分隔符隔离用户数据，明确角色边界
 """
+
 from __future__ import annotations
 
 import html
@@ -78,8 +79,7 @@ class PromptGuard:
         self.max_length = max_length
         # 预编译所有危险模式（IGNORECASE 大小写不敏感）
         self._compiled_patterns: list[tuple[str, re.Pattern[str]]] = [
-            (desc, re.compile(pattern, re.IGNORECASE))
-            for desc, pattern in _DANGEROUS_PATTERNS
+            (desc, re.compile(pattern, re.IGNORECASE)) for desc, pattern in _DANGEROUS_PATTERNS
         ]
 
     def check_injection(self, text: str) -> tuple[bool, str | None]:

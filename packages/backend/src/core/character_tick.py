@@ -14,7 +14,7 @@
 
 import asyncio
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -68,9 +68,7 @@ class CharacterTickEngine:
 
         # 初始化并发信号量（类级别共享）
         if CharacterTickEngine.SEMAPHORE is None:
-            CharacterTickEngine.SEMAPHORE = asyncio.Semaphore(
-                settings.character_max_concurrent
-            )
+            CharacterTickEngine.SEMAPHORE = asyncio.Semaphore(settings.character_max_concurrent)
 
     async def tick_character(self, character_id: UUID) -> None:
         """执行单个角色的 Tick
@@ -87,9 +85,7 @@ class CharacterTickEngine:
         lock_key = f"{self.LOCK_PREFIX}{character_id}"
 
         # 尝试获取锁
-        acquired = await self.redis.set(
-            lock_key, "tick", ex=self.LOCK_TTL, nx=True
-        )
+        acquired = await self.redis.set(lock_key, "tick", ex=self.LOCK_TTL, nx=True)
         if not acquired:
             logger.debug("character_tick_skipped", character_id=str(character_id))
             return
@@ -117,9 +113,7 @@ class CharacterTickEngine:
         context = await self._perceive(character_id)
 
         # 2. 候选过滤
-        candidates = self.registry.get_candidates(
-            context["state"], scene=context["state"].get("location")
-        )
+        candidates = self.registry.get_candidates(context["state"], scene=context["state"].get("location"))
 
         if not candidates:
             logger.warn("no_candidates", character_id=str(character_id))
@@ -130,7 +124,7 @@ class CharacterTickEngine:
 
         # 3.5 MCP 工具调用（如果 LLM 决定使用工具）
         if decision.action == "use_tool":
-            tool_result = await self._execute_mcp_tool(character_id, decision, context)
+            await self._execute_mcp_tool(character_id, decision, context)
             # 工具调用后，继续执行一个默认 Action（如 wait）
             decision.action = "wait"
 
@@ -155,14 +149,15 @@ class CharacterTickEngine:
 
         from src.observability.metrics import (
             CHARACTER_TICK_DURATION,
-            CHARACTER_TICK_ERRORS,
             CHARACTER_TICK_TOTAL,
         )
+
         tick_elapsed = time.perf_counter() - start_perf
         CHARACTER_TICK_DURATION.observe(tick_elapsed)
         CHARACTER_TICK_TOTAL.labels(character_id=cid).inc()
 
         from src.observability.langfuse_tracing import trace_character_tick
+
         trace_character_tick(
             character_id=str(character_id),
             action=decision.action,
@@ -204,15 +199,19 @@ class CharacterTickEngine:
 
         # 从 Redis 读取实时状态（缓存优先）
         redis_state = await self.redis.hgetall(f"char:{character_id}:state")
-        state: dict[str, Any] = {str(k): v for k, v in redis_state.items()} if redis_state else {
-            "location": char_state.location,
-            "stamina": char_state.stamina,
-            "satiety": char_state.satiety,
-            "mood": char_state.mood,
-            "money": char_state.money,
-            "phone_battery": char_state.phone_battery,
-            "social_energy": char_state.social_energy,
-        }
+        state: dict[str, Any] = (
+            {str(k): v for k, v in redis_state.items()}
+            if redis_state
+            else {
+                "location": char_state.location,
+                "stamina": char_state.stamina,
+                "satiety": char_state.satiety,
+                "mood": char_state.mood,
+                "money": char_state.money,
+                "phone_battery": char_state.phone_battery,
+                "social_energy": char_state.social_energy,
+            }
+        )
 
         # 确保 state 中的数值字段是 int 类型（Redis 读取为 str/bytes）
         _NUMERIC_KEYS = {"stamina", "satiety", "money", "phone_battery", "social_energy"}
@@ -249,9 +248,7 @@ class CharacterTickEngine:
             async with db.session() as session:
                 mem_repo = MemoryRepository(session)
                 retrieval_service = RetrievalService(self.llm, mem_repo)
-                memories = await retrieval_service.search(
-                    character_id, query, top_k=10
-                )
+                memories = await retrieval_service.search(character_id, query, top_k=10)
         except Exception as e:
             logger.warning(
                 "memory_retrieval_failed_continue",
@@ -267,9 +264,7 @@ class CharacterTickEngine:
             "plans": plans,
         }
 
-    async def _decide(
-        self, character_id: UUID, context: dict, candidates: list[Action]
-    ) -> DecisionResult:
+    async def _decide(self, character_id: UUID, context: dict, candidates: list[Action]) -> DecisionResult:
         """LLM 决策 - 结构化输出
 
         使用 PromptTemplates.render() 生成决策 Prompt
@@ -288,30 +283,32 @@ class CharacterTickEngine:
         world = context["world"]
 
         # 构建候选 Action 列表文本
-        candidates_text = "\n".join([
-            f"- {a.id}: {a.name}（耗时{a.duration_minutes}分钟，体力消耗{a.energy_cost}）"
-            for a in candidates
-        ])
+        candidates_text = "\n".join(
+            [f"- {a.id}: {a.name}（耗时{a.duration_minutes}分钟，体力消耗{a.energy_cost}）" for a in candidates]
+        )
 
         # 构建 MCP 工具列表文本（角色可调用外部工具获取信息）
         try:
             from src.mcp import MCPClient
+
             mcp_client = MCPClient()
             mcp_tools_text = await mcp_client.format_tools_for_prompt()
         except Exception:
             mcp_tools_text = "（MCP 工具不可用）"
 
         # 构建记忆文本
-        memories_text = "\n".join([
-            m.get("content", str(m)) if isinstance(m, dict) else str(m)
-            for m in context["memories"]
-        ]) if context["memories"] else "暂无相关记忆"
+        memories_text = (
+            "\n".join([m.get("content", str(m)) if isinstance(m, dict) else str(m) for m in context["memories"]])
+            if context["memories"]
+            else "暂无相关记忆"
+        )
 
         # 构建计划文本
-        plans_text = "\n".join([
-            f"- {p.title}（进度{p.progress}%）"
-            for p in context["plans"]
-        ]) if context["plans"] else "暂无计划"
+        plans_text = (
+            "\n".join([f"- {p.title}（进度{p.progress}%）" for p in context["plans"]])
+            if context["plans"]
+            else "暂无计划"
+        )
 
         # 渲染决策 Prompt
         prompt = self.prompts.render(
@@ -323,7 +320,7 @@ class CharacterTickEngine:
             energy=state.get("stamina", 50),
             hunger=state.get("satiety", 50),
             mood=state.get("mood", "平静"),
-            world_time=world.get("world_time", datetime.now(timezone.utc).isoformat()),
+            world_time=world.get("world_time", datetime.now(UTC).isoformat()),
             weather=world.get("weather", "sunny"),
             scenes="",  # 简化
             memories=memories_text,
@@ -336,8 +333,8 @@ class CharacterTickEngine:
             f"\n\n[可用工具（MCP）]\n"
             f"你可以在行动中使用以下工具获取信息或执行操作：\n"
             f"{mcp_tools_text}\n"
-            f"如需使用工具，在 action 字段填写 \"use_tool\"，"
-            f"在 params 中填写 tool_name（如 \"weather.get_current_weather\"）和 tool_args（参数字典）。"
+            f'如需使用工具，在 action 字段填写 "use_tool"，'
+            f'在 params 中填写 tool_name（如 "weather.get_current_weather"）和 tool_args（参数字典）。'
         )
 
         # 定义决策结果 schema
@@ -356,8 +353,8 @@ class CharacterTickEngine:
                             "planId": {"type": "string"},
                             "action": {"type": "string"},  # update/complete/abandon
                             "progress": {"type": "integer"},
-                        }
-                    }
+                        },
+                    },
                 },
                 "proactiveShareIntent": {"type": "boolean"},
             },
@@ -377,10 +374,7 @@ class CharacterTickEngine:
         # 防御性处理 LLM 返回值类型
         # 注意：LLM 可能返回 "planChanges": null，此时 dict.get() 返回 None 而非默认值 []
         raw_plan_changes = result.get("planChanges") or []
-        plan_changes = [
-            pc if isinstance(pc, dict) else {"description": str(pc)}
-            for pc in raw_plan_changes
-        ]
+        plan_changes = [pc if isinstance(pc, dict) else {"description": str(pc)} for pc in raw_plan_changes]
 
         raw_share_intent = result.get("proactiveShareIntent", False)
         proactive_share_intent = bool(raw_share_intent) if raw_share_intent is not None else False
@@ -394,9 +388,7 @@ class CharacterTickEngine:
             proactive_share_intent=proactive_share_intent,
         )
 
-    async def _execute_mcp_tool(
-        self, character_id: UUID, decision: DecisionResult, context: dict
-    ) -> dict | None:
+    async def _execute_mcp_tool(self, character_id: UUID, decision: DecisionResult, context: dict) -> dict | None:
         """执行 MCP 工具调用
 
         当 LLM 决定使用工具时，通过 MCPClient 调用对应 MCP Server，
@@ -471,9 +463,7 @@ class CharacterTickEngine:
 
         return result
 
-    async def _execute_action(
-        self, character_id: UUID, decision: DecisionResult, context: dict
-    ) -> None:
+    async def _execute_action(self, character_id: UUID, decision: DecisionResult, context: dict) -> None:
         """执行 Action - 事务化
 
         流程：
@@ -492,6 +482,7 @@ class CharacterTickEngine:
         if not action_def:
             logger.error("action_not_found", action=decision.action)
             from src.observability.metrics import ACTION_EXECUTION_TOTAL
+
             ACTION_EXECUTION_TOTAL.labels(action_id=decision.action, status="failed").inc()
             return
 
@@ -519,7 +510,8 @@ class CharacterTickEngine:
 
         # 设置当前动作（供前端展示"当前行为"）
         from datetime import timedelta
-        action_end = datetime.now(timezone.utc) + timedelta(minutes=duration)
+
+        action_end = datetime.now(UTC) + timedelta(minutes=duration)
         new_state["current_action"] = {
             "action_id": decision.action,
             "action_name": action_def.name,
@@ -543,7 +535,7 @@ class CharacterTickEngine:
                     reason=decision.reason,
                     duration_minutes=duration,
                     location=new_state.get("location", "unknown"),
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                 )
                 await action_repo.add(record)
 
@@ -555,14 +547,19 @@ class CharacterTickEngine:
                     satiety=int(new_state["satiety"]) if new_state.get("satiety") is not None else None,
                     mood=new_state.get("mood"),
                     money=int(new_state["money"]) if new_state.get("money") is not None else None,
-                    phone_battery=int(new_state["phone_battery"]) if new_state.get("phone_battery") is not None else None,
-                    social_energy=int(new_state["social_energy"]) if new_state.get("social_energy") is not None else None,
+                    phone_battery=int(new_state["phone_battery"])
+                    if new_state.get("phone_battery") is not None
+                    else None,
+                    social_energy=int(new_state["social_energy"])
+                    if new_state.get("social_energy") is not None
+                    else None,
                     location=new_state.get("location"),
                     current_action=new_state.get("current_action"),
                 )
 
                 # 写入状态历史快照（支持前端状态趋势图表）
                 from src.db.models import CharacterStateHistory
+
                 history = CharacterStateHistory(
                     character_id=character_id,
                     location=new_state.get("location"),
@@ -573,7 +570,7 @@ class CharacterTickEngine:
                     phone_battery=int(new_state.get("phone_battery", 0) or 0),
                     social_energy=int(new_state.get("social_energy", 0) or 0),
                     action_id=decision.action,
-                    recorded_at=datetime.now(timezone.utc),
+                    recorded_at=datetime.now(UTC),
                 )
                 session.add(history)
 
@@ -583,7 +580,8 @@ class CharacterTickEngine:
                 mapping={k: str(v) for k, v in new_state.items() if v is not None},
             )
 
-            from src.observability.metrics import ACTION_EXECUTION_TOTAL, ACTION_EXECUTION_DURATION
+            from src.observability.metrics import ACTION_EXECUTION_DURATION, ACTION_EXECUTION_TOTAL
+
             ACTION_EXECUTION_TOTAL.labels(action_id=decision.action, status="success").inc()
             ACTION_EXECUTION_DURATION.labels(action_id=decision.action).observe(time.perf_counter() - start_perf)
 
@@ -595,12 +593,11 @@ class CharacterTickEngine:
             )
         except Exception:
             from src.observability.metrics import ACTION_EXECUTION_TOTAL
+
             ACTION_EXECUTION_TOTAL.labels(action_id=decision.action, status="failed").inc()
             raise
 
-    async def _memorize(
-        self, character_id: UUID, decision: DecisionResult, context: dict
-    ) -> None:
+    async def _memorize(self, character_id: UUID, decision: DecisionResult, context: dict) -> None:
         """记忆沉淀
 
         流程：
@@ -617,10 +614,7 @@ class CharacterTickEngine:
         state = context["state"]
 
         # 生成记忆内容
-        memory_content = (
-            f"{character.name}在{state.get('location')}执行了{decision.action}。"
-            f"理由：{decision.reason}"
-        )
+        memory_content = f"{character.name}在{state.get('location')}执行了{decision.action}。理由：{decision.reason}"
 
         # 写入记忆（需要 db session）
         async with db.session() as session:
@@ -634,13 +628,23 @@ class CharacterTickEngine:
             # 写入记忆片段
             # 根据动作类型动态计算重要性（1-10）
             _ACTION_IMPORTANCE = {
-                "wait": 2, "rest": 3, "sleep": 3,
-                "eat": 4, "drink": 4,
-                "move": 4, "go_out": 5,
-                "work": 6, "study": 6, "practice": 6,
-                "social": 7, "chat": 7, "play": 6,
-                "shop": 5, "buy": 5,
-                "explore": 7, "adventure": 8,
+                "wait": 2,
+                "rest": 3,
+                "sleep": 3,
+                "eat": 4,
+                "drink": 4,
+                "move": 4,
+                "go_out": 5,
+                "work": 6,
+                "study": 6,
+                "practice": 6,
+                "social": 7,
+                "chat": 7,
+                "play": 6,
+                "shop": 5,
+                "buy": 5,
+                "explore": 7,
+                "adventure": 8,
             }
             base_importance = _ACTION_IMPORTANCE.get(decision.action, 5)
             # 如果理由中包含情绪关键词，提升重要性
@@ -669,9 +673,7 @@ class CharacterTickEngine:
             action=decision.action,
         )
 
-    async def _maybe_proactive_share(
-        self, character_id: UUID, decision: DecisionResult, context: dict
-    ) -> None:
+    async def _maybe_proactive_share(self, character_id: UUID, decision: DecisionResult, context: dict) -> None:
         """主动分享 - 角色主动向用户推送消息
 
         触发条件：LLM 决策的 proactive_share_intent=True
@@ -710,6 +712,7 @@ class CharacterTickEngine:
         async with db.session() as session:
             # 获取 ws_manager（可能为 None，Web 客户端实时推送可选）
             from src.runtime import get_ws_manager
+
             ws_manager = get_ws_manager()
 
             sharing_svc = ProactiveSharingService(
@@ -747,9 +750,7 @@ class CharacterTickEngine:
         if content and recipients > 0:
             await self._push_share_to_qq(character_id, content)
 
-    async def _push_share_to_qq(
-        self, character_id: UUID, content: str
-    ) -> None:
+    async def _push_share_to_qq(self, character_id: UUID, content: str) -> None:
         """将主动分享推送到 QQ 平台有活跃会话的用户
 
         查询 conversations 表中 platform=qq 的会话，提取 user_id（格式 qq_{qq_number}），
@@ -761,6 +762,7 @@ class CharacterTickEngine:
         """
         try:
             from src.runtime import get_onebot_adapter
+
             onebot_adapter = get_onebot_adapter()
         except (ImportError, AttributeError):
             logger.debug("onebot_adapter_not_available_for_share")

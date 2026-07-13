@@ -5,6 +5,7 @@
 - trace_span 装饰器（async / sync）
 - 异常时 span 记录异常但 re-raise
 """
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
@@ -12,7 +13,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.observability.tracing import get_tracer, trace_span
-
 
 # ---------------------------------------------------------------------------
 # get_tracer

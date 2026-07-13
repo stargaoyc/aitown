@@ -57,11 +57,7 @@ function mapModuleStatus(status: string): "ok" | "error" | "warning" | "idle" {
   if (["running", "ok", "active", "healthy", "up", "connected"].includes(s)) {
     return "ok";
   }
-  if (
-    ["error", "failed", "stopped", "crashed", "down", "disconnected"].includes(
-      s,
-    )
-  ) {
+  if (["error", "failed", "stopped", "crashed", "down", "disconnected"].includes(s)) {
     return "error";
   }
   if (["warning", "degraded", "slow", "pending"].includes(s)) {
@@ -72,27 +68,11 @@ function mapModuleStatus(status: string): "ok" | "error" | "warning" | "idle" {
 
 function SettingsPage() {
   // 获取系统状态、健康检查、模块列表、MCP 服务器与工具
-  const {
-    data: adminStatus,
-    isLoading: adminLoading,
-    error: adminError,
-  } = useAdminStatus();
+  const { data: adminStatus, isLoading: adminLoading, error: adminError } = useAdminStatus();
   const { data: health } = useHealth();
-  const {
-    data: modulesData,
-    isLoading: modulesLoading,
-    error: modulesError,
-  } = useModules();
-  const {
-    data: mcpServersData,
-    isLoading: serversLoading,
-    error: serversError,
-  } = useMcpServers();
-  const {
-    data: mcpToolsData,
-    isLoading: toolsLoading,
-    error: toolsError,
-  } = useMcpTools();
+  const { data: modulesData, isLoading: modulesLoading, error: modulesError } = useModules();
+  const { data: mcpServersData, isLoading: serversLoading, error: serversError } = useMcpServers();
+  const { data: mcpToolsData, isLoading: toolsLoading, error: toolsError } = useMcpTools();
   const { data: healthData } = useMcpServersHealth();
   const toggleMcpServer = useToggleMcpServer();
   const { data: configData } = useConfig();
@@ -158,9 +138,7 @@ function SettingsPage() {
         className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-sakura-50/80 border border-sakura-200/50 text-sm text-sakura-600"
       >
         <Sliders className="w-4 h-4 shrink-0" />
-        <span>
-          MCP 插件可单独开关，运行时配置可在线编辑并即时生效，无需重启服务
-        </span>
+        <span>MCP 插件可单独开关，运行时配置可在线编辑并即时生效，无需重启服务</span>
       </motion.div>
 
       {/* 加载与错误状态 */}
@@ -168,12 +146,7 @@ function SettingsPage() {
       {adminError && <ErrorDisplay error={adminError} />}
 
       {adminStatus && (
-        <motion.div
-          variants={container}
-          initial="hidden"
-          animate="show"
-          className="space-y-6"
-        >
+        <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
           {/* 系统信息总览 */}
           <motion.div variants={item}>
             <GlassCard hover={false}>
@@ -192,15 +165,11 @@ function SettingsPage() {
                   </div>
                   <StatusBadge
                     status={adminStatus.world_engine.running ? "ok" : "error"}
-                    label={
-                      adminStatus.world_engine.running ? "运行中" : "已停止"
-                    }
+                    label={adminStatus.world_engine.running ? "运行中" : "已停止"}
                   />
                   <div className="mt-2 text-xs text-twilight-400 space-y-0.5">
                     <div>Tick ID: #{adminStatus.world_engine.tick_id}</div>
-                    <div>
-                      Leader: {adminStatus.world_engine.is_leader ? "是" : "否"}
-                    </div>
+                    <div>Leader: {adminStatus.world_engine.is_leader ? "是" : "否"}</div>
                   </div>
                 </div>
 
@@ -213,12 +182,8 @@ function SettingsPage() {
                     </span>
                   </div>
                   <StatusBadge
-                    status={
-                      adminStatus.character_engine.available ? "ok" : "idle"
-                    }
-                    label={
-                      adminStatus.character_engine.available ? "可用" : "未启动"
-                    }
+                    status={adminStatus.character_engine.available ? "ok" : "idle"}
+                    label={adminStatus.character_engine.available ? "可用" : "未启动"}
                   />
                   <div className="mt-2 text-xs text-twilight-400">
                     Tick 间隔: {adminStatus.character_engine.tick_interval}s
@@ -235,9 +200,7 @@ function SettingsPage() {
                   </div>
                   <StatusBadge
                     status={adminStatus.llm.initialized ? "ok" : "error"}
-                    label={
-                      adminStatus.llm.initialized ? "已初始化" : "未初始化"
-                    }
+                    label={adminStatus.llm.initialized ? "已初始化" : "未初始化"}
                   />
                   <div className="mt-2 text-xs text-twilight-400 font-mono truncate">
                     {adminStatus.llm.model || "—"}
@@ -254,31 +217,19 @@ function SettingsPage() {
                   </div>
                   <StatusBadge
                     status={adminStatus.redis === "connected" ? "ok" : "error"}
-                    label={
-                      adminStatus.redis === "connected" ? "已连接" : "断开"
-                    }
+                    label={adminStatus.redis === "connected" ? "已连接" : "断开"}
                   />
-                  <div className="mt-2 text-xs text-twilight-400">
-                    {adminStatus.redis || "—"}
-                  </div>
+                  <div className="mt-2 text-xs text-twilight-400">{adminStatus.redis || "—"}</div>
                 </div>
               </div>
 
               {/* Action Registry 信息 */}
               <div className="mt-4 p-3 rounded-xl bg-white/40 border border-white/30 flex items-center gap-3 flex-wrap">
                 <Activity className="w-4 h-4 text-sakura-400" />
-                <span className="text-sm text-twilight-500 font-medium">
-                  Action Registry
-                </span>
+                <span className="text-sm text-twilight-500 font-medium">Action Registry</span>
                 <StatusBadge
-                  status={
-                    adminStatus.action_registry.initialized ? "ok" : "idle"
-                  }
-                  label={
-                    adminStatus.action_registry.initialized
-                      ? "已初始化"
-                      : "未初始化"
-                  }
+                  status={adminStatus.action_registry.initialized ? "ok" : "idle"}
+                  label={adminStatus.action_registry.initialized ? "已初始化" : "未初始化"}
                 />
                 <span className="text-xs text-twilight-400">
                   已注册行为数: {adminStatus.action_registry.action_count}
@@ -303,9 +254,7 @@ function SettingsPage() {
                   />
                 </div>
                 <div className="p-3 rounded-xl bg-white/40 border border-white/30">
-                  <div className="text-xs text-twilight-400 mb-1">
-                    World Tick
-                  </div>
+                  <div className="text-xs text-twilight-400 mb-1">World Tick</div>
                   <div className="text-lg font-bold text-twilight-500">
                     #{health?.world_tick ?? "—"}
                   </div>
@@ -336,9 +285,7 @@ function SettingsPage() {
                   </div>
                 </div>
                 <div className="p-3 rounded-xl bg-white/40 border border-white/30">
-                  <div className="text-xs text-twilight-400 mb-1">
-                    初始化状态
-                  </div>
+                  <div className="text-xs text-twilight-400 mb-1">初始化状态</div>
                   <StatusBadge
                     status={adminStatus.llm.initialized ? "ok" : "error"}
                     label={adminStatus.llm.initialized ? "已就绪" : "未就绪"}
@@ -359,15 +306,9 @@ function SettingsPage() {
               模块列表
             </h3>
             {modulesError && <ErrorDisplay error={modulesError} />}
-            {modulesLoading && !modulesError && (
-              <LoadingSpinner text="正在加载模块列表..." />
-            )}
+            {modulesLoading && !modulesError && <LoadingSpinner text="正在加载模块列表..." />}
             {!modulesLoading && !modulesError && modules.length === 0 && (
-              <EmptyState
-                icon="📦"
-                title="暂无模块"
-                subtitle="系统暂未注册任何模块"
-              />
+              <EmptyState icon="📦" title="暂无模块" subtitle="系统暂未注册任何模块" />
             )}
             {modules.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -381,9 +322,7 @@ function SettingsPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-twilight-600 text-sm">
-                          {mod.name}
-                        </span>
+                        <span className="font-medium text-twilight-600 text-sm">{mod.name}</span>
                         <span className="text-xs text-twilight-300 px-1.5 py-0.5 rounded bg-white/50">
                           {mod.type}
                         </span>
@@ -392,10 +331,7 @@ function SettingsPage() {
                         {mod.description || "无描述"}
                       </p>
                     </div>
-                    <StatusBadge
-                      status={mapModuleStatus(mod.status)}
-                      label={mod.status}
-                    />
+                    <StatusBadge status={mapModuleStatus(mod.status)} label={mod.status} />
                   </div>
                 ))}
               </div>
@@ -406,29 +342,12 @@ function SettingsPage() {
 
       {/* 顶部统计 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard
-          title="模块总数"
-          value={modules.length}
-          icon="📦"
-          color="sakura"
-        />
-        <StatCard
-          title="MCP 服务器"
-          value={mcpServers.length}
-          icon="🖥️"
-          color="sky"
-        />
-        <StatCard
-          title="MCP 工具"
-          value={mcpTools.length}
-          icon="🔧"
-          color="twilight"
-        />
+        <StatCard title="模块总数" value={modules.length} icon="📦" color="sakura" />
+        <StatCard title="MCP 服务器" value={mcpServers.length} icon="🖥️" color="sky" />
+        <StatCard title="MCP 工具" value={mcpTools.length} icon="🔧" color="twilight" />
         <StatCard
           title="运行中模块"
-          value={
-            modules.filter((m) => mapModuleStatus(m.status) === "ok").length
-          }
+          value={modules.filter((m) => mapModuleStatus(m.status) === "ok").length}
           icon="✅"
           color="sakura"
         />
@@ -457,15 +376,9 @@ function SettingsPage() {
               )}
             </div>
             {serversError && <ErrorDisplay error={serversError} />}
-            {serversLoading && !serversError && (
-              <LoadingSpinner text="正在加载 MCP 服务器..." />
-            )}
+            {serversLoading && !serversError && <LoadingSpinner text="正在加载 MCP 服务器..." />}
             {!serversLoading && !serversError && mcpServers.length === 0 && (
-              <EmptyState
-                icon="🖥️"
-                title="暂无 MCP 服务器"
-                subtitle="未配置任何 MCP 服务器"
-              />
+              <EmptyState icon="🖥️" title="暂无 MCP 服务器" subtitle="未配置任何 MCP 服务器" />
             )}
             {mcpServers.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -491,20 +404,12 @@ function SettingsPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-medium text-twilight-600 text-sm">
-                            {srv.name}
-                          </span>
+                          <span className="font-medium text-twilight-600 text-sm">{srv.name}</span>
                           <span className="text-xs text-twilight-300 px-1.5 py-0.5 rounded bg-white/50">
                             {srv.type}
                           </span>
                           <StatusBadge
-                            status={
-                              isOnline && isEnabled
-                                ? "ok"
-                                : isEnabled
-                                  ? "warning"
-                                  : "idle"
-                            }
+                            status={isOnline && isEnabled ? "ok" : isEnabled ? "warning" : "idle"}
                             label={
                               !isEnabled
                                 ? "已禁用"
@@ -530,11 +435,7 @@ function SettingsPage() {
                           })
                         }
                         disabled={toggleMcpServer.isPending}
-                        title={
-                          isEnabled
-                            ? "点击禁用此 MCP 插件"
-                            : "点击启用此 MCP 插件"
-                        }
+                        title={isEnabled ? "点击禁用此 MCP 插件" : "点击启用此 MCP 插件"}
                         className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${
                           isEnabled ? "bg-sakura-400" : "bg-gray-300"
                         } ${toggleMcpServer.isPending ? "opacity-50 cursor-wait" : "cursor-pointer"}`}
@@ -563,15 +464,9 @@ function SettingsPage() {
               MCP 工具
             </h3>
             {toolsError && <ErrorDisplay error={toolsError} />}
-            {toolsLoading && !toolsError && (
-              <LoadingSpinner text="正在加载 MCP 工具..." />
-            )}
+            {toolsLoading && !toolsError && <LoadingSpinner text="正在加载 MCP 工具..." />}
             {!toolsLoading && !toolsError && mcpTools.length === 0 && (
-              <EmptyState
-                icon="🔧"
-                title="暂无 MCP 工具"
-                subtitle="未注册任何 MCP 工具"
-              />
+              <EmptyState icon="🔧" title="暂无 MCP 工具" subtitle="未注册任何 MCP 工具" />
             )}
             {mcpTools.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -590,9 +485,7 @@ function SettingsPage() {
                       <div className="text-xs text-twilight-400 mt-0.5 truncate">
                         {tool.server}
                         {tool.server_type && (
-                          <span className="ml-1 text-twilight-300">
-                            · {tool.server_type}
-                          </span>
+                          <span className="ml-1 text-twilight-300">· {tool.server_type}</span>
                         )}
                       </div>
                     </div>
@@ -635,8 +528,7 @@ function SettingsPage() {
               </div>
             </div>
             <p className="text-xs text-twilight-400 mb-4">
-              修改后点击保存即可生效，无需重启服务。环境变量值为默认值，Redis
-              覆盖值为当前运行值。
+              修改后点击保存即可生效，无需重启服务。环境变量值为默认值，Redis 覆盖值为当前运行值。
             </p>
             {configItems.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -686,9 +578,7 @@ function SettingsPage() {
                               setHasEdits(true);
                             }}
                             className={`relative w-12 h-6 rounded-full transition-colors ${
-                              editValues[item.key]
-                                ? "bg-sakura-400"
-                                : "bg-gray-300"
+                              editValues[item.key] ? "bg-sakura-400" : "bg-gray-300"
                             }`}
                           >
                             <span
@@ -733,20 +623,14 @@ function SettingsPage() {
                           默认: {String(item.default)}
                         </span>
                       </div>
-                      <div className="text-xs text-twilight-300 mt-1 font-mono">
-                        {item.key}
-                      </div>
+                      <div className="text-xs text-twilight-300 mt-1 font-mono">{item.key}</div>
                     </div>
                   );
                 })}
               </div>
             )}
-            {configItems.length === 0 && (
-              <LoadingSpinner text="正在加载配置..." />
-            )}
-            {updateConfig.isError && (
-              <ErrorDisplay error={updateConfig.error as Error} />
-            )}
+            {configItems.length === 0 && <LoadingSpinner text="正在加载配置..." />}
+            {updateConfig.isError && <ErrorDisplay error={updateConfig.error as Error} />}
           </GlassCard>
         </motion.div>
       </motion.div>

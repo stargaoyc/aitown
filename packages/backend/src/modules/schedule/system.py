@@ -3,23 +3,25 @@
 根据角色 traits.schedule（early_bird / normal / night_owl），
 判断角色在给定时间的活动状态。
 """
+
 from __future__ import annotations
 
-import structlog
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any
+
+import structlog
 
 logger = structlog.get_logger(__name__)
 
 
-class ActivityLevel(str, Enum):
+class ActivityLevel(StrEnum):
     """活动水平等级"""
 
-    SLEEPING = "sleeping"       # 睡眠中
-    DROWSY = "drowsy"           # 困倦（过渡期）
-    ACTIVE = "active"           # 活跃
-    PEAK = "peak"               # 高峰（最佳状态）
+    SLEEPING = "sleeping"  # 睡眠中
+    DROWSY = "drowsy"  # 困倦（过渡期）
+    ACTIVE = "active"  # 活跃
+    PEAK = "peak"  # 高峰（最佳状态）
 
 
 @dataclass(frozen=True)
@@ -44,24 +46,24 @@ class ScheduleProfile:
 # 三种作息类型的档案配置
 SCHEDULE_PROFILES: dict[str, ScheduleProfile] = {
     "early_bird": ScheduleProfile(
-        sleep_start=22,    # 22:00 入睡
-        sleep_end=6,       # 6:00 起床
-        peak_start=7,      # 7:00 进入高峰
-        peak_end=11,       # 11:00 高峰结束
+        sleep_start=22,  # 22:00 入睡
+        sleep_end=6,  # 6:00 起床
+        peak_start=7,  # 7:00 进入高峰
+        peak_end=11,  # 11:00 高峰结束
         stamina_regen_multiplier=1.2,  # 早睡早起体力恢复加成
     ),
     "normal": ScheduleProfile(
-        sleep_start=23,    # 23:00 入睡
-        sleep_end=7,       # 7:00 起床
-        peak_start=9,      # 9:00 进入高峰
-        peak_end=17,       # 17:00 高峰结束
+        sleep_start=23,  # 23:00 入睡
+        sleep_end=7,  # 7:00 起床
+        peak_start=9,  # 9:00 进入高峰
+        peak_end=17,  # 17:00 高峰结束
         stamina_regen_multiplier=1.0,
     ),
     "night_owl": ScheduleProfile(
-        sleep_start=2,     # 2:00 入睡（次日凌晨）
-        sleep_end=10,      # 10:00 起床
-        peak_start=14,     # 14:00 进入高峰
-        peak_end=24,       # 24:00（午夜）高峰结束
+        sleep_start=2,  # 2:00 入睡（次日凌晨）
+        sleep_end=10,  # 10:00 起床
+        peak_start=14,  # 14:00 进入高峰
+        peak_end=24,  # 24:00（午夜）高峰结束
         stamina_regen_multiplier=0.9,  # 熬夜体力恢复略低
     ),
 }
@@ -89,9 +91,7 @@ class ScheduleSystem:
         """
         return self._profiles.get(schedule, self._profiles["normal"])
 
-    def get_activity_level(
-        self, schedule: str, hour: int
-    ) -> ActivityLevel:
+    def get_activity_level(self, schedule: str, hour: int) -> ActivityLevel:
         """获取角色在指定时间的活动水平
 
         Args:
@@ -146,9 +146,7 @@ class ScheduleSystem:
             return "normal"
         return schedule
 
-    def _is_in_sleep_window(
-        self, profile: ScheduleProfile, hour: int
-    ) -> bool:
+    def _is_in_sleep_window(self, profile: ScheduleProfile, hour: int) -> bool:
         """判断是否在睡眠时段
 
         处理跨午夜的情况（如 night_owl 的 2:00-10:00）。

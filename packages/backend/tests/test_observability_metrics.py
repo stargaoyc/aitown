@@ -5,11 +5,11 @@
 - 指标可以正常 inc/observe/set/labels
 - setup_metrics 函数存在且可调用（用 mock FastAPI 验证）
 """
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
 from prometheus_client import Counter, Gauge, Histogram
 
 from src.observability.metrics import (
@@ -21,7 +21,6 @@ from src.observability.metrics import (
     WORLD_TICK_TOTAL,
     setup_metrics,
 )
-
 
 # ---------------------------------------------------------------------------
 # 指标对象存在且类型正确

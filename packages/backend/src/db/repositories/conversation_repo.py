@@ -6,14 +6,15 @@
 - context JSONB 存储压缩后的对话上下文摘要，避免每次拉取全量历史
 - last_message_at 维护会话活跃度，用于排序与清理
 """
-from datetime import datetime, timezone
-from uuid import UUID
-from uuid6 import uuid7
 
-from sqlalchemy import select, update, func
+from datetime import UTC, datetime
+from uuid import UUID
+
+from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from structlog import get_logger
+from uuid6 import uuid7
 
 from src.db.models import Conversation
 from src.db.repositories.base import BaseRepository
@@ -47,27 +48,29 @@ class ConversationRepository(BaseRepository[Conversation]):
             会话对象（含 id 与现有 context）
         """
         # 幂等插入：若已存在则跳过
-        stmt = insert(Conversation).values(
-            id=uuid7(),
-            character_id=character_id,
-            user_id=user_id,
-            platform=platform,
-        ).on_conflict_do_nothing(
-            index_elements=["user_id", "platform", "character_id"],
-        ).returning(Conversation)
+        stmt = (
+            insert(Conversation)
+            .values(
+                id=uuid7(),
+                character_id=character_id,
+                user_id=user_id,
+                platform=platform,
+            )
+            .on_conflict_do_nothing(
+                index_elements=["user_id", "platform", "character_id"],
+            )
+            .returning(Conversation)
+        )
 
         result = await self.session.execute(stmt)
         record = result.scalar_one_or_none()
 
         if record is None:
             # 已存在，反查（含 platform 维度）
-            select_stmt = (
-                select(Conversation)
-                .where(
-                    Conversation.user_id == user_id,
-                    Conversation.platform == platform,
-                    Conversation.character_id == character_id,
-                )
+            select_stmt = select(Conversation).where(
+                Conversation.user_id == user_id,
+                Conversation.platform == platform,
+                Conversation.character_id == character_id,
             )
             result = await self.session.execute(select_stmt)
             record = result.scalar_one()
@@ -106,12 +109,9 @@ class ConversationRepository(BaseRepository[Conversation]):
         Returns:
             会话对象，不存在返回 None
         """
-        stmt = (
-            select(Conversation)
-            .where(
-                Conversation.user_id == user_id,
-                Conversation.character_id == character_id,
-            )
+        stmt = select(Conversation).where(
+            Conversation.user_id == user_id,
+            Conversation.character_id == character_id,
         )
         if platform is not None:
             stmt = stmt.where(Conversation.platform == platform)
@@ -140,7 +140,7 @@ class ConversationRepository(BaseRepository[Conversation]):
             .where(Conversation.id == conversation_id)
             .values(
                 context=context,
-                last_message_at=datetime.now(timezone.utc),
+                last_message_at=datetime.now(UTC),
             )
         )
         await self.session.execute(stmt)
@@ -155,11 +155,7 @@ class ConversationRepository(BaseRepository[Conversation]):
         Args:
             conversation_id: 会话 ID
         """
-        stmt = (
-            update(Conversation)
-            .where(Conversation.id == conversation_id)
-            .values(last_message_at=datetime.now(timezone.utc))
-        )
+        stmt = update(Conversation).where(Conversation.id == conversation_id).values(last_message_at=datetime.now(UTC))
         await self.session.execute(stmt)
         await self.session.flush()
 

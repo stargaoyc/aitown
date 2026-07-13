@@ -8,6 +8,7 @@
 - movement: 移动系统
 - relation: 角色关系图谱
 """
+
 from src.modules.character import CharacterCard, CharacterImporter
 from src.modules.duration import DurationCalculator
 from src.modules.movement import MovementSystem

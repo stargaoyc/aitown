@@ -173,9 +173,7 @@ function MetricsPage() {
         </div>
       </GlassCard>
 
-      {isLoading && !data && (
-        <LoadingSpinner text="正在拉取 Prometheus 指标..." />
-      )}
+      {isLoading && !data && <LoadingSpinner text="正在拉取 Prometheus 指标..." />}
       {error && !data && <ErrorDisplay error={error} />}
 
       {data && (
@@ -241,8 +239,7 @@ function MetricsPage() {
               LLM Token 使用量
             </h3>
             <p className="text-xs text-twilight-400 mb-4 ml-7">
-              按 Prompt / Completion 分组统计的累计 Token
-              消耗（llm_tokens_total）
+              按 Prompt / Completion 分组统计的累计 Token 消耗（llm_tokens_total）
             </p>
             <div className="w-full h-72">
               <ResponsiveContainer width="100%" height="100%">
@@ -250,10 +247,7 @@ function MetricsPage() {
                   data={tokenChartData}
                   margin={{ top: 10, right: 20, left: 0, bottom: 10 }}
                 >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    stroke="rgba(122,95,195,0.15)"
-                  />
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(122,95,195,0.15)" />
                   <XAxis
                     dataKey="name"
                     tick={{ fill: "#7a5fc3", fontSize: 13 }}
@@ -275,11 +269,7 @@ function MetricsPage() {
                     formatter={(v) => [formatNum(Number(v)), "Tokens"]}
                   />
                   <Legend />
-                  <Bar
-                    dataKey="tokens"
-                    name="Token 数量"
-                    radius={[8, 8, 0, 0]}
-                  />
+                  <Bar dataKey="tokens" name="Token 数量" radius={[8, 8, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -296,25 +286,19 @@ function MetricsPage() {
                 <span className="text-sakura-500 font-mono text-xs mt-0.5 shrink-0">
                   ai_town_world_tick_total
                 </span>
-                <span className="text-twilight-400">
-                  世界引擎累计运行的 Tick 总数
-                </span>
+                <span className="text-twilight-400">世界引擎累计运行的 Tick 总数</span>
               </div>
               <div className="flex items-start gap-2 p-3 rounded-xl bg-sky-soft-50/50">
                 <span className="text-sky-soft-500 font-mono text-xs mt-0.5 shrink-0">
                   ai_town_world_tick_id
                 </span>
-                <span className="text-twilight-400">
-                  当前世界 Tick ID（自增序列号）
-                </span>
+                <span className="text-twilight-400">当前世界 Tick ID（自增序列号）</span>
               </div>
               <div className="flex items-start gap-2 p-3 rounded-xl bg-twilight-50/50">
                 <span className="text-twilight-500 font-mono text-xs mt-0.5 shrink-0">
                   ai_town_character_tick_total
                 </span>
-                <span className="text-twilight-400">
-                  角色引擎累计处理的 Tick 总数
-                </span>
+                <span className="text-twilight-400">角色引擎累计处理的 Tick 总数</span>
               </div>
               <div className="flex items-start gap-2 p-3 rounded-xl bg-sakura-50/50">
                 <span className="text-sakura-500 font-mono text-xs mt-0.5 shrink-0">
@@ -328,17 +312,13 @@ function MetricsPage() {
                 <span className="text-sky-soft-500 font-mono text-xs mt-0.5 shrink-0">
                   ai_town_llm_cost_total_usd_total
                 </span>
-                <span className="text-twilight-400">
-                  LLM 调用累计成本（美元）
-                </span>
+                <span className="text-twilight-400">LLM 调用累计成本（美元）</span>
               </div>
               <div className="flex items-start gap-2 p-3 rounded-xl bg-twilight-50/50">
                 <span className="text-twilight-500 font-mono text-xs mt-0.5 shrink-0">
                   ai_town_redis_connected
                 </span>
-                <span className="text-twilight-400">
-                  Redis 连接状态（1=已连接, 0=断开）
-                </span>
+                <span className="text-twilight-400">Redis 连接状态（1=已连接, 0=断开）</span>
               </div>
             </div>
           </GlassCard>
@@ -351,9 +331,7 @@ function MetricsPage() {
                   <DollarSign className="w-6 h-6 text-sakura-500" />
                 </div>
                 <div>
-                  <div className="text-sm text-twilight-400">
-                    LLM 累计成本（USD）
-                  </div>
+                  <div className="text-sm text-twilight-400">LLM 累计成本（USD）</div>
                   <div className="text-2xl font-bold gradient-text-sakura">
                     ${data.llm_cost_total_usd.toFixed(6)}
                   </div>
@@ -362,9 +340,7 @@ function MetricsPage() {
               <div className="text-right">
                 <div className="text-sm text-twilight-400">Token 总量</div>
                 <div className="text-xl font-bold text-twilight-500">
-                  {formatNum(
-                    data.llm_tokens_prompt + data.llm_tokens_completion,
-                  )}
+                  {formatNum(data.llm_tokens_prompt + data.llm_tokens_completion)}
                 </div>
               </div>
             </div>
