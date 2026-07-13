@@ -15,7 +15,7 @@ jobs:
         working-directory: packages/backend
     services:
       postgres:
-        image: pgvector/pgvector:pg17
+        image: pgvector/pgvector:pg18
         env:
           POSTGRES_USER: aitown
           POSTGRES_PASSWORD: aitown_dev
@@ -78,7 +78,7 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-          cache-dependency-path: packages/frontend/pnpm-lock.yaml
+          cache-dependency-path: '**/pnpm-lock.yaml'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Lint with oxlint
