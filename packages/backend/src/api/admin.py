@@ -9,7 +9,7 @@
 import json
 from collections import defaultdict
 from datetime import datetime
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 import yaml
@@ -285,12 +285,13 @@ async def import_character_card(
     """导入角色卡 YAML 文件
 
     通过 JSON body 提供 yaml 字段（值为 YAML 字符串）。
+    同名角色将更新档案与初始状态，保留历史数据（记忆/行为/关系）。
 
     Args:
         payload: JSON body，包含 yaml 字段
 
     Returns:
-        创建的角色信息
+        创建或更新的角色信息
     """
     redis = get_redis()
     if not redis:
@@ -309,14 +310,27 @@ async def import_character_card(
         raise HTTPException(status_code=400, detail=f"YAML 解析失败: {e}") from e
 
     async with db.session() as session:
+        repo = CharacterRepository(session)
         importer = CharacterImporter(session, redis)
+
+        # 同名角色：更新而非拒绝（保留历史数据，仅刷新档案和初始状态）
+        name = data.get("name") if isinstance(data, dict) else None
+        existing = await repo.get_by_name(name) if name else None
+        updated = False
+        character: Any = None
+
         try:
-            character = await importer.import_from_dict(data)
+            if existing:
+                character = await importer.update_from_dict(existing, data)
+                updated = True
+            else:
+                character = await importer.import_from_dict(data)
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"角色卡校验失败: {e}") from e
 
     return {
-        "message": "角色导入成功",
+        "message": "角色更新成功" if updated else "角色导入成功",
+        "updated": updated,
         "character": {
             "id": str(character.id),
             "name": character.name,
@@ -358,19 +372,74 @@ async def import_characters_batch(
     docs = [d for d in docs if d]  # 过滤空文档
 
     async with db.session() as session:
+        repo = CharacterRepository(session)
         importer = CharacterImporter(session, redis)
         characters = []
+        updated_count = 0
         for i, data in enumerate(docs):
             try:
-                character = await importer.import_from_dict(data)
+                # 同名角色：更新而非跳过（保留历史数据）
+                name = data.get("name") if isinstance(data, dict) else None
+                existing = await repo.get_by_name(name) if name else None
+                if existing:
+                    character = await importer.update_from_dict(existing, data)
+                    updated_count += 1
+                else:
+                    character = await importer.import_from_dict(data)
                 characters.append(character)
             except Exception as e:
                 logger.warning("batch_import_item_failed", index=i, error=str(e))
 
     return {
-        "message": f"批量导入完成: {len(characters)} 个角色",
+        "message": f"批量完成: 新增 {len(characters) - updated_count} 个，更新 {updated_count} 个",
         "characters": [{"id": str(c.id), "name": c.name} for c in characters],
         "total": len(characters),
+        "updated": updated_count,
+        "created": len(characters) - updated_count,
+    }
+
+
+@router.delete("/characters/{character_id}")
+async def delete_character(
+    character_id: UUID,
+    user: Admin,
+):
+    """删除角色及其所有相关数据（管理接口，仅 admin）
+
+    删除范围（依赖 PG ON DELETE CASCADE 自动级联）：
+    - characters / character_states / character_state_history
+    - action_records / memory_episodes / reflections / reflection_sources
+    - plans / person_memories / conversations→messages / relations / character_diaries
+    - Redis 状态键 char:{id}:state
+
+    Args:
+        character_id: 角色 ID
+
+    Returns:
+        删除结果
+
+    Raises:
+        404: 角色不存在
+    """
+    redis = get_redis()
+
+    async with db.session() as session:
+        repo = CharacterRepository(session)
+        deleted = await repo.delete_character(character_id, redis)
+
+    if not deleted:
+        raise HTTPException(status_code=404, detail=f"角色不存在: {character_id}")
+
+    logger.info(
+        "admin_character_deleted",
+        character_id=str(character_id),
+        operator=user.get("username"),
+    )
+
+    return {
+        "success": True,
+        "message": f"角色 {character_id} 已删除",
+        "character_id": str(character_id),
     }
 
 

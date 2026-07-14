@@ -88,7 +88,7 @@ class DiaryService:
             repo = MemoryRepository(session)
             memories = await repo.get_by_character_and_time_range(character_id, start_date, target)
 
-        if not memories or len(memories) < 3:
+        if not memories or len(memories) < 1:
             logger.info(
                 "diary_insufficient_memories",
                 character_id=str(character_id),
@@ -161,6 +161,111 @@ class DiaryService:
                 exc_info=True,
             )
             return None
+
+    async def generate_diaries_for_all_characters(self, period: str) -> dict:
+        """为所有活跃角色批量生成指定周期的日记
+
+        对每个角色先检查当前周期是否已生成今日日记，已存在则跳过（幂等）。
+        单个角色失败不影响其余角色，最终返回汇总计数。
+
+        Args:
+            period: day/week/month/year
+
+        Returns:
+            汇总字典：period / total / success / skipped / failed
+        """
+        if period not in self.PERIOD_DAYS:
+            logger.warning("diary_batch_invalid_period", period=period)
+            return {"period": period, "total": 0, "success": 0, "skipped": 0, "failed": 0}
+
+        from sqlalchemy import text
+
+        from src.db.repositories import CharacterRepository
+
+        target = self._get_target_time()
+
+        async with self.session_factory() as session:
+            repo = CharacterRepository(session)
+            characters = await repo.get_active_characters()
+
+        success = 0
+        skipped = 0
+        failed = 0
+
+        for char in characters:
+            try:
+                # 幂等检查：当前周期今日日记已存在则跳过
+                async with self.session_factory() as session:
+                    exists = await session.execute(
+                        text("""
+                            SELECT 1 FROM character_diaries
+                            WHERE character_id = :cid AND period = :period
+                              AND diary_date::date = (:target_date)::date
+                            LIMIT 1
+                        """),
+                        {
+                            "cid": str(char.id),
+                            "period": period,
+                            "target_date": target,
+                        },
+                    )
+                    if exists.fetchone() is not None:
+                        skipped += 1
+                        logger.debug(
+                            "diary_batch_character_skipped",
+                            character_id=str(char.id),
+                            character_name=char.name,
+                            period=period,
+                        )
+                        continue
+
+                diary = await self.generate_diary(
+                    character_id=char.id,
+                    character_name=char.name,
+                    period=period,
+                )
+                if diary is not None:
+                    success += 1
+                    logger.info(
+                        "diary_batch_character_success",
+                        character_id=str(char.id),
+                        character_name=char.name,
+                        period=period,
+                    )
+                else:
+                    failed += 1
+                    logger.warning(
+                        "diary_batch_character_failed",
+                        character_id=str(char.id),
+                        character_name=char.name,
+                        period=period,
+                    )
+            except Exception as e:
+                failed += 1
+                logger.error(
+                    "diary_batch_character_error",
+                    character_id=str(char.id),
+                    character_name=char.name,
+                    period=period,
+                    error=str(e),
+                    exc_info=True,
+                )
+
+        logger.info(
+            "diary_batch_complete",
+            period=period,
+            total=len(characters),
+            success=success,
+            skipped=skipped,
+            failed=failed,
+        )
+        return {
+            "period": period,
+            "total": len(characters),
+            "success": success,
+            "skipped": skipped,
+            "failed": failed,
+        }
 
     async def _save_diary(self, data: dict) -> None:
         """保存日记到数据库"""

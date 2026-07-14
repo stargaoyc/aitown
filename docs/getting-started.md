@@ -405,9 +405,9 @@ pnpm --version
 # 输出应为：11.x.x
 ```
 
-#### 3.1.5 PostgreSQL 17 安装
+#### 3.1.5 PostgreSQL 18 安装
 
-> **重要**：PostgreSQL 必须是 17 或更高版本，且必须安装 `pg_uuidv7`、`pgvector`、`pg_trgm` 三个扩展。
+> **重要**：PostgreSQL 必须是 18 或更高版本，且必须安装 `pgvector`、`pg_trgm` 三个扩展。
 
 **推荐方式：使用项目内置的 Docker 镜像（最省事）**
 
@@ -418,13 +418,12 @@ pnpm --version
 docker compose -f docker-compose.infra.yml up -d postgres
 ```
 
-这会启动一个 PostgreSQL 17 容器，已安装 pg_uuidv7 + pgvector + pg_trgm，端口 5432，用户名 `ai_town`，密码 `password`，数据库名 `ai_town`。
+这会启动一个 PostgreSQL 18 容器，已安装 pgvector + pg_trgm，端口 5432，用户名 `ai_town`，密码 `password`，数据库名 `ai_town`。
 
 **Windows 手动安装（不推荐，扩展编译麻烦）**：
 1. 访问 https://www.postgresql.org/download/windows/
-2. 下载 17.x 版本安装包
+2. 下载 18.x 版本安装包
 3. 安装时记住密码
-4. 需要单独编译 pg_uuidv7（需要 Visual Studio Build Tools）
 
 **Linux (Ubuntu)**：
 ```bash
@@ -432,26 +431,12 @@ docker compose -f docker-compose.infra.yml up -d postgres
 sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
 curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/postgresql.gpg
 sudo apt update
-sudo apt install -y postgresql-17 postgresql-server-dev-17
-
-# 编译 pg_uuidv7
-cd /tmp
-git clone https://github.com/fboulnois/pg_uuidv7.git
-cd pg_uuidv7
-make
-sudo make install
-```
+sudo apt install -y postgresql-18 postgresql-server-dev-18
 
 **macOS**：
 ```bash
-brew install postgresql@17
+brew install postgresql@18
 brew install pgvector
-# pg_uuidv7 需手动编译
-cd /tmp
-git clone https://github.com/fboulnois/pg_uuidv7.git
-cd pg_uuidv7
-make
-make install
 ```
 
 #### 3.1.6 Redis 安装

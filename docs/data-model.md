@@ -1,6 +1,6 @@
 # 数据模型设计
 
-> 本文档定义 AI Town 的全部数据库表结构、ER 关系、索引策略。所有持久化数据统一存储于 PostgreSQL 17 + pgvector，主键使用 UUID v7（时间有序），时间字段统一 TIMESTAMPTZ。
+> 本文档定义 AI Town 的全部数据库表结构、ER 关系、索引策略。所有持久化数据统一存储于 PostgreSQL 18 + pgvector，主键使用 UUID v7（时间有序），时间字段统一 TIMESTAMPTZ。
 
 ---
 

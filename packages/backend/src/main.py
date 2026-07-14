@@ -19,7 +19,9 @@ API 路由：
 """
 
 import asyncio
+import json
 from contextlib import asynccontextmanager
+from datetime import datetime
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -48,6 +50,7 @@ from src.db.repositories import (
 )
 from src.db.session import db
 from src.llm import LLMClient, PromptTemplates
+from src.memory.diary_service import DiaryService
 from src.memory.embedding_worker import EmbeddingWorker
 from src.messaging import WebSocketManager
 from src.messaging.websocket import router as ws_router
@@ -290,6 +293,14 @@ async def lifespan(app: FastAPI):
             message="CharacterTickEngine module not found, character tick loop disabled",
         )
 
+    # 5.5 启动日记自动生成调度器（后台任务）
+    diary_scheduler_task: asyncio.Task | None = None
+    try:
+        diary_scheduler_task = asyncio.create_task(_diary_scheduler_loop())
+        logger.info("diary_scheduler_started")
+    except Exception as e:
+        logger.error("diary_scheduler_start_failed", error=str(e), exc_info=True)
+
     # 6. 初始化 Phase 2 模块
     try:
         scene_loader = SceneLoader(redis)
@@ -367,6 +378,14 @@ async def lifespan(app: FastAPI):
         character_tick_task.cancel()
         try:
             await character_tick_task
+        except asyncio.CancelledError:
+            pass
+
+    # 取消日记自动生成调度器
+    if diary_scheduler_task:
+        diary_scheduler_task.cancel()
+        try:
+            await diary_scheduler_task
         except asyncio.CancelledError:
             pass
 
@@ -469,6 +488,96 @@ async def _character_tick_loop() -> None:
             # 继续循环，不中断
 
 
+async def _diary_scheduler_loop() -> None:
+    """日记自动生成后台循环
+
+    每 1800 秒（30 分钟现实时间）检查一次世界时间，根据时段决定生成哪种周期的日记：
+    - 每日：世界时间 22:00-06:00（一天结束时）
+    - 每周：每 7 个世界日
+    - 每月：每 30 个世界日
+    - 每年：每 365 个世界日
+
+    生成是幂等的：DiaryService 会跳过当前周期已存在日记的角色。
+    循环内部捕获所有异常，保证不会崩溃退出。
+    """
+    interval = 1800
+    logger.info("diary_scheduler_loop_started", interval=interval)
+
+    while True:
+        try:
+            await asyncio.sleep(interval)
+
+            if not redis:
+                continue
+
+            # 读取世界状态（world:state 主哈希中的 world_time 字段为 ISO 格式时间）
+            world_state = await redis.hgetall("world:state")
+            if not world_state:
+                continue
+
+            world_time_raw = str(world_state.get("world_time", ""))
+            if not world_time_raw:
+                continue
+
+            # 兼容 world_time 被 JSON 双重序列化的情况
+            try:
+                parsed = json.loads(world_time_raw)
+                if isinstance(parsed, str):
+                    world_time_raw = parsed
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+            try:
+                world_time = datetime.fromisoformat(world_time_raw)
+            except ValueError:
+                logger.warning("diary_scheduler_invalid_world_time", raw=world_time_raw)
+                continue
+
+            hour = world_time.hour
+            day_of_year = world_time.timetuple().tm_yday
+
+            # 根据世界时间确定需要生成的周期
+            periods_to_generate: list[str] = []
+            if hour >= 22 or hour < 6:
+                periods_to_generate.append("day")
+            if day_of_year % 7 == 0:
+                periods_to_generate.append("week")
+            if day_of_year % 30 == 0:
+                periods_to_generate.append("month")
+            if day_of_year % 365 == 0:
+                periods_to_generate.append("year")
+
+            if not periods_to_generate:
+                continue
+
+            logger.info(
+                "diary_scheduler_trigger",
+                periods=periods_to_generate,
+                world_hour=hour,
+                world_day_of_year=day_of_year,
+            )
+
+            service = DiaryService(session_factory=db.session)
+            for period in periods_to_generate:
+                try:
+                    summary = await service.generate_diaries_for_all_characters(period)
+                    logger.info("diary_scheduler_period_done", period=period, summary=summary)
+                except Exception as e:
+                    logger.error(
+                        "diary_scheduler_period_failed",
+                        period=period,
+                        error=str(e),
+                        exc_info=True,
+                    )
+
+        except asyncio.CancelledError:
+            logger.info("diary_scheduler_loop_cancelled")
+            raise
+        except Exception as e:
+            logger.error("diary_scheduler_loop_error", error=str(e), exc_info=True)
+            # 继续循环，不中断
+
+
 # === FastAPI 应用实例 ===
 app = FastAPI(
     title="AI Town Backend",
@@ -512,6 +621,10 @@ class AuthMiddleware:
         "/api/v1/admin/onebot/messages",
         "/api/v1/admin/proactive-shares",
         "/api/v1/admin/world/snapshots",
+        "/api/v1/admin/status",
+        "/api/v1/admin/metrics-detail",
+        "/api/v1/admin/logs",
+        "/api/v1/admin/config",
         "/api/v1/mcp/servers",
         "/api/v1/mcp/tools",
         "/api/v1/modules",

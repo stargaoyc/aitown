@@ -42,14 +42,14 @@
 | 前端状态 | TanStack Router 1.170 + TanStack Query 5.101 + Zustand 5.0 + Zod 4.4 |
 | 前端 Lint | oxlint + oxfmt |
 | 前端组件 | shadcn/ui + Tailwind CSS v4 + Framer Motion |
-| 主数据库 | PostgreSQL 17 + pgvector + pg_uuidv7 + JSONB + 分区表 |
+| 主数据库 | PostgreSQL 18 + pgvector + pg_uuidv7 + JSONB + 分区表 |
 | 缓存/实时 | Redis 8.0 |
 | 消息队列 | Redis Streams |
 | 连接池 | PgBouncer |
 | 工具调用 | MCP 协议（自研 + 社区现成） |
 | 可观测性 | OpenTelemetry + Langfuse + Prometheus + Grafana + Jaeger + Loki |
 
-> 数据持久化统一基于 **PostgreSQL 17 + pgvector**（结构化数据 + 向量检索 + JSONB 灵活字段 + 分区表）。主键采用 **UUID v7**（时间有序，索引友好）。详见 [架构设计](docs/architecture.md)。
+> 数据持久化统一基于 **PostgreSQL 18 + pgvector**（结构化数据 + 向量检索 + JSONB 灵活字段 + 分区表）。主键采用 **UUID v7**（时间有序，索引友好）。详见 [架构设计](docs/architecture.md)。
 
 ---
 
@@ -59,7 +59,7 @@
 
 - **Python 3.13+** / [uv](https://docs.astral.sh/uv/) 包管理器
 - **Node.js 22+** / [pnpm](https://pnpm.io/) 11+
-- **PostgreSQL 17+**，需启用以下扩展：
+- **PostgreSQL 18+**，需启用以下扩展：
   - `pg_uuidv7`（时间有序 UUID 主键）
   - `vector`（pgvector 向量检索）
   - `pg_trgm`（模糊匹配）

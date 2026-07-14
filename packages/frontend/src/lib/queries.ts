@@ -270,6 +270,16 @@ export function useImportCharacterBatch() {
   });
 }
 
+export function useDeleteCharacter() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (characterId: string) => api.deleteCharacter(characterId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["characters"] });
+    },
+  });
+}
+
 export function useVectorSearch() {
   return useMutation({
     mutationFn: ({

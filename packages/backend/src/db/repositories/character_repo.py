@@ -3,14 +3,18 @@
 Character 为静态档案，CharacterState 为 PG 镜像（Redis 为主）。
 """
 
+from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from structlog import get_logger
 
 from src.db.models import Character, CharacterState
 from src.db.repositories.base import BaseRepository
+
+if TYPE_CHECKING:
+    from redis.asyncio import Redis
 
 logger = get_logger()
 
@@ -82,3 +86,42 @@ class CharacterRepository(BaseRepository[Character]):
             character_id=str(character_id),
             fields=list(fields.keys()),
         )
+
+    async def get_by_name(self, name: str) -> Character | None:
+        """按角色名查询角色（用于导入时同名冲突检测）"""
+        stmt = select(Character).where(Character.name == name)
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def delete_character(
+        self,
+        character_id: UUID,
+        redis: "Redis | None" = None,
+    ) -> bool:
+        """删除角色及其所有相关数据
+
+        PG 删除依赖 ON DELETE CASCADE 自动清理：
+        character_states / character_state_history / action_records / memory_episodes /
+        reflections / reflection_sources / plans / person_memories /
+        conversations→messages / relations / character_diaries
+
+        若传入 redis，同时清理 Redis 中的 char:{id}:state 键。
+        返回 True 表示已删除，False 表示角色不存在。
+        """
+        char = await self.session.get(Character, character_id)
+        if char is None:
+            return False
+
+        name = char.name
+        await self.session.execute(delete(Character).where(Character.id == character_id))
+        await self.session.flush()
+
+        if redis is not None:
+            await redis.delete(f"char:{character_id}:state")
+
+        logger.info(
+            "character_deleted",
+            character_id=str(character_id),
+            name=name,
+        )
+        return True

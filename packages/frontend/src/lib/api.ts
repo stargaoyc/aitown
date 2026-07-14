@@ -192,6 +192,13 @@ export const api = {
       body: JSON.stringify({ yaml }),
     }),
 
+  // 角色删除
+  deleteCharacter: (characterId: string) =>
+    request<{ success: boolean; message: string; character_id: string }>(
+      `/admin/characters/${characterId}`,
+      { method: "DELETE" },
+    ),
+
   // 角色状态历史
   getCharacterStateHistory: (id: string, limit = 50) =>
     request<{ data: StateHistoryEntry[]; total: number }>(

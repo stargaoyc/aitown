@@ -119,6 +119,72 @@ class CharacterImporter:
         logger.info("角色导入完成: %s (%s)", card.name, character.id)
         return character
 
+    async def update_from_dict(self, existing: Character, data: dict[str, Any]) -> Character:
+        """更新已有角色卡（保留历史数据，仅更新角色档案和初始状态）
+
+        Args:
+            existing: 已有的 Character 实体
+            data: 新的角色卡字典（已解析的 YAML）
+
+        Returns:
+            更新后的 Character 实体
+        """
+        card = CharacterCard.model_validate(data)
+        logger.info("角色卡校验通过（更新模式）: %s", card.name)
+
+        # 合并 personality 到 traits
+        traits = dict(card.traits)
+        if card.personality:
+            traits["personality"] = card.personality
+
+        # 更新 Character 基础字段
+        existing.age = card.age
+        existing.occupation = card.occupation
+        existing.is_active = card.is_active
+        existing.traits = traits
+        existing.backstory = card.backstory
+        existing.avatar_url = card.avatar_url
+        existing.voice_preset = card.voice_preset
+        self.session.add(existing)
+        await self.session.flush()
+        logger.info("角色已更新: id=%s, name=%s", existing.id, existing.name)
+
+        # 更新 CharacterState（仅重置初始状态字段）
+        from sqlalchemy import select
+
+        result = await self.session.execute(select(CharacterState).where(CharacterState.character_id == existing.id))
+        state = result.scalar_one_or_none()
+        if state:
+            state.location = card.initial_state.location
+            state.stamina = card.initial_state.stamina
+            state.satiety = card.initial_state.satiety
+            state.mood = card.initial_state.mood
+            state.money = card.initial_state.money
+            state.phone_battery = card.initial_state.phone_battery
+            state.social_energy = card.initial_state.social_energy
+            self.session.add(state)
+            await self.session.flush()
+        else:
+            # 状态记录不存在，创建新的
+            state = CharacterState(
+                character_id=existing.id,
+                location=card.initial_state.location,
+                stamina=card.initial_state.stamina,
+                satiety=card.initial_state.satiety,
+                mood=card.initial_state.mood,
+                money=card.initial_state.money,
+                phone_battery=card.initial_state.phone_battery,
+                social_energy=card.initial_state.social_energy,
+            )
+            self.session.add(state)
+            await self.session.flush()
+
+        # 更新 Redis（实时状态缓存）
+        await self._cache_state_to_redis(existing.id, state)
+
+        logger.info("角色更新完成: %s (%s)", existing.name, existing.id)
+        return existing
+
     async def _cache_state_to_redis(self, character_id, state: CharacterState) -> None:
         """将角色状态缓存到 Redis
 

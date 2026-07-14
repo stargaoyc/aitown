@@ -54,7 +54,7 @@ class PersonMemoryService:
                 {"cid": str(character_id), "uid": user_id},
             )
             row = result.fetchone()
-            return dict(row) if row else None
+            return dict(row._mapping) if row else None
 
     async def update_memory(
         self,

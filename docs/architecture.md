@@ -109,7 +109,7 @@
 ┌──────────────────────────────────▼──────────────────────────────────────────┐
 │                    基础设施层 (Infrastructure Layer)                        │
 │  ┌───────────────────┐  ┌─────────────┐  ┌──────────────┐ │
-│  │  PostgreSQL 17    │  │  Redis 8.0  │  │  LLM 网关    │ │
+│  │  PostgreSQL 18    │  │  Redis 8.0  │  │  LLM 网关    │ │
 │  │  + pgvector       │  │  缓存/锁/   │  │  OpenAI 兼容 │ │
 │  │  + pg_uuidv7      │  │  实时状态    │  │  chat/image/ │ │
 │  │  + JSONB          │  │  Leader 选举│  │  video/embed │ │
