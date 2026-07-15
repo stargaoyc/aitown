@@ -87,22 +87,8 @@ services:
 
   # ============================================================
   # MCP Server 层（按需启用）
+  # 已移除 code-executor 和 web-search（外部能力，非内部业务所需）
   # ============================================================
-
-  mcp-web-search:
-    build:
-      context: ./packages/mcp-servers
-      dockerfile: Dockerfile
-      args:
-        SERVER: web-search
-    container_name: aitown-mcp-search
-    restart: unless-stopped
-    environment:
-      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
-    ports:
-      - "8002:8002"
-    networks: [aitown-net]
-    profiles: [mcp]
 
   mcp-weather:
     build:

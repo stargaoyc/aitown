@@ -15,23 +15,8 @@ logger = get_logger(__name__)
 
 
 # MCP Server 配置映射（环境变量 → 服务器元数据）
+# 已移除 code-executor 和 web-search（外部能力，非内部业务所需）
 _MCP_SERVERS_CONFIG = [
-    {
-        "name": "code-executor",
-        "env_key": "MCP_CODE_SERVER",
-        "default_port": 8001,
-        "type": "self-developed",
-        "tools": ["execute_python", "list_allowed_modules"],
-        "description": "Python 代码沙箱执行（subprocess 隔离 + 模块白名单）",
-    },
-    {
-        "name": "web-search",
-        "env_key": "MCP_SEARCH_SERVER",
-        "default_port": 8002,
-        "type": "community",
-        "tools": ["search", "search_news"],
-        "description": "网络搜索（Tavily API 集成）",
-    },
     {
         "name": "weather",
         "env_key": "MCP_WEATHER_SERVER",

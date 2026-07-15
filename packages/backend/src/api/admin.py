@@ -22,7 +22,7 @@ from structlog import get_logger
 
 from src.auth.rbac import require_role
 from src.config import Settings, settings
-from src.core.evolutions.time_evolution import (
+from src.core.world.evolutions.time_evolution import (
     TIME_KEY,
     compute_day_phase,
     compute_season,
@@ -809,24 +809,28 @@ async def get_detailed_metrics():
 
 
 # === 运行时配置管理 ===
+#
+# 通过 src.config_runtime 模块统一管理：
+# - Pydantic 校验类型与取值范围
+# - Redis 覆盖值的加载与持久化
+# - 与 settings 对象的同步（向后兼容业务代码）
+#
+# 详见 src/config_runtime.py
 
-# 可通过前端动态调整的配置项白名单（键名 → 类型）
-_RUNTIME_CONFIG_KEYS = {
-    "share_cooldown_seconds": int,
-    "share_daily_limit": int,
-    "share_probability_action": float,
-    "share_probability_mood": float,
-    "share_probability_location": float,
-    "share_probability_routine": float,
-    "memory_llm_scoring_enabled": bool,
-    "world_tick_seconds": int,
-    "character_tick_seconds": int,
-    "character_max_concurrent": int,
-    "llm_daily_budget_usd": float,
-    "log_level": str,
-}
+from src.config_runtime import (
+    RuntimeConfig,
+)
+from src.config_runtime import (
+    get_runtime_config as _get_runtime_config_singleton,
+)
+from src.config_runtime import (
+    reset_runtime_config as _reset_runtime_config_item,
+)
+from src.config_runtime import (
+    update_runtime_config as _update_runtime_config_items,
+)
 
-# 配置项中文说明
+# 配置项中文说明（供前端展示）
 _CONFIG_LABELS = {
     "share_cooldown_seconds": "分享冷却时间（秒）",
     "share_daily_limit": "每日分享上限",
@@ -850,30 +854,29 @@ async def get_runtime_config():
     Returns:
         各配置项的当前值、默认值、类型和说明
     """
-    redis = get_redis()
-
-    # 从 Redis 读取运行时覆盖
-    overrides = {}
-    if redis:
-        raw = await redis.get("config:overrides")
-        if raw:
-            try:
-                overrides = json.loads(raw)  # type: ignore[arg-type]
-            except (json.JSONDecodeError, TypeError):
-                pass
+    config = _get_runtime_config_singleton()
+    defaults = Settings()  # type: ignore[call-arg]
 
     result = []
-    for key, typ in _RUNTIME_CONFIG_KEYS.items():
-        default_val = getattr(settings, key, None)
-        current_val = overrides.get(key, default_val)
+    for key, field in RuntimeConfig.model_fields.items():
+        default_val = getattr(defaults, key, field.default)
+        current_val = getattr(config, key)
         result.append(
             {
                 "key": key,
                 "label": _CONFIG_LABELS.get(key, key),
-                "type": typ.__name__,
+                "type": (
+                    "bool"
+                    if field.annotation is bool
+                    else "int"
+                    if field.annotation is int
+                    else "float"
+                    if field.annotation is float
+                    else "str"
+                ),
                 "default": default_val,
                 "current": current_val,
-                "overridden": key in overrides,
+                "overridden": current_val != default_val,
             }
         )
 
@@ -887,8 +890,8 @@ async def update_runtime_config(
 ):
     """更新运行时配置（写入 Redis 覆盖值，无需重启）
 
-    仅允许更新白名单中的配置项。
-    更新后立即生效（后续读取会优先使用 Redis 覆盖值）。
+    通过 Pydantic 校验后写入 Redis，立即生效。
+    无效值或越界值会被拒绝并返回 400。
 
     Args:
         updates: {key: value} 配置更新字典
@@ -900,46 +903,16 @@ async def update_runtime_config(
     if not redis:
         raise HTTPException(500, "Redis not available for config override")
 
-    # 读取现有覆盖
-    raw = await redis.get("config:overrides")
-    overrides = {}
-    if raw:
-        try:
-            overrides = json.loads(raw)  # type: ignore[arg-type]
-        except (json.JSONDecodeError, TypeError):
-            pass
+    try:
+        updated = await _update_runtime_config_items(redis, updates)
+    except ValueError as e:
+        raise HTTPException(400, f"配置校验失败: {e}") from e
 
-    # 应用更新（仅白名单中的键）
-    updated = []
-    for key, value in updates.items():
-        if key not in _RUNTIME_CONFIG_KEYS:
-            continue
-        typ = _RUNTIME_CONFIG_KEYS[key]
-        try:
-            if typ is bool:
-                value = bool(value) if not isinstance(value, str) else value.lower() in ("true", "1", "yes")
-            elif typ is int:
-                value = int(value)
-            elif typ is float:
-                value = float(value)
-            else:
-                value = str(value)
-            overrides[key] = value
-            updated.append({"key": key, "value": value, "label": _CONFIG_LABELS.get(key, key)})
-        except (ValueError, TypeError) as e:
-            raise HTTPException(400, f"Invalid value for '{key}': {e}") from e
-
-    # 写回 Redis
-    await redis.set("config:overrides", json.dumps(overrides))
-
-    # 同时更新 settings 对象（内存中立即生效）
-    for item in updated:
-        setattr(settings, item["key"], item["value"])
-
+    data = [{"key": k, "value": v, "label": _CONFIG_LABELS.get(k, k)} for k, v in updated.items()]
     return {
         "success": True,
-        "updated": len(updated),
-        "data": updated,
+        "updated": len(data),
+        "data": data,
     }
 
 
@@ -949,27 +922,20 @@ async def reset_config_item(key: str):
 
     Args:
         key: 配置项键名
+
+    Raises:
+        400: 未知配置项
     """
     redis = get_redis()
     if not redis:
         raise HTTPException(500, "Redis not available")
 
-    if key not in _RUNTIME_CONFIG_KEYS:
+    if key not in RuntimeConfig.model_fields:
         raise HTTPException(400, f"Unknown config key: {key}")
 
-    raw = await redis.get("config:overrides")
-    if raw:
-        try:
-            overrides = json.loads(raw)  # type: ignore[arg-type]
-        except (json.JSONDecodeError, TypeError):
-            overrides = {}
-
-        if key in overrides:
-            del overrides[key]
-            await redis.set("config:overrides", json.dumps(overrides))
-
-    # 恢复默认值到 settings 对象
-    default_val = getattr(Settings(), key, None)  # type: ignore[call-arg]
-    setattr(settings, key, default_val)
+    try:
+        default_val = await _reset_runtime_config_item(redis, key)
+    except KeyError as e:
+        raise HTTPException(400, str(e)) from e
 
     return {"success": True, "key": key, "reset_to": default_val}

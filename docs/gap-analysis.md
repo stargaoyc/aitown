@@ -35,8 +35,10 @@
 | 多模型备用源         | P1     | ❌ 未完成   | LLM 仍为单一 endpoint                                                                                                                                         |
 | 核心模块测试覆盖     | P1     | ❌ 未完成   | WorldEngine/CharacterTickEngine/MessageService 仍无测试                                                                                                       |
 | 速率限制覆盖         | P2     | ❌ 未完成   |                                                                                                                                                               |
-| 模块边界重组         | P2     | 📋 已规划   | core/ → core/world/ + core/character/ 重组方案已文档化，待执行                                                                                                |
-| 跨角色资源原子化     | P2     | 📋 已规划   | per-character 锁已有，跨资源锁待实现                                                                                                                          |
+| 模块边界重组         | P2     | ✅ 已完成   | core/ → core/world/（engine + evolutions）+ core/character/（tick）已重组，向后兼容 re-export                                                                 |
+| 跨角色资源原子化     | P2     | ✅ 已完成   | `src/core/locks.py` 分布式锁，按 ID 排序获取避免死锁，TTL 自动过期；chat_with 已接入                                                                          |
+| 配置管理修复         | P2     | ✅ 已完成   | `src/config_runtime.py` Pydantic 校验 + Redis 持久化，admin.py 三端点已接入，main.py 启动加载                                                                 |
+| MCP 清理             | P2     | ✅ 已完成   | 移除 code-executor、web-search MCP Server，保留 weather/shop-simulator/knowledge-base/character-social 四个内部业务 Server                                    |
 
 ---
 
@@ -97,36 +99,41 @@ yuiju 是一个 TypeScript 实现的同类多智能体陪伴系统，采用 mono
 
 ### 2.2 模块边界
 
-#### 2.2.1 `core/` 模块职责边界模糊
+#### 2.2.1 ✅ `core/` 模块职责边界已重组
 
-**现状**：`src/core/` 同时包含：
+**已完成改进**：
 
-- `world_engine.py`（世界引擎）
-- `character_tick.py`（角色 Tick 引擎）
-- `evolutions/` 子目录（5 个演化器：event/resource/scene/time/weather）
+- 重组为 `src/core/world/`（含 `engine.py` + `evolutions/`）和 `src/core/character/`（含 `tick.py`）
+- `src/core/__init__.py` 通过 re-export 保持向后兼容
+- `src/core/world/evolutions/` 内部 5 个演化器（event/resource/scene/time/weather）的导入路径已全部更新
+- 所有引用方（`admin.py`、`test_weather_evolution.py` 等）导入路径已同步修正
 
-**问题**：
+**重组后目录结构**：
 
-- `character_tick.py` 单文件超过 700 行（含 5 阶段闭环逻辑），与 `world_engine.py` 在同一层级但职责差异大
-- `evolutions/` 是 World Engine 的子能力，放在 `core/` 顶层而非 `core/world/` 子目录，导致 `core/` 目录看起来像"杂项核心逻辑堆放处"
-- 缺少 `core/action_system.py`（`development-guide.md` 文档中提到的文件实际不存在，Action 系统实际在 `src/actions/` 目录）
+```text
+src/core/
+├── __init__.py          # re-export WorldEngine + CharacterTickEngine
+├── locks.py             # 跨角色分布式锁
+├── world/
+│   ├── __init__.py
+│   ├── engine.py        # WorldEngine（从 core/world_engine.py 迁入）
+│   └── evolutions/
+│       ├── __init__.py
+│       ├── event_evolution.py
+│       ├── resource_evolution.py
+│       ├── scene_evolution.py
+│       ├── time_evolution.py
+│       └── weather_evolution.py
+└── character/
+    ├── __init__.py
+    └── tick.py          # CharacterTickEngine（从 core/character_tick.py 迁入）
+```
 
-**改进建议**：
+#### 2.2.2 `modules/` 与 `core/` 边界（保持现状）
 
-- 重组为 `src/core/world/`（含 `engine.py` + `evolutions/`）和 `src/core/character/`（含 `tick.py` + 阶段处理器）
-- 修正 `development-guide.md` 中与代码不一致的路径描述
+**现状**：`src/modules/` 包含 `character/`、`duration/`、`movement/`、`relation/`、`schedule/`、`town/`。
 
-#### 2.2.2 `modules/` 与 `core/` 边界不清
-
-**现状**：`src/modules/` 包含 `character/`、`duration/`、`movement/`、`relation/`、`schedule/`、`town/`，但这些模块大多是被 `core/` 调用的辅助系统，而非可插拔模块。
-
-**问题**：
-
-- 命名上 `modules/` 暗示"可插拔模块"，实际是核心子系统（移动、作息、关系）
-- 真正的可插拔能力是 `mcp-servers/`，但那是在 `packages/` 层级，不在 `src/modules/`
-- `src/modules/character/importer.py` 和 `src/modules/character/schema.py` 与 `src/db/models/character.py` 职责重叠
-
-**改进建议**：将 `modules/` 重命名为 `systems/` 或按领域归并到 `core/` 子目录；明确"可插拔模块"特指 MCP Server。
+**决策**：暂不重命名 `modules/`。这些模块虽名为"modules"，但在代码中已被广泛引用，重命名收益有限、风险较高。文档中明确"可插拔模块"特指 `packages/mcp-servers/` 下的 MCP Server 即可。
 
 ### 2.3 依赖管理
 
@@ -163,26 +170,47 @@ _handler = JWTHandler(
 
 ### 2.4 配置管理
 
-#### 2.4.1 `config.py` + Redis 运行时覆盖的混合策略问题
+#### 2.4.1 ✅ 运行时配置 Pydantic 校验已实现
 
-**现状**：
+**已完成改进**：
 
-- `src/config.py` 使用 `pydantic-settings` 从 `.env` 加载静态配置（90+ 字段）
-- `main.py` 的 `lifespan` 在启动时从 Redis `config:overrides` 读取 JSON，通过 `setattr(settings, key, value)` 覆盖（第 138-151 行）
-- `PUT /api/v1/admin/config` 端点允许通过 API 修改白名单配置项（`_RUNTIME_CONFIG_KEYS`，12 个键）
+- 创建 `src/config_runtime.py`，定义 `RuntimeConfig` Pydantic BaseModel（12 个可热更新字段）
+- 通过 `model_validator(mode="after")` 校验取值范围：
+  - 概率类字段（share_probability_*）必须在 0-1 之间
+  - tick 间隔（world_tick_seconds / character_tick_seconds）不能小于 5 秒
+  - character_max_concurrent 不能小于 1
+  - log_level 必须是 debug/info/warning/error 之一
+- `admin.py` 三个端点（GET/PUT/DELETE `/api/v1/admin/config`）全部接入新模块
+- `main.py` 启动时调用 `load_runtime_config(redis)` 从 Redis 加载覆盖值并校验
+- 业务代码仍读 `settings.xxx`（通过 `apply_to_settings()` 同步），无需改动
 
-**问题**：
+**架构**：
 
-- **真相源不明确**：同一配置项有 `.env` 默认值、Redis 覆盖值、`settings` 内存值三份，`reset_config_item` 端点通过 `Settings()` 重新实例化获取"默认值"（第 2925 行），但 `Settings()` 会再次读取 `.env`，行为依赖运行时 `.env` 文件状态
-- **覆盖范围有限**：仅 12 个配置项可通过 Redis 覆盖，但 `jwt_secret`、`openai_api_key` 等敏感配置无法热更新，密钥轮换必须重启
-- **类型安全缺失**：`setattr(settings, key, value)` 绕过了 Pydantic 校验，`_RUNTIME_CONFIG_KEYS` 手动维护类型映射，与 `Settings` 类定义重复
-- **多实例不一致**：若部署多实例，每个实例在启动时读取 Redis 覆盖，但运行时 `PUT /api/v1/admin/config` 只更新当前实例的 `settings` 内存对象，其他实例需重启才生效
+```text
+启动流程：
+  .env → Settings (pydantic-settings)
+  Redis config:overrides → RuntimeConfig.model_validate() → apply_to_settings(settings)
 
-**改进建议**：
+更新流程：
+  PUT /api/v1/admin/config
+    → update_runtime_config(redis, updates)
+    → RuntimeConfig.model_validate(merged)  # Pydantic 校验
+    → redis.set(config:overrides, json)
+    → apply_to_settings(settings)  # 内存立即生效
 
-- 短期：将运行时配置项收敛到独立的 `RuntimeConfig` Pydantic 模型，从 Redis 加载并校验类型，避免 `setattr` 绕过校验
-- 中期：所有需要热更新的配置（如 `character_tick_seconds`、`share_daily_limit`）改为通过 `RuntimeConfig` 单例读取，业务代码每次读取最新值，而非依赖 `settings.character_tick_seconds`
-- 长期：参考 yuiju 的 `yuiju.config.ts` 单一配置源模式，将业务配置集中到一个 TypeScript/Python 配置文件，`.env` 仅保留敏感密钥
+重置流程：
+  DELETE /api/v1/admin/config/{key}
+    → reset_runtime_config(redis, key)
+    → 从 Settings() 读取默认值
+    → RuntimeConfig.model_validate(merged)
+    → redis.set(config:overrides, json)
+    → apply_to_settings(settings)
+```
+
+**仍存在的问题（未在本次修复）**：
+
+- 多实例不一致：运行时 PUT 只更新当前实例内存，其他实例需重启才加载新 Redis 值
+- 敏感配置（jwt_secret、openai_api_key）仍需重启才能变更（设计如此，非缺陷）
 
 #### 2.4.2 `.env.example` 缺少部分配置项
 

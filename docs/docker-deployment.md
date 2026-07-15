@@ -33,25 +33,25 @@
            ┌────────▼────────┐
            │   MCP Servers   │
            │  (独立容器)      │
-           │  search/weather │
-           │  shop/kb/social │
+           │  weather/shop   │
+           │  kb/social      │
            └─────────────────┘
 ```
 
 ### 容器清单
 
-| 容器 | 镜像 | 端口 | 说明 |
-|------|------|------|------|
-| `postgres` | 自构 (pgvector + pg_uuidv7) | 5432 | 主数据库 |
-| `redis` | `redis:8.0-alpine` | 6379 | 缓存/队列/锁 |
-| `backend` | 自构 (Python 3.13 + uv) | 8000 | FastAPI 后端 |
-| `frontend` | 自构 (Node 22 + Nginx) | 80 | 前端静态服务 |
-| `mcp-*` | 自构 (Python 3.13) | 8002-8006 | MCP 工具服务 |
-| `prometheus` | `prom/prometheus` | 9090 | 指标采集 |
-| `loki` | `grafana/loki:3.0.0` | 3100 | 日志聚合 |
-| `jaeger` | `jaegertracing/all-in-one` | 16686 | 链路追踪 |
-| `grafana` | `grafana/grafana:12.0.0` | 3000 | 可视化面板 |
-| `alloy` | `grafana/alloy` | 12345 | 日志收集器 |
+| 容器         | 镜像                        | 端口      | 说明         |
+| ------------ | --------------------------- | --------- | ------------ |
+| `postgres`   | 自构 (pgvector + pg_uuidv7) | 5432      | 主数据库     |
+| `redis`      | `redis:8.0-alpine`          | 6379      | 缓存/队列/锁 |
+| `backend`    | 自构 (Python 3.13 + uv)     | 8000      | FastAPI 后端 |
+| `frontend`   | 自构 (Node 22 + Nginx)      | 80        | 前端静态服务 |
+| `mcp-*`      | 自构 (Python 3.13)          | 8003-8006 | MCP 工具服务 |
+| `prometheus` | `prom/prometheus`           | 9090      | 指标采集     |
+| `loki`       | `grafana/loki:3.0.0`        | 3100      | 日志聚合     |
+| `jaeger`     | `jaegertracing/all-in-one`  | 16686     | 链路追踪     |
+| `grafana`    | `grafana/grafana:12.0.0`    | 3000      | 可视化面板   |
+| `alloy`      | `grafana/alloy`             | 12345     | 日志收集器   |
 
 ---
 
@@ -59,17 +59,18 @@
 
 ### 2.1 系统要求
 
-| 项目 | 最低要求 | 推荐 |
-|------|---------|------|
-| CPU | 2 核 | 4 核+ |
-| 内存 | 4 GB | 8 GB+ |
-| 磁盘 | 20 GB | 50 GB+（SSD） |
-| Docker | 24.0+ | 最新稳定版 |
-| Docker Compose | v2.20+ | 最新稳定版 |
+| 项目           | 最低要求 | 推荐          |
+| -------------- | -------- | ------------- |
+| CPU            | 2 核     | 4 核+         |
+| 内存           | 4 GB     | 8 GB+         |
+| 磁盘           | 20 GB    | 50 GB+（SSD） |
+| Docker         | 24.0+    | 最新稳定版    |
+| Docker Compose | v2.20+   | 最新稳定版    |
 
 ### 2.2 安装 Docker
 
 **Linux (Ubuntu/Debian):**
+
 ```bash
 curl -fsSL https://get.docker.com | sh
 sudo usermod -aG docker $USER
@@ -119,12 +120,12 @@ ADMIN_PASSWORD=your-secure-admin-password
 
 项目包含 4 个 Dockerfile：
 
-| Dockerfile | 位置 | 说明 |
-|-----------|------|------|
-| PostgreSQL | `docker/postgres/Dockerfile` | 基于 `pgvector/pgvector:pg17`，补装 `pg_uuidv7` |
-| 后端 | `packages/backend/Dockerfile` | 多阶段构建，Python 3.13 + uv |
-| 前端 | `packages/frontend/Dockerfile` | 多阶段构建，Node 22 + Nginx |
-| MCP Server | `packages/mcp-servers/Dockerfile` | 通用模板，通过 `--build-arg SERVER` 指定 |
+| Dockerfile | 位置                              | 说明                                            |
+| ---------- | --------------------------------- | ----------------------------------------------- |
+| PostgreSQL | `docker/postgres/Dockerfile`      | 基于 `pgvector/pgvector:pg17`，补装 `pg_uuidv7` |
+| 后端       | `packages/backend/Dockerfile`     | 多阶段构建，Python 3.13 + uv                    |
+| 前端       | `packages/frontend/Dockerfile`    | 多阶段构建，Node 22 + Nginx                     |
+| MCP Server | `packages/mcp-servers/Dockerfile` | 通用模板，通过 `--build-arg SERVER` 指定        |
 
 ### 3.2 后端 Dockerfile（多阶段构建）
 
@@ -151,6 +152,7 @@ CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
 **关键设计**：
+
 - 多阶段构建减小镜像体积（builder 阶段的编译工具不进入最终镜像）
 - 使用 `uv sync --frozen` 确保依赖与 lockfile 完全一致
 - 非 root 用户运行（`aitown`）
@@ -175,6 +177,7 @@ EXPOSE 80
 ```
 
 **Nginx 配置**（`packages/frontend/nginx.conf`）：
+
 - SPA 路由回退（`try_files $uri /index.html`）
 - API 反向代理（`/api/` → `backend:8000`）
 - WebSocket 反向代理（`/ws/` → `backend:8000`）
@@ -200,15 +203,11 @@ CMD ["python", "server.py"]
 ```
 
 **构建示例**：
+
 ```bash
 # 构建天气 MCP Server
 docker build --build-arg SERVER=weather \
   -t aitown/mcp-weather \
-  packages/mcp-servers/
-
-# 构建搜索 MCP Server
-docker build --build-arg SERVER=web-search \
-  -t aitown/mcp-search \
   packages/mcp-servers/
 ```
 
@@ -222,7 +221,7 @@ docker build -t aitown/backend packages/backend/
 docker build -t aitown/frontend packages/frontend/
 
 # 构建 MCP Servers（逐个构建）
-for server in web-search weather shop-simulator knowledge-base character-social; do
+for server in weather shop-simulator knowledge-base character-social; do
   docker build --build-arg SERVER=$server \
     -t aitown/mcp-$server \
     packages/mcp-servers/
@@ -240,11 +239,11 @@ docker build -t aitown/postgres docker/postgres/
 
 项目提供 3 个 Docker Compose 文件：
 
-| 文件 | 用途 |
-|------|------|
-| `docker-compose.yml` | 完整生产部署（基础设施 + 应用 + 可观测性） |
-| `docker-compose.infra.yml` | 仅基础设施（本地开发用） |
-| `docker-compose-win.infra.yml` | Windows 基础设施（路径兼容） |
+| 文件                           | 用途                                       |
+| ------------------------------ | ------------------------------------------ |
+| `docker-compose.yml`           | 完整生产部署（基础设施 + 应用 + 可观测性） |
+| `docker-compose.infra.yml`     | 仅基础设施（本地开发用）                   |
+| `docker-compose-win.infra.yml` | Windows 基础设施（路径兼容）               |
 
 ### 4.2 分层启动（Profile 机制）
 
@@ -285,6 +284,7 @@ docker compose logs -f backend
 ```
 
 启动成功后：
+
 - **前端**：http://localhost
 - **后端 API 文档**：http://localhost:8000/docs
 - **后端健康检查**：http://localhost:8000/health
@@ -329,12 +329,12 @@ asyncio.run(main())
 
 ### 5.1 必填变量
 
-| 变量 | 说明 | 示例 |
-|------|------|------|
-| `OPENAI_API_KEY` | LLM API Key | `sk-xxx` |
-| `JWT_SECRET` | JWT 签名密钥 | 随机 32 字节 |
-| `ADMIN_PASSWORD` | 管理员密码 | `your-password` |
-| `DB_PASSWORD` | 数据库密码 | `your-password` |
+| 变量             | 说明         | 示例            |
+| ---------------- | ------------ | --------------- |
+| `OPENAI_API_KEY` | LLM API Key  | `sk-xxx`        |
+| `JWT_SECRET`     | JWT 签名密钥 | 随机 32 字节    |
+| `ADMIN_PASSWORD` | 管理员密码   | `your-password` |
+| `DB_PASSWORD`    | 数据库密码   | `your-password` |
 
 ### 5.2 Docker Compose 环境变量覆盖
 
@@ -355,7 +355,6 @@ MCP Server 的连接地址需要在 `.env` 中配置为容器名：
 
 ```bash
 # 容器内部互相访问使用容器名
-MCP_SEARCH_SERVER=http://mcp-web-search:8002
 MCP_WEATHER_SERVER=http://mcp-weather:8003
 MCP_SHOP_SERVER=http://mcp-shop-simulator:8004
 MCP_KB_SERVER=http://mcp-knowledge-base:8005
@@ -418,13 +417,13 @@ docker compose --profile mcp --profile observability up -d
 
 ### 7.1 数据卷说明
 
-| 卷名 | 挂载点 | 说明 |
-|------|--------|------|
-| `pg_data` | `/var/lib/postgresql/data` | PostgreSQL 数据 |
-| `redis_data` | `/data` | Redis 持久化 |
-| `prometheus_data` | `/prometheus` | Prometheus 指标 |
-| `loki_data` | `/loki` | Loki 日志 |
-| `grafana_data` | `/var/lib/grafana` | Grafana 配置 |
+| 卷名              | 挂载点                     | 说明            |
+| ----------------- | -------------------------- | --------------- |
+| `pg_data`         | `/var/lib/postgresql/data` | PostgreSQL 数据 |
+| `redis_data`      | `/data`                    | Redis 持久化    |
+| `prometheus_data` | `/prometheus`              | Prometheus 指标 |
+| `loki_data`       | `/loki`                    | Loki 日志       |
+| `grafana_data`    | `/var/lib/grafana`         | Grafana 配置    |
 
 ### 7.2 数据库备份
 
@@ -474,22 +473,22 @@ docker compose --profile observability up -d
 
 ### 8.2 访问入口
 
-| 服务 | 地址 | 默认账号 |
-|------|------|---------|
-| Grafana | http://localhost:3000 | admin / admin123 |
-| Prometheus | http://localhost:9090 | - |
-| Jaeger | http://localhost:16686 | - |
-| Loki | http://localhost:3100 | 通过 Grafana 查询 |
+| 服务       | 地址                   | 默认账号          |
+| ---------- | ---------------------- | ----------------- |
+| Grafana    | http://localhost:3000  | admin / admin123  |
+| Prometheus | http://localhost:9090  | -                 |
+| Jaeger     | http://localhost:16686 | -                 |
+| Loki       | http://localhost:3100  | 通过 Grafana 查询 |
 
 ### 8.3 预置 Dashboard
 
 Grafana 启动后自动加载 3 个预置 Dashboard（位于 `docker/observability/grafana/dashboards/`）：
 
-| Dashboard | 文件 | 说明 |
-|-----------|------|------|
-| AI Town Overview | `ai-town-overview.json` | 系统总览（Tick 状态、角色数、Redis、LLM） |
-| LLM 监控 | `ai-town-llm.json` | LLM 调用耗时、Token、成本、错误率 |
-| Character Tick | `ai-town-character-tick.json` | 角色 Tick 耗时、Action 分布、错误 |
+| Dashboard        | 文件                          | 说明                                      |
+| ---------------- | ----------------------------- | ----------------------------------------- |
+| AI Town Overview | `ai-town-overview.json`       | 系统总览（Tick 状态、角色数、Redis、LLM） |
+| LLM 监控         | `ai-town-llm.json`            | LLM 调用耗时、Token、成本、错误率         |
+| Character Tick   | `ai-town-character-tick.json` | 角色 Tick 耗时、Action 分布、错误         |
 
 ### 8.4 日志查看
 
@@ -617,10 +616,10 @@ backend:
   deploy:
     resources:
       limits:
-        cpus: '2'
+        cpus: "2"
         memory: 2G
       reservations:
-        cpus: '1'
+        cpus: "1"
         memory: 512M
 ```
 
@@ -656,11 +655,11 @@ docker compose exec postgres psql -U ai_town -c "
 ```yaml
 # docker-compose.yml 中可定义多个网络隔离服务
 networks:
-  frontend-net:    # 前端 + 后端
+  frontend-net: # 前端 + 后端
     driver: bridge
-  backend-net:     # 后端 + 数据库/Redis
+  backend-net: # 后端 + 数据库/Redis
     driver: bridge
-  observability-net:  # 可观测性组件
+  observability-net: # 可观测性组件
     driver: bridge
 ```
 
@@ -730,10 +729,10 @@ docker inspect --format='{{.State.Health.Status}}' aitown-backend
 
 ## 十三、相关文档
 
-| 主题 | 文档 |
-|------|------|
-| 部署与运维（通用） | [deployment.md](deployment.md) |
-| 可观测性设计 | [observability.md](observability.md) |
-| 配置参考 | [config-reference.md](config-reference.md) |
-| 数据模型 | [data-model.md](data-model.md) |
-| 项目不足与改进 | [gap-analysis.md](gap-analysis.md) |
+| 主题               | 文档                                       |
+| ------------------ | ------------------------------------------ |
+| 部署与运维（通用） | [deployment.md](deployment.md)             |
+| 可观测性设计       | [observability.md](observability.md)       |
+| 配置参考           | [config-reference.md](config-reference.md) |
+| 数据模型           | [data-model.md](data-model.md)             |
+| 项目不足与改进     | [gap-analysis.md](gap-analysis.md)         |

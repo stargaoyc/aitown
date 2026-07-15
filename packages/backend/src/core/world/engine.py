@@ -28,7 +28,7 @@ from redis.asyncio import Redis
 from structlog import get_logger
 
 from src.config import settings
-from src.core.evolutions import default_evolutions
+from src.core.world.evolutions import default_evolutions
 from src.db.models import WorldEvent, WorldSnapshot
 from src.db.repositories import WorldEventRepository, WorldSnapshotRepository
 from src.db.session import db

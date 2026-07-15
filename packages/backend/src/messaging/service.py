@@ -616,8 +616,12 @@ class MessageService:
         1. 直接返回纯文本（旧模型或配置变更）
         2. 返回带 markdown code fence 的 JSON
         3. 返回 JSON 但带额外说明文字
+        4. 返回 malformed JSON（缺少逗号、引号不匹配等）
 
-        本方法优先解析 JSON 提取 response 字段；失败时返回原文。
+        本方法依次尝试：
+        1. 标准 JSON 解析
+        2. 正则提取 "response" 字段值
+        3. 返回原文
 
         Args:
             raw: LLM 原始输出
@@ -626,18 +630,19 @@ class MessageService:
             提取后的回复文本
         """
         import json
+        import re
 
         text = raw.strip()
         # 去除可能的 markdown code fence
         if text.startswith("```"):
             lines = text.split("\n")
-            # 去掉首尾的 ``` 行
             if lines[0].startswith("```"):
                 lines = lines[1:]
             if lines and lines[-1].startswith("```"):
                 lines = lines[:-1]
             text = "\n".join(lines).strip()
 
+        # 策略1：标准 JSON 解析
         try:
             data = json.loads(text)
             if isinstance(data, dict):
@@ -647,7 +652,22 @@ class MessageService:
         except (json.JSONDecodeError, TypeError):
             pass
 
-        # 解析失败：直接返回原文（去掉了 code fence）
+        # 策略2：正则提取 "response" 字段值（容错 malformed JSON）
+        # 匹配 "response": "..." 或 "response"："..."（中文冒号）
+        # 支持转义引号和跨行内容
+        match = re.search(
+            r'"response"\s*[:：]\s*"((?:[^"\\]|\\.)*)"',
+            text,
+            re.DOTALL,
+        )
+        if match:
+            value = match.group(1)
+            # 反转义常见的转义序列
+            value = value.replace("\\n", "\n").replace("\\'", "'").replace('\\"', '"')
+            if value.strip():
+                return value.strip()
+
+        # 策略3：返回原文（去掉了 code fence）
         return text
 
     async def _maybe_compress_context(

@@ -93,7 +93,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        server: [code-executor, shop-simulator, character-social, knowledge-base]
+        server: [shop-simulator, character-social, knowledge-base, weather]
     defaults:
       run:
         working-directory: packages/mcp-servers/${{ matrix.server }}

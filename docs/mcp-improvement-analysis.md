@@ -6,6 +6,24 @@
 > - 参考项目：yuiju 的 `packages/utils/src/llm/tools/` 工具系统
 > - 撰写日期：2026-07-14
 
+> **2026-07-14 更新：MCP 清理已完成**
+>
+> 根据本文档分析结论，已执行以下清理：
+>
+> - **移除** `code-executor` MCP Server：外部代码执行能力，非小镇核心业务，安全风险高于收益
+> - **移除** `web-search` MCP Server：外部搜索能力，非小镇核心业务，可按需通过 LLM 内置工具实现
+> - **保留** 4 个内部业务 Server：`weather`、`shop-simulator`、`knowledge-base`、`character-social`
+>
+> 清理涉及的文件：
+>
+> - 删除 `packages/mcp-servers/code-executor/` 目录
+> - 删除 `packages/mcp-servers/web-search/` 目录
+> - 更新 `src/api/mcp.py`：移除 `_MCP_SERVERS_CONFIG` 中的 code-executor 和 web-search 条目
+> - 更新 `src/mcp/client.py`：移除 `MCP_SERVERS` 列表中的 web-search 条目
+> - 更新 `.env.example`：移除 `MCP_CODE_SERVER` 和 `MCP_SEARCH_SERVER` 环境变量
+> - 更新 `docker-compose.yml`：移除 `mcp-web-search` 服务定义
+> - 更新 `.github/workflows/ci.yml`：matrix 仅保留 4 个 Server
+
 ---
 
 ## 一、当前 MCP 方案概览
@@ -25,12 +43,12 @@ Character Tick 引擎 ──(phase 3.5 use_tool)──> MCPClient ──HTTP/SSE
 
 ### 1.2 关键集成点
 
-| 位置 | 文件 | 行为 |
-|------|------|------|
-| 决策注入 | `core/character_tick.py::_decide` | 把 `format_tools_for_prompt()` 追加到 Prompt，让 LLM 选 `action="use_tool"` |
+| 位置     | 文件                                        | 行为                                                                                                                |
+| -------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| 决策注入 | `core/character_tick.py::_decide`           | 把 `format_tools_for_prompt()` 追加到 Prompt，让 LLM 选 `action="use_tool"`                                         |
 | 工具执行 | `core/character_tick.py::_execute_mcp_tool` | 调 `MCPClient.call_tool_by_full_name`，结果写入 MemoryEpisode（截断 500 字符），随后强制 `decision.action = "wait"` |
-| 启用控制 | `src/mcp/client.py::get_enabled_servers` | 从 Redis hash `mcp:enabled` 读取开关，未配置时默认全开 |
-| 管理 API | `src/api/mcp.py` | 列表 / 详情 / 健康检查 / 启停 / 测试调用 |
+| 启用控制 | `src/mcp/client.py::get_enabled_servers`    | 从 Redis hash `mcp:enabled` 读取开关，未配置时默认全开                                                              |
+| 管理 API | `src/api/mcp.py`                            | 列表 / 详情 / 健康检查 / 启停 / 测试调用                                                                            |
 
 ### 1.3 设计约定
 
@@ -44,14 +62,14 @@ Character Tick 引擎 ──(phase 3.5 use_tool)──> MCPClient ──HTTP/SSE
 
 ### 2.1 优点
 
-| # | 优点 | 说明 |
-|---|------|------|
-| 1 | 进程隔离 | code-executor 用 subprocess 沙箱执行用户代码，主进程不被污染；其他 Server 故障不影响后端 |
-| 2 | 独立部署 | 各 Server 可独立扩缩容、独立发版，符合 monorepo 边界 |
-| 3 | 标准协议 | 采用 MCP 协议，未来可被社区 Server 替换（web-search、weather 已是社区骨架） |
-| 4 | 启停可控 | Redis hash 控制启用粒度，前端可视化开关 |
-| 5 | 边界正确 | 工具返回 deltas 而非直接写状态，与 AGENTS.md「Action executor 不直接写状态」「LLM 不直接修改状态」一致 |
-| 6 | 失败不阻塞 | MCPClient 所有调用 try/except 兜底，离线时返回错误，不中断 Tick |
+| #   | 优点       | 说明                                                                                                   |
+| --- | ---------- | ------------------------------------------------------------------------------------------------------ |
+| 1   | 进程隔离   | code-executor 用 subprocess 沙箱执行用户代码，主进程不被污染；其他 Server 故障不影响后端               |
+| 2   | 独立部署   | 各 Server 可独立扩缩容、独立发版，符合 monorepo 边界                                                   |
+| 3   | 标准协议   | 采用 MCP 协议，未来可被社区 Server 替换（web-search、weather 已是社区骨架）                            |
+| 4   | 启停可控   | Redis hash 控制启用粒度，前端可视化开关                                                                |
+| 5   | 边界正确   | 工具返回 deltas 而非直接写状态，与 AGENTS.md「Action executor 不直接写状态」「LLM 不直接修改状态」一致 |
+| 6   | 失败不阻塞 | MCPClient 所有调用 try/except 兜底，离线时返回错误，不中断 Tick                                        |
 
 ### 2.2 缺点
 
@@ -59,11 +77,11 @@ Character Tick 引擎 ──(phase 3.5 use_tool)──> MCPClient ──HTTP/SSE
 
 工具清单在 **三处重复定义且不一致**：
 
-| 位置 | Server 数 | code-executor | 工具参数描述 |
-|------|-----------|---------------|--------------|
-| `src/api/mcp.py::_MCP_SERVERS_CONFIG` | 6 | ✅ 含 | 完整 |
-| `src/mcp/client.py::MCP_SERVERS` | 5 | ❌ 缺 | 参数描述与上不一致（如 `query_kb` 一边是 `question`、一边是 `query`） |
-| 各 Server `server.py` | — | — | 真正实现，但工具 schema 未被客户端读取 |
+| 位置                                  | Server 数 | code-executor | 工具参数描述                                                          |
+| ------------------------------------- | --------- | ------------- | --------------------------------------------------------------------- |
+| `src/api/mcp.py::_MCP_SERVERS_CONFIG` | 6         | ✅ 含         | 完整                                                                  |
+| `src/mcp/client.py::MCP_SERVERS`      | 5         | ❌ 缺         | 参数描述与上不一致（如 `query_kb` 一边是 `question`、一边是 `query`） |
+| 各 Server `server.py`                 | —         | —             | 真正实现，但工具 schema 未被客户端读取                                |
 
 后果：LLM Prompt 看到的工具列表与实际可调用的工具对不齐，code-executor 在客户端根本不可见。
 
@@ -109,27 +127,27 @@ LLM 返回的 `tool_args` 是 `dict[str, Any]`，直接透传给 Server。错误
 
 ### 3.1 yuiju 工具系统概览
 
-| 维度 | yuiju 做法 |
-|------|-----------|
-| 工具位置 | `packages/utils/src/llm/tools/` 内联 TypeScript 模块 |
-| Schema 定义 | 独立 `schema/` 目录，每个工具有 JSON Schema |
-| 调用方式 | 进程内函数调用，无 IPC |
-| 工具清单 | query-state / memory-search / person-memory / propose-plan-changes / review-plan-changes / query-available-inventory-items / query-static-guide |
-| 状态修改权 | LLM 仅能「提案」`proposePlanChanges`，需 `reviewPlanChanges` 审查后才生效 |
-| 调用约束 | Prompt 显式声明「`proposePlanChanges` 只能调用一次」「工具返回为客观事实」 |
-| 静态知识 | `queryStaticGuide` 工具查询 worldMap/shopProducts/dinerMenu，避免 Prompt 膨胀 |
+| 维度        | yuiju 做法                                                                                                                                      |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| 工具位置    | `packages/utils/src/llm/tools/` 内联 TypeScript 模块                                                                                            |
+| Schema 定义 | 独立 `schema/` 目录，每个工具有 JSON Schema                                                                                                     |
+| 调用方式    | 进程内函数调用，无 IPC                                                                                                                          |
+| 工具清单    | query-state / memory-search / person-memory / propose-plan-changes / review-plan-changes / query-available-inventory-items / query-static-guide |
+| 状态修改权  | LLM 仅能「提案」`proposePlanChanges`，需 `reviewPlanChanges` 审查后才生效                                                                       |
+| 调用约束    | Prompt 显式声明「`proposePlanChanges` 只能调用一次」「工具返回为客观事实」                                                                      |
+| 静态知识    | `queryStaticGuide` 工具查询 worldMap/shopProducts/dinerMenu，避免 Prompt 膨胀                                                                   |
 
 ### 3.2 关键差异矩阵
 
-| 维度 | aitown 现状 | yuiju 现状 | 评价 |
-|------|-------------|------------|------|
-| 工具部署 | 外部进程（MCP） | 内联模块 | aitown 隔离更强，但 IPC 开销大 |
-| Schema 来源 | 客户端硬编码 | 服务端定义 + 客户端引用 | yuiju 单一真相源 |
-| 工具发现 | 静态配置 | 静态导出 | 都未利用 MCP `tools/list` |
-| 状态修改 | 工具返回 deltas，caller 应用 | LLM 提案 → 审查 → 应用 | yuiju 多一层审查 |
-| 调用约束 | Prompt 未声明 | Prompt 显式声明次数与语义 | yuiju 更严谨 |
-| 静态知识 | 直接注入 Prompt | 工具按需查询 | yuiju 避免 Prompt 膨胀 |
-| 业务工具 | shop/social 放 MCP | 库存查询为工具，买卖为 Action | yuiju 边界更清晰 |
+| 维度        | aitown 现状                  | yuiju 现状                    | 评价                           |
+| ----------- | ---------------------------- | ----------------------------- | ------------------------------ |
+| 工具部署    | 外部进程（MCP）              | 内联模块                      | aitown 隔离更强，但 IPC 开销大 |
+| Schema 来源 | 客户端硬编码                 | 服务端定义 + 客户端引用       | yuiju 单一真相源               |
+| 工具发现    | 静态配置                     | 静态导出                      | 都未利用 MCP `tools/list`      |
+| 状态修改    | 工具返回 deltas，caller 应用 | LLM 提案 → 审查 → 应用        | yuiju 多一层审查               |
+| 调用约束    | Prompt 未声明                | Prompt 显式声明次数与语义     | yuiju 更严谨                   |
+| 静态知识    | 直接注入 Prompt              | 工具按需查询                  | yuiju 避免 Prompt 膨胀         |
+| 业务工具    | shop/social 放 MCP           | 库存查询为工具，买卖为 Action | yuiju 边界更清晰               |
 
 ### 3.3 yuiju 可借鉴点
 
@@ -200,28 +218,28 @@ class ToolRegistry:
 
 ### 5.1 判断标准
 
-| 标准 | 倾向 MCP | 倾向内联 |
-|------|----------|----------|
-| 是否需要进程隔离（安全） | ✅ | — |
-| 是否依赖外部 API | ✅ | — |
-| 是否返回状态 deltas | — | ✅（应为 Action executor） |
-| 是否需要 precondition 过滤 | — | ✅（应为 Action） |
-| 是否纯查询、无副作用 | — | ✅（可为 local 工具） |
-| 是否需要独立扩缩容 | ✅ | — |
+| 标准                       | 倾向 MCP | 倾向内联                   |
+| -------------------------- | -------- | -------------------------- |
+| 是否需要进程隔离（安全）   | ✅       | —                          |
+| 是否依赖外部 API           | ✅       | —                          |
+| 是否返回状态 deltas        | —        | ✅（应为 Action executor） |
+| 是否需要 precondition 过滤 | —        | ✅（应为 Action）          |
+| 是否纯查询、无副作用       | —        | ✅（可为 local 工具）      |
+| 是否需要独立扩缩容         | ✅       | —                          |
 
 ### 5.2 归属建议
 
-| 当前工具 | 现位置 | 建议位置 | 理由 |
-|----------|--------|----------|------|
-| `code-executor.execute_python` | MCP | **保留 MCP** | 需要 subprocess 沙箱隔离，安全边界硬需求 |
-| `web-search.search` / `search_news` | MCP | **保留 MCP** | 外部 Tavily API，网络 IO 重，可被社区 Server 替换 |
-| `weather.get_current_weather` / `get_forecast` | MCP | **保留 MCP** | 外部 OpenWeatherMap API |
-| `shop-simulator.buy_item` / `sell_item` | MCP | **迁移为 Action executor** | 返回 money/inventory deltas，纯业务逻辑，无外部依赖，应受 precondition 约束（如必须在 shop 场景） |
-| `shop-simulator.list_items` / `get_item_details` | MCP | **内联为 local 工具** | 纯查询，可由 `TownService` 直接读取 `configs/shop-catalog.yaml` |
-| `knowledge-base.query_kb` | MCP | **内联为 local 工具** | 硬编码数据应迁到 PG `world_settings` 表或 YAML，按需查询 |
-| `character-social.give_gift` | MCP | **迁移为 Action executor** | 返回 relation/inventory deltas，应受关系等级 precondition 约束 |
-| `character-social.invite_date` | MCP | **迁移为 Action executor** | 同上，且需要 target 在同场景的 precondition |
-| `character-social.resolve_conflict` | MCP | **迁移为 Action executor** | 同上 |
+| 当前工具                                         | 现位置 | 建议位置                   | 理由                                                                                              |
+| ------------------------------------------------ | ------ | -------------------------- | ------------------------------------------------------------------------------------------------- |
+| `code-executor.execute_python`                   | MCP    | **保留 MCP**               | 需要 subprocess 沙箱隔离，安全边界硬需求                                                          |
+| `web-search.search` / `search_news`              | MCP    | **保留 MCP**               | 外部 Tavily API，网络 IO 重，可被社区 Server 替换                                                 |
+| `weather.get_current_weather` / `get_forecast`   | MCP    | **保留 MCP**               | 外部 OpenWeatherMap API                                                                           |
+| `shop-simulator.buy_item` / `sell_item`          | MCP    | **迁移为 Action executor** | 返回 money/inventory deltas，纯业务逻辑，无外部依赖，应受 precondition 约束（如必须在 shop 场景） |
+| `shop-simulator.list_items` / `get_item_details` | MCP    | **内联为 local 工具**      | 纯查询，可由 `TownService` 直接读取 `configs/shop-catalog.yaml`                                   |
+| `knowledge-base.query_kb`                        | MCP    | **内联为 local 工具**      | 硬编码数据应迁到 PG `world_settings` 表或 YAML，按需查询                                          |
+| `character-social.give_gift`                     | MCP    | **迁移为 Action executor** | 返回 relation/inventory deltas，应受关系等级 precondition 约束                                    |
+| `character-social.invite_date`                   | MCP    | **迁移为 Action executor** | 同上，且需要 target 在同场景的 precondition                                                       |
+| `character-social.resolve_conflict`              | MCP    | **迁移为 Action executor** | 同上                                                                                              |
 
 ### 5.3 迁移后拓扑
 
@@ -240,40 +258,40 @@ class ToolRegistry:
 
 ### 6.1 P0（1 周内）：消除真相源分裂
 
-| 任务 | 落点 | 验收 |
-|------|------|------|
-| 创建 `src/mcp/registry.py` 统一注册中心 | 新增模块 | `_MCP_SERVERS_CONFIG` 与 `MCP_SERVERS` 删除，所有引用走 registry |
-| 启动时调用 MCP `tools/list` 自动发现工具 | `registry.discover_tools` | 新增 Server 工具无需改客户端代码 |
-| 修复 code-executor 在客户端不可见 | registry | LLM Prompt 中可见 code-executor 工具 |
-| 工具参数 Pydantic 校验 | `MCPClient.call_tool` | 错误类型 args 在客户端即被拒绝 |
+| 任务                                     | 落点                      | 验收                                                             |
+| ---------------------------------------- | ------------------------- | ---------------------------------------------------------------- |
+| 创建 `src/mcp/registry.py` 统一注册中心  | 新增模块                  | `_MCP_SERVERS_CONFIG` 与 `MCP_SERVERS` 删除，所有引用走 registry |
+| 启动时调用 MCP `tools/list` 自动发现工具 | `registry.discover_tools` | 新增 Server 工具无需改客户端代码                                 |
+| 修复 code-executor 在客户端不可见        | registry                  | LLM Prompt 中可见 code-executor 工具                             |
+| 工具参数 Pydantic 校验                   | `MCPClient.call_tool`     | 错误类型 args 在客户端即被拒绝                                   |
 
 ### 6.2 P1（2-3 周）：业务工具回归 Action
 
-| 任务 | 落点 | 验收 |
-|------|------|------|
-| `give_gift` / `invite_date` / `resolve_conflict` 迁为 Action | `src/actions/social/` | 候选过滤生效，precondition 约束关系等级与场景 |
-| `buy_item` / `sell_item` 迁为 Action | `src/actions/economy/` | 必须在 shop 场景才进候选 |
-| `list_items` / `get_item_details` 迁为 TownService 内联 | `src/modules/town/` | 商店目录外置到 `configs/shop-catalog.yaml` |
-| `query_kb` 迁为 WorldGuideService 内联 | `src/modules/world/` | 知识数据迁到 PG `world_settings` 表或 YAML |
-| 删除 `packages/mcp-servers/shop-simulator/` 与 `character-social/` | 包移除 | docker-compose 同步移除服务 |
+| 任务                                                               | 落点                   | 验收                                          |
+| ------------------------------------------------------------------ | ---------------------- | --------------------------------------------- |
+| `give_gift` / `invite_date` / `resolve_conflict` 迁为 Action       | `src/actions/social/`  | 候选过滤生效，precondition 约束关系等级与场景 |
+| `buy_item` / `sell_item` 迁为 Action                               | `src/actions/economy/` | 必须在 shop 场景才进候选                      |
+| `list_items` / `get_item_details` 迁为 TownService 内联            | `src/modules/town/`    | 商店目录外置到 `configs/shop-catalog.yaml`    |
+| `query_kb` 迁为 WorldGuideService 内联                             | `src/modules/world/`   | 知识数据迁到 PG `world_settings` 表或 YAML    |
+| 删除 `packages/mcp-servers/shop-simulator/` 与 `character-social/` | 包移除                 | docker-compose 同步移除服务                   |
 
 ### 6.3 P1（2 周）：韧性与可观测性
 
-| 任务 | 落点 | 验收 |
-|------|------|------|
-| MCPClient 接入 CircuitBreaker | `src/mcp/client.py` | Server 故障时熔断 60s，不每 Tick 重试 |
-| 工具调用 OTel span + Prometheus 指标 | `src/observability/` | Grafana 可见 MCP 调用面板 |
-| 单角色工具调用预算 | `char:{id}:state` | 超预算时 Prompt 不再列出工具 |
-| 工具结果即时回流决策 | `character_tick.py` | 工具成功后带结果重决策，不再强制 wait |
+| 任务                                 | 落点                 | 验收                                  |
+| ------------------------------------ | -------------------- | ------------------------------------- |
+| MCPClient 接入 CircuitBreaker        | `src/mcp/client.py`  | Server 故障时熔断 60s，不每 Tick 重试 |
+| 工具调用 OTel span + Prometheus 指标 | `src/observability/` | Grafana 可见 MCP 调用面板             |
+| 单角色工具调用预算                   | `char:{id}:state`    | 超预算时 Prompt 不再列出工具          |
+| 工具结果即时回流决策                 | `character_tick.py`  | 工具成功后带结果重决策，不再强制 wait |
 
 ### 6.4 P2（1 个月）：Prompt 规范化与深度集成
 
-| 任务 | 落点 | 验收 |
-|------|------|------|
-| `decision.yaml` 增加 `[工具使用规则]` 段 | `configs/prompts/` | LLM 不再滥用工具 |
-| 工具调用约束（次数/语义）写入 Prompt | 同上 | 与 yuiju 对齐 |
-| 探索 MCP `resources` 用于静态知识 | `src/mcp/` | 替代当前 query_kb 的工具模式 |
-| MCP Client/Server 鉴权（多租户场景） | `src/mcp/auth.py` | 非 localhost 部署可用 |
+| 任务                                     | 落点               | 验收                         |
+| ---------------------------------------- | ------------------ | ---------------------------- |
+| `decision.yaml` 增加 `[工具使用规则]` 段 | `configs/prompts/` | LLM 不再滥用工具             |
+| 工具调用约束（次数/语义）写入 Prompt     | 同上               | 与 yuiju 对齐                |
+| 探索 MCP `resources` 用于静态知识        | `src/mcp/`         | 替代当前 query_kb 的工具模式 |
+| MCP Client/Server 鉴权（多租户场景）     | `src/mcp/auth.py`  | 非 localhost 部署可用        |
 
 ---
 
@@ -289,11 +307,11 @@ class ToolRegistry:
 
 ## 八、相关文档
 
-| 主题 | 文档 |
-|------|------|
-| 模块与 MCP 设计 | [module-system.md](module-system.md) |
-| Action 系统 | [action-system.md](action-system.md) |
+| 主题               | 文档                                                          |
+| ------------------ | ------------------------------------------------------------- |
+| 模块与 MCP 设计    | [module-system.md](module-system.md)                          |
+| Action 系统        | [action-system.md](action-system.md)                          |
 | yuiju 工具系统对比 | [yuiju-comparison.md](yuiju-comparison.md#五llm-工具系统对比) |
-| 项目 gap 分析 | [gap-analysis.md](gap-analysis.md) |
-| LLM 边界约定 | [AGENTS.md §4.3](../AGENTS.md) |
-| Prompt 规范 | [rules/prompt-style.md](rules/prompt-style.md) |
+| 项目 gap 分析      | [gap-analysis.md](gap-analysis.md)                            |
+| LLM 边界约定       | [AGENTS.md §4.3](../AGENTS.md)                                |
+| Prompt 规范        | [rules/prompt-style.md](rules/prompt-style.md)                |

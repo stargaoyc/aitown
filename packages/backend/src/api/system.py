@@ -53,8 +53,17 @@ async def health():
     partition_scheduler = get_partition_scheduler()
     onebot_adapter = get_onebot_adapter()
 
+    # 实际检查 Redis 连接是否存活（而非仅检查对象是否存在）
+    redis_alive = False
+    if redis:
+        try:
+            await redis.ping()
+            redis_alive = True
+        except Exception:
+            redis_alive = False
+
     must_modules = {
-        "redis": redis is not None,
+        "redis": redis_alive,
         "world_engine": world_engine is not None,
         "llm": llm is not None,
         "action_registry": registry is not None,
@@ -70,6 +79,7 @@ async def health():
     return {
         "status": "ok" if all_must_ok else "degraded",
         "world_tick": world_engine.tick_id if world_engine else 0,
+        "redis": "connected" if redis_alive else "disconnected",
         "must_modules": must_modules,
         "optional_modules": optional_modules,
         "current_world_time": _get_current_world_time(),

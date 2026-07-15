@@ -752,6 +752,30 @@ class CharacterTickEngine:
 
         # 加载双方档案
         character = context["character"]
+
+        # 跨角色资源锁：防止 A→B 和 B→A 同时执行导致关系更新竞争
+        from src.core.locks import acquire_resource_locks
+
+        async with acquire_resource_locks(self.redis, character_id, target_id) as acquired:
+            if not acquired:
+                logger.info(
+                    "chat_with_lock_busy",
+                    character_id=str(character_id),
+                    target_id=target_id_str,
+                )
+                return None
+            return await self._do_chat_with(character_id, target_id, target_id_str, character, decision, context)
+
+    async def _do_chat_with(
+        self,
+        character_id: UUID,
+        target_id: UUID,
+        target_id_str: str,
+        character: Any,
+        decision: DecisionResult,
+        context: dict,
+    ) -> str | None:
+        """chat_with 实际执行逻辑（在跨角色锁保护下运行）"""
         async with db.session() as session:
             char_repo = CharacterRepository(session)
             target_data = await char_repo.get_character_with_state(target_id)

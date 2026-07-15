@@ -8,15 +8,15 @@
 
 ### 1.1 基础信息
 
-| 项 | 值 |
-|----|----|
-| Base URL | `http://localhost:8000/api/v1` |
-| 协议 | HTTP/1.1 (生产建议 HTTP/2 + HTTPS) |
+| 项       | 值                                      |
+| -------- | --------------------------------------- |
+| Base URL | `http://localhost:8000/api/v1`          |
+| 协议     | HTTP/1.1 (生产建议 HTTP/2 + HTTPS)      |
 | 数据格式 | JSON (`Content-Type: application/json`) |
-| 字符编码 | UTF-8 |
-| 时间格式 | ISO 8601 UTC（`2026-07-06T08:00:00Z`） |
-| ID 格式 | UUID v7（时间有序） |
-| 分页 | `?page=1&page_size=20`，响应含 `total` |
+| 字符编码 | UTF-8                                   |
+| 时间格式 | ISO 8601 UTC（`2026-07-06T08:00:00Z`）  |
+| ID 格式  | UUID v7（时间有序）                     |
+| 分页     | `?page=1&page_size=20`，响应含 `total`  |
 
 ### 1.2 统一响应格式
 
@@ -24,7 +24,7 @@
 {
   "code": 0,
   "message": "ok",
-  "data": { },
+  "data": {},
   "trace_id": "abc123"
 }
 ```
@@ -42,19 +42,19 @@
 
 ### 1.3 错误码
 
-| 范围 | 含义 |
-|------|------|
-| `0` | 成功 |
+| 范围    | 含义                           |
+| ------- | ------------------------------ |
+| `0`     | 成功                           |
 | `400xx` | 客户端错误（参数/权限/未找到） |
-| `500xx` | 服务端错误 |
-| `503xx` | 依赖服务不可用（LLM/MCP/DB） |
+| `500xx` | 服务端错误                     |
+| `503xx` | 依赖服务不可用（LLM/MCP/DB）   |
 
 ### 1.4 鉴权
 
-| 渠道 | 方式 |
-|------|------|
+| 渠道          | 方式                          |
+| ------------- | ----------------------------- |
 | Web Dashboard | `Authorization: Bearer <jwt>` |
-| 第三方集成 | `X-API-Key: <key>` |
+| 第三方集成    | `X-API-Key: <key>`            |
 
 ---
 
@@ -62,20 +62,20 @@
 
 ### 2.1 角色管理
 
-| 端点 | 方法 | 说明 |
-|------|------|------|
-| `/api/v1/characters` | GET | 角色列表（分页、过滤） |
-| `/api/v1/characters` | POST | 创建角色 |
-| `/api/v1/characters/{id}` | GET | 角色详情 |
-| `/api/v1/characters/{id}` | PUT | 更新角色 |
-| `/api/v1/characters/{id}` | DELETE | 删除角色（软删除） |
-| `/api/v1/characters/{id}/state` | GET | 角色实时状态 |
-| `/api/v1/characters/{id}/memories` | GET | 角色记忆列表 |
-| `/api/v1/characters/{id}/actions` | GET | 角色行为历史 |
-| `/api/v1/characters/{id}/reflections` | GET | 角色反思列表 |
-| `/api/v1/characters/{id}/plans` | GET | 角色计划列表 |
-| `/api/v1/characters/{id}/relations` | GET | 角色关系图谱 |
-| `/api/v1/characters/{id}/nearby` | GET | 同场景其他角色（多智能体交互可见性） |
+| 端点                                  | 方法   | 说明                                 |
+| ------------------------------------- | ------ | ------------------------------------ |
+| `/api/v1/characters`                  | GET    | 角色列表（分页、过滤）               |
+| `/api/v1/characters`                  | POST   | 创建角色                             |
+| `/api/v1/characters/{id}`             | GET    | 角色详情                             |
+| `/api/v1/characters/{id}`             | PUT    | 更新角色                             |
+| `/api/v1/characters/{id}`             | DELETE | 删除角色（软删除）                   |
+| `/api/v1/characters/{id}/state`       | GET    | 角色实时状态                         |
+| `/api/v1/characters/{id}/memories`    | GET    | 角色记忆列表                         |
+| `/api/v1/characters/{id}/actions`     | GET    | 角色行为历史                         |
+| `/api/v1/characters/{id}/reflections` | GET    | 角色反思列表                         |
+| `/api/v1/characters/{id}/plans`       | GET    | 角色计划列表                         |
+| `/api/v1/characters/{id}/relations`   | GET    | 角色关系图谱                         |
+| `/api/v1/characters/{id}/nearby`      | GET    | 同场景其他角色（多智能体交互可见性） |
 
 #### 创建角色
 
@@ -166,20 +166,21 @@ GET /api/v1/characters/{id}/nearby
 ```
 
 **说明**：
+
 - 仅返回同 `location` 的其他活跃角色，排除查询角色本人；
 - `relationship_type` / `strength` 来自 `RelationGraph`，未建立关系时返回 `stranger` / `0`；
 - 角色无位置时返回空列表与 `location: null`。
 
 ### 2.2 世界管理
 
-| 端点 | 方法 | 说明 |
-|------|------|------|
-| `/api/v1/world/state` | GET | 世界状态 |
-| `/api/v1/world/weather` | PUT | 手动设置天气 |
-| `/api/v1/world/time` | PUT | 手动调整时间 |
-| `/api/v1/world/pause` | POST | 暂停世界推进 |
-| `/api/v1/world/resume` | POST | 恢复世界推进 |
-| `/api/v1/world/snapshots` | GET | 快照列表（回放用） |
+| 端点                      | 方法 | 说明               |
+| ------------------------- | ---- | ------------------ |
+| `/api/v1/world/state`     | GET  | 世界状态           |
+| `/api/v1/world/weather`   | PUT  | 手动设置天气       |
+| `/api/v1/world/time`      | PUT  | 手动调整时间       |
+| `/api/v1/world/pause`     | POST | 暂停世界推进       |
+| `/api/v1/world/resume`    | POST | 恢复世界推进       |
+| `/api/v1/world/snapshots` | GET  | 快照列表（回放用） |
 
 #### 设置天气
 
@@ -192,13 +193,13 @@ Content-Type: application/json
 
 ### 2.3 模块管理
 
-| 端点 | 方法 | 说明 |
-|------|------|------|
-| `/api/v1/modules` | GET / POST | 模块列表 / 注册 |
-| `/api/v1/modules/{name}` | GET / PUT / DELETE | 模块详情 / 更新 / 卸载 |
-| `/api/v1/modules/{name}/enable` | POST | 启用模块 |
-| `/api/v1/modules/{name}/disable` | POST | 禁用模块 |
-| `/api/v1/modules/{name}/health` | GET | 模块健康检查 |
+| 端点                             | 方法               | 说明                   |
+| -------------------------------- | ------------------ | ---------------------- |
+| `/api/v1/modules`                | GET / POST         | 模块列表 / 注册        |
+| `/api/v1/modules/{name}`         | GET / PUT / DELETE | 模块详情 / 更新 / 卸载 |
+| `/api/v1/modules/{name}/enable`  | POST               | 启用模块               |
+| `/api/v1/modules/{name}/disable` | POST               | 禁用模块               |
+| `/api/v1/modules/{name}/health`  | GET                | 模块健康检查           |
 
 #### 注册 MCP 模块
 
@@ -207,33 +208,33 @@ POST /api/v1/modules
 Content-Type: application/json
 
 {
-  "name": "code-executor",
+  "name": "weather",
   "type": "mcp",
   "enabled": true,
   "config": { "timeout": 30 },
   "dependencies": [],
-  "mcp_server_url": "http://localhost:8001"
+  "mcp_server_url": "http://localhost:8003"
 }
 ```
 
 #### 启用模块
 
 ```http
-POST /api/v1/modules/code-executor/enable
+POST /api/v1/modules/weather/enable
 ```
 
 ```json
-{ "code": 0, "data": { "name": "code-executor", "enabled": true, "health_check_status": "healthy" } }
+{ "code": 0, "data": { "name": "weather", "enabled": true, "health_check_status": "healthy" } }
 ```
 
 ### 2.4 MCP Server 管理
 
-| 端点 | 方法 | 说明 |
-|------|------|------|
-| `/api/v1/mcp/servers` | GET / POST | MCP Server 列表（含 `enabled` 字段）/ 注册 |
-| `/api/v1/mcp/servers/{id}` | DELETE | 注销 MCP Server |
-| `/api/v1/mcp/servers/{server_name}/enabled` | PUT | **动态启用/禁用 MCP Server**（Redis 持久化） |
-| `/api/v1/mcp/tools` | GET | 所有可用工具列表（仅返回已启用 Server 的工具） |
+| 端点                                        | 方法       | 说明                                           |
+| ------------------------------------------- | ---------- | ---------------------------------------------- |
+| `/api/v1/mcp/servers`                       | GET / POST | MCP Server 列表（含 `enabled` 字段）/ 注册     |
+| `/api/v1/mcp/servers/{id}`                  | DELETE     | 注销 MCP Server                                |
+| `/api/v1/mcp/servers/{server_name}/enabled` | PUT        | **动态启用/禁用 MCP Server**（Redis 持久化）   |
+| `/api/v1/mcp/tools`                         | GET        | 所有可用工具列表（仅返回已启用 Server 的工具） |
 
 #### 查询所有可用工具
 
@@ -245,8 +246,8 @@ GET /api/v1/mcp/tools
 {
   "code": 0,
   "data": [
-    { "name": "run_python", "server": "code-executor", "description": "在沙箱中执行Python代码", "parameters": { ... } },
-    { "name": "search_web", "server": "web-search", "description": "网页搜索", "parameters": { ... } }
+    { "name": "get_current_weather", "server": "weather", "description": "查询指定城市的实时天气", "parameters": { ... } },
+    { "name": "list_items", "server": "shop-simulator", "description": "列出商店商品", "parameters": { ... } }
   ]
 }
 ```
@@ -272,6 +273,7 @@ Content-Type: application/json
 ```
 
 **说明**：
+
 - 开关状态持久化到 Redis hash `mcp:enabled`，重启后端自动恢复；
 - 禁用后，`list_tools()` 和 `format_tools_for_prompt()` 不再返回该 Server 的工具；
 - 调用已禁用 Server 的工具会抛 `RuntimeError`；
@@ -281,13 +283,13 @@ Content-Type: application/json
 
 ### 2.5 会话与消息
 
-| 端点 | 方法 | 说明 |
-|------|------|------|
-| `/api/v1/conversations` | GET | 会话列表 |
-| `/api/v1/conversations/{id}` | GET | 会话详情 |
-| `/api/v1/conversations/{id}/messages` | GET | 会话消息历史（分页） |
-| `/api/v1/conversations/{id}/messages` | POST | 发送消息（Web 渠道） |
-| `/api/v1/conversations/{id}/intervene` | POST | 人工干预插入消息 |
+| 端点                                   | 方法 | 说明                 |
+| -------------------------------------- | ---- | -------------------- |
+| `/api/v1/conversations`                | GET  | 会话列表             |
+| `/api/v1/conversations/{id}`           | GET  | 会话详情             |
+| `/api/v1/conversations/{id}/messages`  | GET  | 会话消息历史（分页） |
+| `/api/v1/conversations/{id}/messages`  | POST | 发送消息（Web 渠道） |
+| `/api/v1/conversations/{id}/intervene` | POST | 人工干预插入消息     |
 
 #### 发送消息
 
@@ -321,31 +323,31 @@ GET /api/v1/conversations/{id}/messages?page=1&page_size=20
 
 ### 2.6 可观测性
 
-| 端点 | 方法 | 说明 |
-|------|------|------|
-| `/api/v1/observability/traces` | GET | 链路查询（按 trace_id / character_id / time） |
-| `/api/v1/observability/logs` | GET | 日志查询 |
-| `/api/v1/observability/metrics` | GET | 指标数据 |
-| `/api/v1/observability/db/health` | GET | PG/Redis 健康检查 |
+| 端点                              | 方法 | 说明                                          |
+| --------------------------------- | ---- | --------------------------------------------- |
+| `/api/v1/observability/traces`    | GET  | 链路查询（按 trace_id / character_id / time） |
+| `/api/v1/observability/logs`      | GET  | 日志查询                                      |
+| `/api/v1/observability/metrics`   | GET  | 指标数据                                      |
+| `/api/v1/observability/db/health` | GET  | PG/Redis 健康检查                             |
 
 ### 2.7 系统设置
 
-| 端点 | 方法 | 说明 |
-|------|------|------|
-| `/api/v1/settings/models` | GET / PUT | 模型配置 |
-| `/api/v1/settings/prompts` | GET / PUT | Prompt 模板管理 |
-| `/api/v1/settings/permissions` | GET / PUT | 权限管理 |
+| 端点                           | 方法      | 说明            |
+| ------------------------------ | --------- | --------------- |
+| `/api/v1/settings/models`      | GET / PUT | 模型配置        |
+| `/api/v1/settings/prompts`     | GET / PUT | Prompt 模板管理 |
+| `/api/v1/settings/permissions` | GET / PUT | 权限管理        |
 
 ### 2.8 运维
 
-| 端点 | 方法 | 说明 |
-|------|------|------|
-| `/api/v1/admin/partitions` | GET | 查看分区表状态 |
-| `/api/v1/admin/partitions/precreate` | POST | 手动预创建分区 |
-| `/api/v1/admin/tick` | POST | 强制触发某角色 Tick（调试用） |
-| `/api/v1/admin/restore-snapshot` | POST | 用指定快照重置世界态（调试用） |
-| `/api/v1/admin/logs` | GET | 读取后端日志文件（支持行数与级别过滤） |
-| `/api/v1/admin/metrics-detail` | GET | 解析 Prometheus 指标为结构化 JSON（World/Character/Action/LLM/Message/HTTP 分类） |
+| 端点                                 | 方法 | 说明                                                                              |
+| ------------------------------------ | ---- | --------------------------------------------------------------------------------- |
+| `/api/v1/admin/partitions`           | GET  | 查看分区表状态                                                                    |
+| `/api/v1/admin/partitions/precreate` | POST | 手动预创建分区                                                                    |
+| `/api/v1/admin/tick`                 | POST | 强制触发某角色 Tick（调试用）                                                     |
+| `/api/v1/admin/restore-snapshot`     | POST | 用指定快照重置世界态（调试用）                                                    |
+| `/api/v1/admin/logs`                 | GET  | 读取后端日志文件（支持行数与级别过滤）                                            |
+| `/api/v1/admin/metrics-detail`       | GET  | 解析 Prometheus 指标为结构化 JSON（World/Character/Action/LLM/Message/HTTP 分类） |
 
 #### 读取后端日志
 
@@ -366,6 +368,7 @@ GET /api/v1/admin/logs?lines=200&level=ERROR
 ```
 
 **参数**：
+
 - `lines`（可选，默认 200）：返回最后 N 行日志；
 - `level`（可选，默认全部）：过滤日志级别（DEBUG/INFO/WARN/ERROR）。
 
@@ -393,12 +396,12 @@ GET /api/v1/admin/metrics-detail
 
 ### 2.9 记忆扩展（日记 + Person Memory）
 
-| 端点 | 方法 | 说明 | 鉴权 |
-|------|------|------|------|
-| `/api/v1/characters/{id}/diaries` | GET | 角色日记列表（支持 `period` 与 `limit` 过滤） | 可选 |
-| `/api/v1/characters/{id}/diaries/generate` | POST | 为角色生成指定周期日记（需 admin/operator） | 必须 |
-| `/api/v1/characters/{id}/person-memory` | GET | 角色对某用户的记忆（`user_id` 查询参数） | 可选 |
-| `/api/v1/characters/{id}/person-memory/list` | GET | 角色对所有用户的记忆列表（按热度倒序） | 可选 |
+| 端点                                         | 方法 | 说明                                          | 鉴权 |
+| -------------------------------------------- | ---- | --------------------------------------------- | ---- |
+| `/api/v1/characters/{id}/diaries`            | GET  | 角色日记列表（支持 `period` 与 `limit` 过滤） | 可选 |
+| `/api/v1/characters/{id}/diaries/generate`   | POST | 为角色生成指定周期日记（需 admin/operator）   | 必须 |
+| `/api/v1/characters/{id}/person-memory`      | GET  | 角色对某用户的记忆（`user_id` 查询参数）      | 可选 |
+| `/api/v1/characters/{id}/person-memory/list` | GET  | 角色对所有用户的记忆列表（按热度倒序）        | 可选 |
 
 #### 生成角色日记
 
@@ -408,10 +411,12 @@ Authorization: Bearer <jwt>
 ```
 
 **参数**：
+
 - `period`（默认 `day`）：`day` / `week` / `month` / `year`
 - `character_name`（可选）：角色名，未提供时从数据库查询
 
 **流程**：
+
 1. 从 `memory_episodes` 提取指定时间段内的记忆（按真实 UTC 时间过滤）
 2. 调用 LLM 生成叙事性日记（第一人称，200-500 字）
 3. 保存到 `character_diaries` 表
@@ -441,6 +446,7 @@ Authorization: Bearer <jwt>
 ```
 
 **说明**：
+
 - 当指定时间段内记忆少于 3 条时返回 422
 - `diary_date` 使用真实 UTC 时间戳（非虚拟世界时间）
 - `diary_end_date` 仅在 `period != "day"` 时填充
@@ -475,11 +481,11 @@ GET /api/v1/characters/{character_id}/person-memory/list?limit=50
 
 ### 2.10 通知
 
-| 端点 | 方法 | 说明 |
-|------|------|------|
-| `/api/v1/notifications` | GET | 当前用户通知列表（支持 `limit`） |
-| `/api/v1/notifications/{id}/read` | PUT | 标记单条通知为已读 |
-| `/api/v1/notifications/read-all` | PUT | 标记当前用户所有通知为已读 |
+| 端点                              | 方法 | 说明                             |
+| --------------------------------- | ---- | -------------------------------- |
+| `/api/v1/notifications`           | GET  | 当前用户通知列表（支持 `limit`） |
+| `/api/v1/notifications/{id}/read` | PUT  | 标记单条通知为已读               |
+| `/api/v1/notifications/read-all`  | PUT  | 标记当前用户所有通知为已读       |
 
 #### 通知列表
 
@@ -518,12 +524,12 @@ Authorization: Bearer <jwt>
 
 ### 2.11 调试与检索
 
-| 端点 | 方法 | 说明 |
-|------|------|------|
-| `/api/v1/admin/vector-search` | POST | 向量检索测试（pgvector + HNSW） |
-| `/api/v1/admin/proactive-shares` | GET | 主动分享历史（`extra_data->>'share_type' = 'proactive'`） |
-| `/api/v1/admin/world/snapshots` | GET | 世界状态快照列表 |
-| `/api/v1/characters/{id}/state-history` | GET | 角色状态变更历史 |
+| 端点                                    | 方法 | 说明                                                      |
+| --------------------------------------- | ---- | --------------------------------------------------------- |
+| `/api/v1/admin/vector-search`           | POST | 向量检索测试（pgvector + HNSW）                           |
+| `/api/v1/admin/proactive-shares`        | GET  | 主动分享历史（`extra_data->>'share_type' = 'proactive'`） |
+| `/api/v1/admin/world/snapshots`         | GET  | 世界状态快照列表                                          |
+| `/api/v1/characters/{id}/state-history` | GET  | 角色状态变更历史                                          |
 
 #### 向量检索
 
@@ -558,12 +564,12 @@ Authorization: Bearer <jwt>
 
 ### 3.1 WebSocket 端点
 
-| 端点 | 说明 | 推送内容 |
-|------|------|----------|
-| `/ws/dashboard` | 仪表盘实时数据 | 全局角色状态、世界状态、事件流 |
-| `/ws/characters/{id}` | 特定角色状态推送 | 该角色的状态变更、行为事件 |
-| `/ws/modules` | 模块状态变更推送 | 模块启用/禁用/健康状态 |
-| `/ws/conversations/{id}` | 会话实时消息 | 新消息推送 |
+| 端点                     | 说明             | 推送内容                       |
+| ------------------------ | ---------------- | ------------------------------ |
+| `/ws/dashboard`          | 仪表盘实时数据   | 全局角色状态、世界状态、事件流 |
+| `/ws/characters/{id}`    | 特定角色状态推送 | 该角色的状态变更、行为事件     |
+| `/ws/modules`            | 模块状态变更推送 | 模块启用/禁用/健康状态         |
+| `/ws/conversations/{id}` | 会话实时消息     | 新消息推送                     |
 
 #### WebSocket 消息格式
 
@@ -584,10 +590,10 @@ Authorization: Bearer <jwt>
 #### 客户端订阅示例
 
 ```javascript
-const ws = new WebSocket('ws://localhost:8000/ws/dashboard');
+const ws = new WebSocket("ws://localhost:8000/ws/dashboard");
 ws.onmessage = (event) => {
   const msg = JSON.parse(event.data);
-  if (msg.type === 'character.state_update') {
+  if (msg.type === "character.state_update") {
     store.updateCharacter(msg.data);
   }
 };
@@ -595,8 +601,8 @@ ws.onmessage = (event) => {
 
 ### 3.2 SSE 端点
 
-| 端点 | 说明 |
-|------|------|
+| 端点          | 说明                           |
+| ------------- | ------------------------------ |
 | `/sse/traces` | 链路追踪实时流（用于调试面板） |
 
 ```http
@@ -616,20 +622,20 @@ data: {"trace_id":"def","span":"llm.generate","model":"gpt-4o","tokens":450}
 
 ### 4.1 分页参数
 
-| 参数 | 默认 | 说明 |
-|------|------|------|
-| `page` | 1 | 页码（从 1 开始） |
-| `page_size` | 20 | 每页数量（最大 100） |
+| 参数        | 默认 | 说明                 |
+| ----------- | ---- | -------------------- |
+| `page`      | 1    | 页码（从 1 开始）    |
+| `page_size` | 20   | 每页数量（最大 100） |
 
 ### 4.2 过滤参数
 
-| 参数 | 适用 | 示例 |
-|------|------|------|
-| `q` | 角色名/消息内容模糊搜索 | `?q=小明` |
-| `status` | 角色/模块/计划 | `?status=active` |
-| `character_id` | 行为/记忆/消息 | `?character_id=...` |
-| `start_time` / `end_time` | 时间范围 | `?start_time=...&end_time=...` |
-| `platform` | 消息 | `?platform=qq` |
+| 参数                      | 适用                    | 示例                           |
+| ------------------------- | ----------------------- | ------------------------------ |
+| `q`                       | 角色名/消息内容模糊搜索 | `?q=小明`                      |
+| `status`                  | 角色/模块/计划          | `?status=active`               |
+| `character_id`            | 行为/记忆/消息          | `?character_id=...`            |
+| `start_time` / `end_time` | 时间范围                | `?start_time=...&end_time=...` |
+| `platform`                | 消息                    | `?platform=qq`                 |
 
 ### 4.3 排序
 
@@ -639,12 +645,12 @@ data: {"trace_id":"def","span":"llm.generate","model":"gpt-4o","tokens":450}
 
 ## 五、限流
 
-| 端点分类 | 限流 |
-|----------|------|
-| 公开查询 | 60 req/min/IP |
-| 鉴权用户 | 300 req/min/user |
-| LLM 触发端点（发送消息、强制决策） | 20 req/min/user |
-| 管理端点（启用/禁用模块） | 10 req/min/user |
+| 端点分类                           | 限流             |
+| ---------------------------------- | ---------------- |
+| 公开查询                           | 60 req/min/IP    |
+| 鉴权用户                           | 300 req/min/user |
+| LLM 触发端点（发送消息、强制决策） | 20 req/min/user  |
+| 管理端点（启用/禁用模块）          | 10 req/min/user  |
 
 超限返回 `429 Too Many Requests`，响应头 `X-RateLimit-Reset`。
 
@@ -664,10 +670,10 @@ data: {"trace_id":"def","span":"llm.generate","model":"gpt-4o","tokens":450}
 
 ## 七、相关文档
 
-| 主题 | 文档 |
-|------|------|
-| 前端 API 客户端 | [frontend-design.md](frontend-design.md) |
-| 模块系统 | [module-system.md](module-system.md) |
-| 数据模型 | [data-model.md](data-model.md) |
-| 配置参考 | [config-reference.md](config-reference.md) |
-| 可观测性端点 | [observability.md](observability.md) |
+| 主题            | 文档                                       |
+| --------------- | ------------------------------------------ |
+| 前端 API 客户端 | [frontend-design.md](frontend-design.md)   |
+| 模块系统        | [module-system.md](module-system.md)       |
+| 数据模型        | [data-model.md](data-model.md)             |
+| 配置参考        | [config-reference.md](config-reference.md) |
+| 可观测性端点    | [observability.md](observability.md)       |

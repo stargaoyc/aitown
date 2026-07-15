@@ -52,7 +52,7 @@ pnpm dev                          # 启动 Vite 开发服务器
 ### 2.4 MCP Servers（按需）
 
 ```bash
-cd packages/mcp-servers/code-executor
+cd packages/mcp-servers/weather
 uv sync
 uv run server.py
 ```

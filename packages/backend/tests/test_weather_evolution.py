@@ -1,9 +1,9 @@
-"""src/core/evolutions/weather_evolution.py 单元测试
+"""src/core/world/evolutions/weather_evolution.py 单元测试
 
 覆盖 WeatherEvolution 的静态方法与数据结构完整性。
 """
 
-from src.core.evolutions.weather_evolution import (
+from src.core.world.evolutions.weather_evolution import (
     SEASON_WEIGHTS,
     WEATHER_IMPACT,
     WEATHER_TYPES,

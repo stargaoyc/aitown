@@ -26,17 +26,9 @@ logger = get_logger(__name__)
 MCP_ENABLED_KEY = "mcp:enabled"
 
 
-# MCP Server 配置（与 main.py 中的 _MCP_SERVERS_CONFIG 保持一致）
+# MCP Server 配置（与 api/mcp.py 中的 _MCP_SERVERS_CONFIG 保持一致）
+# 已移除 code-executor 和 web-search（外部能力，非内部业务所需）
 MCP_SERVERS: list[dict[str, Any]] = [
-    {
-        "name": "web-search",
-        "env_key": "MCP_SEARCH_SERVER",
-        "default_port": 8002,
-        "tools": {
-            "search": {"desc": "网络搜索（获取实时信息、新闻、知识）", "params": {"query": "搜索关键词"}},
-            "search_news": {"desc": "搜索最新新闻", "params": {"query": "新闻关键词", "max_results": 5}},
-        },
-    },
     {
         "name": "weather",
         "env_key": "MCP_WEATHER_SERVER",

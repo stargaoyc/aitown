@@ -10,7 +10,7 @@ import random
 from redis.asyncio import Redis
 from structlog import get_logger
 
-from src.core.evolutions.base import WorldEvolution
+from src.core.world.evolutions.base import WorldEvolution
 
 logger = get_logger(__name__)
 

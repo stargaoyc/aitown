@@ -9,8 +9,8 @@ from datetime import datetime, timedelta
 from redis.asyncio import Redis
 from structlog import get_logger
 
-from src.core.evolutions.base import WorldEvolution
-from src.core.evolutions.time_evolution import TIME_KEY
+from src.core.world.evolutions.base import WorldEvolution
+from src.core.world.evolutions.time_evolution import TIME_KEY
 
 logger = get_logger(__name__)
 

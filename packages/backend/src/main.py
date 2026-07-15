@@ -72,7 +72,7 @@ from src.security.rate_limiter import RateLimiter
 
 # 尝试导入 CharacterTickEngine（可能尚未创建）
 try:
-    from src.core.character_tick import CharacterTickEngine
+    from src.core.character import CharacterTickEngine
 
     CHARACTER_ENGINE_AVAILABLE = True
 except ImportError:
@@ -163,22 +163,18 @@ async def lifespan(app: FastAPI):
         REDIS_CONNECTED.set(0)
         raise
 
-    # 1.2 加载运行时配置覆盖（从 Redis 读取，覆盖 settings 对象）
+    # 1.2 加载运行时配置覆盖（从 Redis 读取，Pydantic 校验后覆盖 settings 对象）
+    # 使用 src.config_runtime 统一管理：类型校验 + 范围检查 + Redis 持久化
     try:
-        import json
+        from src.config_runtime import load_runtime_config
 
-        raw_overrides = await redis.get("config:overrides")
-        if raw_overrides:
-            overrides = json.loads(raw_overrides)  # type: ignore[arg-type]
-            applied = 0
-            for key, value in overrides.items():
-                if hasattr(settings, key):
-                    setattr(settings, key, value)
-                    applied += 1
-            if applied > 0:
-                logger.info("runtime_config_overrides_loaded", count=applied, keys=list(overrides.keys()))
+        config = await load_runtime_config(redis)
+        logger.info(
+            "runtime_config_loaded",
+            keys=list(config.model_dump().keys()),
+        )
     except Exception as e:
-        logger.warning("runtime_config_override_load_failed", error=str(e))
+        logger.warning("runtime_config_load_failed", error=str(e))
 
     # 1.1 初始化成本控制 + 速率限制器（依赖 Redis）
     set_budget_manager(redis, daily_budget_usd=settings.llm_daily_budget_usd)
@@ -307,6 +303,18 @@ async def lifespan(app: FastAPI):
         logger.info("diary_scheduler_started")
     except Exception as e:
         logger.error("diary_scheduler_start_failed", error=str(e), exc_info=True)
+
+    # 5.6 启动时同步活跃角色数指标（避免重启后指标面板显示 0）
+    try:
+        async with db.session() as session:
+            repo = CharacterRepository(session)
+            active_chars = await repo.get_active_characters()
+        from src.observability.metrics import ACTIVE_CHARACTERS
+
+        ACTIVE_CHARACTERS.set(len(active_chars))
+        logger.info("active_characters_metric_set", count=len(active_chars))
+    except Exception as e:
+        logger.warning("active_characters_metric_set_failed", error=str(e))
 
     # 6. 初始化 Phase 2 模块
     try:

@@ -39,22 +39,22 @@
 
 ### 组件清单
 
-| 组件 | 镜像/版本 | 端口 | 说明 |
-|------|-----------|------|------|
-| Nginx | `nginx:alpine` | 80/443 | 反向代理 |
-| 前端 | 自构 (Node 22) | 80 (容器内) | 静态文件 |
-| 后端 | 自构 (Python 3.13) | 8000 | FastAPI |
-| PostgreSQL | `pgvector/pgvector:pg17` + pg_uuidv7 | 5432 | 主数据库 |
-| PgBouncer | `edoburu/pgbouncer` | 6432 | 连接池 |
-| Redis | `redis:8.0-alpine` | 6379 | 缓存/队列 |
-| MCP Servers | 自构 + 社区 | 8001–8006 | 工具服务 |
-| Jaeger | `jaegertracing/all-in-one` | 16686 | 链路追踪 |
-| Prometheus | `prom/prometheus` | 9090 | 指标 |
-| Grafana | `grafana/grafana:12.x` | 3000 | 可视化 |
-| OTel Collector | `otel/opentelemetry-collector-contrib` | 4318 | 收集器 |
-| Langfuse | `langfuse/langfuse:3` | 3001 | LLM 追踪 |
-| **Loki** | **`grafana/loki:3.x`** | **3100** | **日志聚合** |
-| **Grafana Alloy** | **`grafana/alloy`** | **12345** | **统一可观测性收集器** |
+| 组件              | 镜像/版本                              | 端口        | 说明                   |
+| ----------------- | -------------------------------------- | ----------- | ---------------------- |
+| Nginx             | `nginx:alpine`                         | 80/443      | 反向代理               |
+| 前端              | 自构 (Node 22)                         | 80 (容器内) | 静态文件               |
+| 后端              | 自构 (Python 3.13)                     | 8000        | FastAPI                |
+| PostgreSQL        | `pgvector/pgvector:pg17` + pg_uuidv7   | 5432        | 主数据库               |
+| PgBouncer         | `edoburu/pgbouncer`                    | 6432        | 连接池                 |
+| Redis             | `redis:8.0-alpine`                     | 6379        | 缓存/队列              |
+| MCP Servers       | 自构 + 社区                            | 8003–8006   | 工具服务               |
+| Jaeger            | `jaegertracing/all-in-one`             | 16686       | 链路追踪               |
+| Prometheus        | `prom/prometheus`                      | 9090        | 指标                   |
+| Grafana           | `grafana/grafana:12.x`                 | 3000        | 可视化                 |
+| OTel Collector    | `otel/opentelemetry-collector-contrib` | 4318        | 收集器                 |
+| Langfuse          | `langfuse/langfuse:3`                  | 3001        | LLM 追踪               |
+| **Loki**          | **`grafana/loki:3.x`**                 | **3100**    | **日志聚合**           |
+| **Grafana Alloy** | **`grafana/alloy`**                    | **12345**   | **统一可观测性收集器** |
 
 ---
 
@@ -125,7 +125,7 @@ version: "3.9"
 services:
   postgres:
     build:
-      context: ./docker/postgres       # 自定义镜像: pgvector + pg_uuidv7
+      context: ./docker/postgres # 自定义镜像: pgvector + pg_uuidv7
       dockerfile: Dockerfile
     environment:
       POSTGRES_DB: ai_town
@@ -170,14 +170,6 @@ services:
     build: ./packages/frontend
     depends_on: [backend]
     ports: ["80:80"]
-
-  mcp-code-executor:
-    build: ./packages/mcp-servers/code-executor
-    ports: ["8001:8001"]
-
-  mcp-web-search:
-    build: ./packages/mcp-servers/web-search
-    ports: ["8002:8002"]
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:latest
@@ -273,8 +265,6 @@ MODEL_STRONG=gpt-4o
 MODEL_FLASH=gpt-3.5-turbo
 
 # ===== MCP Servers =====
-MCP_CODE_SERVER=http://localhost:8001
-MCP_SEARCH_SERVER=http://localhost:8002
 MCP_WEATHER_SERVER=http://localhost:8003
 MCP_SHOP_SERVER=http://localhost:8004
 MCP_KB_SERVER=http://localhost:8005
@@ -340,19 +330,19 @@ curl -X POST http://localhost:8000/api/v1/admin/partitions/precreate \
 
 ### 5.1 PostgreSQL 高可用
 
-| 方案 | 说明 |
-|------|------|
-| 流复制 | 1 主 + 2 从，同步复制 |
-| Patroni | 自动故障转移 |
-| PgBouncer | 连接池中间件 |
-| 异地备份 | 每日全量 + WAL 归档 |
+| 方案      | 说明                  |
+| --------- | --------------------- |
+| 流复制    | 1 主 + 2 从，同步复制 |
+| Patroni   | 自动故障转移          |
+| PgBouncer | 连接池中间件          |
+| 异地备份  | 每日全量 + WAL 归档   |
 
 ### 5.2 Redis 高可用
 
-| 方案 | 说明 |
-|------|------|
-| Redis Sentinel | 主从 + 哨兵自动切换 |
-| Redis Cluster | 数据分片（数据量大时） |
+| 方案           | 说明                   |
+| -------------- | ---------------------- |
+| Redis Sentinel | 主从 + 哨兵自动切换    |
+| Redis Cluster  | 数据分片（数据量大时） |
 
 ### 5.3 后端水平扩展
 
@@ -384,13 +374,13 @@ curl -X POST http://localhost:8000/api/v1/admin/partitions/precreate \
 
 ### 6.1 数据库
 
-| 表 | 月增量（50 角色） | 年增量 | 存储估算 |
-|----|-------------------|--------|----------|
-| `action_records` | ~150 万 | ~1800 万 | ~50 GB/年 |
-| `memory_episodes` | ~150 万 | ~1800 万 | ~80 GB/年（含向量） |
-| `messages` | 视用户量 | — | ~10 GB/年 |
-| `reflections` | ~2500 | ~3 万 | < 100 MB |
-| 其他 | 稳定 | — | < 1 GB |
+| 表                | 月增量（50 角色） | 年增量   | 存储估算            |
+| ----------------- | ----------------- | -------- | ------------------- |
+| `action_records`  | ~150 万           | ~1800 万 | ~50 GB/年           |
+| `memory_episodes` | ~150 万           | ~1800 万 | ~80 GB/年（含向量） |
+| `messages`        | 视用户量          | —        | ~10 GB/年           |
+| `reflections`     | ~2500             | ~3 万    | < 100 MB            |
+| 其他              | 稳定              | —        | < 1 GB              |
 
 **建议**：PG 实例内存 ≥ 16GB，`shared_buffers` ≥ 4GB，HNSW 索引内存预留 2GB。
 
@@ -400,10 +390,10 @@ curl -X POST http://localhost:8000/api/v1/admin/partitions/precreate \
 
 ### 6.3 LLM 成本
 
-| 模型 | 单价（参考） | 单次决策成本 |
-|------|--------------|--------------|
-| gpt-4o | $2.5/1M in, $10/1M out | ~$0.01 |
-| gpt-4o-mini | $0.15/1M in, $0.6/1M out | ~$0.001 |
+| 模型        | 单价（参考）             | 单次决策成本 |
+| ----------- | ------------------------ | ------------ |
+| gpt-4o      | $2.5/1M in, $10/1M out   | ~$0.01       |
+| gpt-4o-mini | $0.15/1M in, $0.6/1M out | ~$0.001      |
 
 50 角色 × 30s/Tick × 24h = 14.4 万次决策/天。日预算约 $200（强模型）或 $20（mini）。
 
@@ -413,10 +403,10 @@ curl -X POST http://localhost:8000/api/v1/admin/partitions/precreate \
 
 ### 7.1 备份策略
 
-| 对象 | 方式 | 频率 |
-|------|------|------|
+| 对象       | 方式                      | 频率                |
+| ---------- | ------------------------- | ------------------- |
 | PostgreSQL | `pg_dump` 全量 + WAL 归档 | 每日全量 + 实时归档 |
-| Redis | RDB 快照 + AOF | 每 10 分钟 RDB |
+| Redis      | RDB 快照 + AOF            | 每 10 分钟 RDB      |
 
 ### 7.2 恢复演练
 
@@ -429,16 +419,16 @@ curl -X POST http://localhost:8000/api/v1/admin/partitions/precreate \
 
 ### 8.1 告警规则
 
-| 告警 | 条件 | 严重度 |
-|------|------|--------|
-| PG 不可用 | `pg_up == 0` 持续 1min | Critical |
-| Redis 不可用 | `redis_up == 0` 持续 1min | Critical |
-| 后端错误率 | `http_5xx_rate > 1%` 持续 5min | High |
-| LLM 调用失败率 | `llm_error_rate > 5%` 持续 5min | High |
-| Tick 延迟 | `character_tick_p95 > 5s` 持续 10min | Medium |
-| DB 连接池 | `pool_usage > 80%` 持续 5min | Medium |
-| 磁盘使用 | `disk_usage > 80%` | High |
-| 模块不健康 | `module_unhealthy > 0` 持续 5min | Medium |
+| 告警           | 条件                                 | 严重度   |
+| -------------- | ------------------------------------ | -------- |
+| PG 不可用      | `pg_up == 0` 持续 1min               | Critical |
+| Redis 不可用   | `redis_up == 0` 持续 1min            | Critical |
+| 后端错误率     | `http_5xx_rate > 1%` 持续 5min       | High     |
+| LLM 调用失败率 | `llm_error_rate > 5%` 持续 5min      | High     |
+| Tick 延迟      | `character_tick_p95 > 5s` 持续 10min | Medium   |
+| DB 连接池      | `pool_usage > 80%` 持续 5min         | Medium   |
+| 磁盘使用       | `disk_usage > 80%`                   | High     |
+| 模块不健康     | `module_unhealthy > 0` 持续 5min     | Medium   |
 
 ### 8.2 告警通道
 
@@ -450,10 +440,10 @@ curl -X POST http://localhost:8000/api/v1/admin/partitions/precreate \
 
 ## 九、相关文档
 
-| 主题 | 文档 |
-|------|------|
+| 主题            | 文档                                         |
+| --------------- | -------------------------------------------- |
 | Docker 部署指南 | [docker-deployment.md](docker-deployment.md) |
-| 配置参考 | [config-reference.md](config-reference.md) |
-| 可观测性 | [observability.md](observability.md) |
-| 数据模型 | [data-model.md](data-model.md) |
-| 开发指南 | [development-guide.md](development-guide.md) |
+| 配置参考        | [config-reference.md](config-reference.md)   |
+| 可观测性        | [observability.md](observability.md)         |
+| 数据模型        | [data-model.md](data-model.md)               |
+| 开发指南        | [development-guide.md](development-guide.md) |

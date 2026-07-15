@@ -12,12 +12,12 @@ Redis Key 约定：
     world:state:events     - Hash，活跃事件（event_id → JSON）
 """
 
-from src.core.evolutions.base import WorldEvolution
-from src.core.evolutions.event_evolution import EventEvolution
-from src.core.evolutions.resource_evolution import ResourceEvolution
-from src.core.evolutions.scene_evolution import SceneEvolution
-from src.core.evolutions.time_evolution import TimeEvolution
-from src.core.evolutions.weather_evolution import WeatherEvolution
+from src.core.world.evolutions.base import WorldEvolution
+from src.core.world.evolutions.event_evolution import EventEvolution
+from src.core.world.evolutions.resource_evolution import ResourceEvolution
+from src.core.world.evolutions.scene_evolution import SceneEvolution
+from src.core.world.evolutions.time_evolution import TimeEvolution
+from src.core.world.evolutions.weather_evolution import WeatherEvolution
 
 __all__ = [
     "WorldEvolution",
