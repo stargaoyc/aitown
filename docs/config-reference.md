@@ -46,16 +46,19 @@
 
 > **说明**：LLM 评分会额外消耗 Token，建议在低角色数（<10）或调试期启用。生产环境 50 角色时建议保持 `false` 以控制成本。
 
-### 1.5 MCP Servers
+### 1.5 本地工具
 
-| 变量                 | 必填 | 默认 | 说明                |
-| -------------------- | ---- | ---- | ------------------- |
-| `MCP_WEATHER_SERVER` | 否   | —    | 天气查询 Server URL |
-| `MCP_SHOP_SERVER`    | 否   | —    | 商店模拟 Server URL |
-| `MCP_KB_SERVER`      | 否   | —    | 知识库 Server URL   |
-| `MCP_TOOL_TIMEOUT`   | 否   | 30   | 工具调用超时（秒）  |
+> **2026-07-15 更新**：原 MCP Server 架构已转换为进程内本地工具（`src/tools/`），不再需要独立 Server 容器与对应的环境变量。
 
-> **MCP 插件开关**：每个 MCP Server 的启用/禁用状态存储在 Redis hash `mcp:enabled` 中，通过前端 Dashboard 或 `PUT /api/v1/mcp/servers/{name}/enabled` API 控制。未配置时默认全部启用。详见 [模块与 MCP 系统设计](module-system.md#51-mcp-插件单独开关redis-持久化)。
+工具随后端启动自动加载，无独立进程或网络配置项。工具按命名空间（shop / knowledge / social / world / self_info）组织，共 16 个工具，通过 Redis hash `tools:enabled` 控制启用状态。
+
+| 项           | 说明                                                                                                            |
+| ------------ | --------------------------------------------------------------------------------------------------------------- |
+| 命名空间开关 | Redis hash `tools:enabled`，键为工具全名（如 `shop.buy_item`），值为 `"true"` / `"false"`，未配置时默认全部启用 |
+| 开关控制方式 | 前端 Dashboard toggle / `PUT /api/v1/mcp/servers/{namespace}/enabled`（路径保留以兼容前端）                     |
+| 健康检查     | 本地工具为进程内调用，`/api/v1/mcp/servers/health` 始终返回 `online`                                            |
+
+详见 [模块与本地工具系统设计](module-system.md#51-工具命名空间单独开关redis-持久化)。
 
 ### 1.6 可观测性
 
@@ -177,12 +180,8 @@ character:
   memory_top_k: 10
   reflection_threshold: 20 # 每 N 条未反思记忆触发反思
 
-mcp:
-  tool_timeout: 30
-  servers:
-    weather: ${MCP_WEATHER_SERVER}
-    shop: ${MCP_SHOP_SERVER}
-    knowledge-base: ${MCP_KB_SERVER}
+tools:
+  enabled_namespaces: [shop, knowledge, social, world, self_info] # 默认全部启用，运行时由 Redis hash `tools:enabled` 覆盖
 
 messaging:
   qq:
@@ -217,10 +216,11 @@ auth:
 modules:
   # 见第三节：模块配置
   enabled:
-    - weather
-    - shop-simulator
-    - knowledge-base
-    - character-social
+    - shop
+    - knowledge
+    - social
+    - world
+    - self_info
 ```
 
 ---
@@ -234,14 +234,12 @@ modules:
 ```yaml
 modules:
   enabled:
-    - weather
-    - shop-simulator
+    - shop
+    - knowledge
   registered:
-    - name: weather
-      type: mcp
-      mcp_server_url: ${MCP_WEATHER_SERVER}
-      config:
-        timeout: 30
+    - name: shop
+      type: tools
+      config: {}
       dependencies: []
     - name: emotion-analyzer
       type: local
@@ -249,17 +247,18 @@ modules:
         model: local-emotion-v1
 ```
 
+> **说明**：`type: tools` 的模块对应 `src/tools/` 下进程内 async 函数工具，不再有 `mcp_server_url` 字段。开关状态实际持久化在 Redis hash `tools:enabled`（详见 [模块与本地工具系统设计 §二](module-system.md#二本地工具调用层toolregistry)），`module_configs` 表的 `enabled` 字段仅作为元数据镜像。
+
 ### 3.2 动态管理（PG `module_configs` 表）
 
 ```sql
-INSERT INTO module_configs (name, type, enabled, config, dependencies, mcp_server_url)
+INSERT INTO module_configs (name, type, enabled, config, dependencies)
 VALUES (
-  'weather',
-  'mcp',
+  'shop',
+  'tools',
   true,
-  '{"timeout": 30}'::jsonb,
-  '{}',
-  'http://localhost:8003'
+  '{}'::jsonb,
+  '{}'
 );
 ```
 
@@ -267,13 +266,13 @@ VALUES (
 
 ```bash
 # 启用
-curl -X POST http://localhost:8000/api/v1/modules/weather/enable
+curl -X POST http://localhost:8000/api/v1/modules/shop/enable
 
 # 禁用
-curl -X POST http://localhost:8000/api/v1/modules/weather/disable
+curl -X POST http://localhost:8000/api/v1/modules/shop/disable
 ```
 
-详见 [模块与MCP系统设计](module-system.md)。
+详见 [模块与本地工具系统设计](module-system.md)。
 
 ---
 
@@ -426,24 +425,23 @@ scenes:
 
 ## 七、默认值速查
 
-| 配置                    | 默认               | 来源                             |
-| ----------------------- | ------------------ | -------------------------------- |
-| World Tick 间隔         | 30s                | 真实时间                         |
-| 虚拟时间推进            | 10 分钟/Tick       | 虚拟时间                         |
-| 角色并发上限            | 10                 | —                                |
-| 记忆 Top-K              | 10                 | 检索                             |
-| 反思阈值                | 20 条              | —                                |
-| embedding 维度          | 1536               | OpenAI small                     |
-| 连接池大小              | 20                 | —                                |
-| LLM 超时                | 30s                | —                                |
-| LLM 日预算              | 10.0 USD           | 超预算降级到 flash               |
-| MCP 工具超时            | 30s                | —                                |
-| MCP 插件开关            | 全部启用           | Redis `mcp:enabled` 未配置时默认 |
-| 记忆 LLM 评分           | 关闭 (`false`)     | `MEMORY_LLM_SCORING_ENABLED`     |
-| OneBot 群聊回复模式     | 智能回复 (`false`) | `ONEBOT_GROUP_AT_ONLY`           |
-| OneBot 群聊回复概率上限 | 0.4                | `GROUP_REPLY_PROBABILITY_CAP`    |
-| JWT 过期                | 24h                | —                                |
-| Trace 采样率            | 0.5                | —                                |
+| 配置                    | 默认               | 来源                               |
+| ----------------------- | ------------------ | ---------------------------------- |
+| World Tick 间隔         | 30s                | 真实时间                           |
+| 虚拟时间推进            | 10 分钟/Tick       | 虚拟时间                           |
+| 角色并发上限            | 10                 | —                                  |
+| 记忆 Top-K              | 10                 | 检索                               |
+| 反思阈值                | 20 条              | —                                  |
+| embedding 维度          | 1536               | OpenAI small                       |
+| 连接池大小              | 20                 | —                                  |
+| LLM 超时                | 30s                | —                                  |
+| LLM 日预算              | 10.0 USD           | 超预算降级到 flash                 |
+| 本地工具开关            | 全部启用           | Redis `tools:enabled` 未配置时默认 |
+| 记忆 LLM 评分           | 关闭 (`false`)     | `MEMORY_LLM_SCORING_ENABLED`       |
+| OneBot 群聊回复模式     | 智能回复 (`false`) | `ONEBOT_GROUP_AT_ONLY`             |
+| OneBot 群聊回复概率上限 | 0.4                | `GROUP_REPLY_PROBABILITY_CAP`      |
+| JWT 过期                | 24h                | —                                  |
+| Trace 采样率            | 0.5                | —                                  |
 
 ---
 

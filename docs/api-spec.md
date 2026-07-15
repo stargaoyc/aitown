@@ -47,7 +47,7 @@
 | `0`     | 成功                           |
 | `400xx` | 客户端错误（参数/权限/未找到） |
 | `500xx` | 服务端错误                     |
-| `503xx` | 依赖服务不可用（LLM/MCP/DB）   |
+| `503xx` | 依赖服务不可用（LLM/DB）       |
 
 ### 1.4 鉴权
 
@@ -201,40 +201,45 @@ Content-Type: application/json
 | `/api/v1/modules/{name}/disable` | POST               | 禁用模块               |
 | `/api/v1/modules/{name}/health`  | GET                | 模块健康检查           |
 
-#### 注册 MCP 模块
+#### 注册模块
 
 ```http
 POST /api/v1/modules
 Content-Type: application/json
 
 {
-  "name": "weather",
-  "type": "mcp",
+  "name": "shop",
+  "type": "tools",
   "enabled": true,
-  "config": { "timeout": 30 },
-  "dependencies": [],
-  "mcp_server_url": "http://localhost:8003"
+  "config": {},
+  "dependencies": []
 }
 ```
+
+> `type` 可选 `tools`（进程内本地工具，对应 `src/tools/`）/ `local` / `skill`。原 `mcp` 类型已于 2026-07-15 转换为 `tools`，不再有 `mcp_server_url` 字段。
 
 #### 启用模块
 
 ```http
-POST /api/v1/modules/weather/enable
+POST /api/v1/modules/shop/enable
 ```
 
 ```json
-{ "code": 0, "data": { "name": "weather", "enabled": true, "health_check_status": "healthy" } }
+{ "code": 0, "data": { "name": "shop", "enabled": true, "health_check_status": "healthy" } }
 ```
 
-### 2.4 MCP Server 管理
+### 2.4 工具命名空间管理
 
-| 端点                                        | 方法       | 说明                                           |
-| ------------------------------------------- | ---------- | ---------------------------------------------- |
-| `/api/v1/mcp/servers`                       | GET / POST | MCP Server 列表（含 `enabled` 字段）/ 注册     |
-| `/api/v1/mcp/servers/{id}`                  | DELETE     | 注销 MCP Server                                |
-| `/api/v1/mcp/servers/{server_name}/enabled` | PUT        | **动态启用/禁用 MCP Server**（Redis 持久化）   |
-| `/api/v1/mcp/tools`                         | GET        | 所有可用工具列表（仅返回已启用 Server 的工具） |
+> **路径说明**：以下端点路径保留 `/api/v1/mcp/*` 以兼容前端，实际管理的是进程内本地工具命名空间（`src/tools/`），不再涉及独立 Server 容器。
+
+| 端点                                        | 方法 | 说明                                                          |
+| ------------------------------------------- | ---- | ------------------------------------------------------------- |
+| `/api/v1/mcp/servers`                       | GET  | 工具命名空间列表（含工具清单 + `enabled` 字段）               |
+| `/api/v1/mcp/servers/health`                | GET  | 健康检查（本地工具为进程内调用，始终返回 `online`）           |
+| `/api/v1/mcp/servers/{name}`                | GET  | 单个工具命名空间详情                                          |
+| `/api/v1/mcp/servers/{server_name}/enabled` | PUT  | **动态启用/禁用整个命名空间**（Redis `tools:enabled` 持久化） |
+| `/api/v1/mcp/tools`                         | GET  | 所有可用工具列表（仅返回已启用命名空间的工具）                |
+| `/api/v1/mcp/tools/{tool_name}/invoke`      | POST | 测试调用本地工具（管理调试用）                                |
 
 #### 查询所有可用工具
 
@@ -246,13 +251,14 @@ GET /api/v1/mcp/tools
 {
   "code": 0,
   "data": [
-    { "name": "get_current_weather", "server": "weather", "description": "查询指定城市的实时天气", "parameters": { ... } },
-    { "name": "list_items", "server": "shop-simulator", "description": "列出商店商品", "parameters": { ... } }
+    { "name": "shop.list_items", "namespace": "shop", "description": "列出商店商品", "parameters": { ... } },
+    { "name": "shop.buy_item", "namespace": "shop", "description": "购买商品", "parameters": { ... } },
+    { "name": "world.get_world_info", "namespace": "world", "description": "查询世界状态/天气", "parameters": { ... } }
   ]
 }
 ```
 
-#### 切换 MCP Server 启用状态
+#### 切换工具命名空间启用状态
 
 ```http
 PUT /api/v1/mcp/servers/{server_name}/enabled
@@ -266,7 +272,7 @@ Content-Type: application/json
   "code": 0,
   "message": "ok",
   "data": {
-    "server_name": "shop-simulator",
+    "server_name": "shop",
     "enabled": false
   }
 }
@@ -274,12 +280,12 @@ Content-Type: application/json
 
 **说明**：
 
-- 开关状态持久化到 Redis hash `mcp:enabled`，重启后端自动恢复；
-- 禁用后，`list_tools()` 和 `format_tools_for_prompt()` 不再返回该 Server 的工具；
-- 调用已禁用 Server 的工具会抛 `RuntimeError`；
+- 开关状态持久化到 Redis hash `tools:enabled`（键为工具全名，值为 `"true"` / `"false"`），重启后端自动恢复；
+- 禁用后，`format_tools_for_prompt()` 不再返回该命名空间的工具，LLM 决策时不可见；
+- 本地工具为进程内 async 函数调用，无网络开销，`/servers/health` 始终返回 `online`；
 - 未配置开关时默认全部启用。
 
-详见 [模块与 MCP 系统设计 - MCP 插件单独开关](module-system.md#51-mcp-插件单独开关redis-持久化)。
+详见 [模块与本地工具系统设计 - 工具命名空间单独开关](module-system.md#51-工具命名空间单独开关redis-持久化)。
 
 ### 2.5 会话与消息
 

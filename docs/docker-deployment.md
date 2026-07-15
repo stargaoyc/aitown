@@ -20,38 +20,33 @@
 ┌──────────▼──────────┐           ┌────────────▼──────────────┐
 │   前端 (Nginx)      │           │     后端 (FastAPI)         │
 │   静态文件服务       │           │   World Engine + APIs     │
-└─────────────────────┘           └────────────┬──────────────┘
+└─────────────────────┘           │   本地工具（ToolRegistry） │
+                                  └────────────┬──────────────┘
                                                │
                     ┌──────────────────────────┐
                     │                          │
            ┌────────▼────────┐      ┌──────────▼─────────┐
            │   PostgreSQL    │      │     Redis          │
            │  +pgvector      │      │  缓存/队列/锁      │
-           │  +pg_uuidv7     │      │                    │
+           │  +pg_uuidv7     │      │  tools:enabled     │
            └─────────────────┘      └────────────────────┘
-                    │
-           ┌────────▼────────┐
-           │   MCP Servers   │
-           │  (独立容器)      │
-           │  weather/shop   │
-           │  kb/social      │
-           └─────────────────┘
 ```
+
+> 工具已内联到后端进程（`src/tools/`），不再需要独立的 MCP Server 容器。工具启用状态存储在 Redis hash `tools:enabled`。
 
 ### 容器清单
 
-| 容器         | 镜像                        | 端口      | 说明         |
-| ------------ | --------------------------- | --------- | ------------ |
-| `postgres`   | 自构 (pgvector + pg_uuidv7) | 5432      | 主数据库     |
-| `redis`      | `redis:8.0-alpine`          | 6379      | 缓存/队列/锁 |
-| `backend`    | 自构 (Python 3.13 + uv)     | 8000      | FastAPI 后端 |
-| `frontend`   | 自构 (Node 22 + Nginx)      | 80        | 前端静态服务 |
-| `mcp-*`      | 自构 (Python 3.13)          | 8003-8006 | MCP 工具服务 |
-| `prometheus` | `prom/prometheus`           | 9090      | 指标采集     |
-| `loki`       | `grafana/loki:3.0.0`        | 3100      | 日志聚合     |
-| `jaeger`     | `jaegertracing/all-in-one`  | 16686     | 链路追踪     |
-| `grafana`    | `grafana/grafana:12.0.0`    | 3000      | 可视化面板   |
-| `alloy`      | `grafana/alloy`             | 12345     | 日志收集器   |
+| 容器         | 镜像                        | 端口  | 说明                         |
+| ------------ | --------------------------- | ----- | ---------------------------- |
+| `postgres`   | 自构 (pgvector + pg_uuidv7) | 5432  | 主数据库                     |
+| `redis`      | `redis:8.0-alpine`          | 6379  | 缓存/队列/锁/工具开关        |
+| `backend`    | 自构 (Python 3.13 + uv)     | 8000  | FastAPI 后端（含本地工具层） |
+| `frontend`   | 自构 (Node 22 + Nginx)      | 80    | 前端静态服务                 |
+| `prometheus` | `prom/prometheus`           | 9090  | 指标采集                     |
+| `loki`       | `grafana/loki:3.0.0`        | 3100  | 日志聚合                     |
+| `jaeger`     | `jaegertracing/all-in-one`  | 16686 | 链路追踪                     |
+| `grafana`    | `grafana/grafana:12.0.0`    | 3000  | 可视化面板                   |
+| `alloy`      | `grafana/alloy`             | 12345 | 日志收集器                   |
 
 ---
 
@@ -118,14 +113,15 @@ ADMIN_PASSWORD=your-secure-admin-password
 
 ### 3.1 Dockerfile 说明
 
-项目包含 4 个 Dockerfile：
+项目包含 3 个 Dockerfile：
 
-| Dockerfile | 位置                              | 说明                                            |
-| ---------- | --------------------------------- | ----------------------------------------------- |
-| PostgreSQL | `docker/postgres/Dockerfile`      | 基于 `pgvector/pgvector:pg17`，补装 `pg_uuidv7` |
-| 后端       | `packages/backend/Dockerfile`     | 多阶段构建，Python 3.13 + uv                    |
-| 前端       | `packages/frontend/Dockerfile`    | 多阶段构建，Node 22 + Nginx                     |
-| MCP Server | `packages/mcp-servers/Dockerfile` | 通用模板，通过 `--build-arg SERVER` 指定        |
+| Dockerfile | 位置                           | 说明                                            |
+| ---------- | ------------------------------ | ----------------------------------------------- |
+| PostgreSQL | `docker/postgres/Dockerfile`   | 基于 `pgvector/pgvector:pg17`，补装 `pg_uuidv7` |
+| 后端       | `packages/backend/Dockerfile`  | 多阶段构建，Python 3.13 + uv                    |
+| 前端       | `packages/frontend/Dockerfile` | 多阶段构建，Node 22 + Nginx                     |
+
+> 原本独立的 MCP Server Dockerfile 已移除，工具调用改为后端进程内的 async 函数（`src/tools/`），不再需要单独构建。
 
 ### 3.2 后端 Dockerfile（多阶段构建）
 
@@ -183,35 +179,7 @@ EXPOSE 80
 - WebSocket 反向代理（`/ws/` → `backend:8000`）
 - 静态资源长期缓存（`/assets/` → `expires 1y`）
 
-### 3.4 MCP Server Dockerfile（通用模板）
-
-```dockerfile
-# packages/mcp-servers/Dockerfile
-# 通过 --build-arg SERVER=<name> 构建不同的 MCP Server
-FROM python:3.13-slim AS builder
-RUN pip install uv
-WORKDIR /app
-ARG SERVER
-COPY ${SERVER}/pyproject.toml ${SERVER}/uv.lock ./
-RUN uv sync --frozen --no-dev
-
-FROM python:3.13-slim
-COPY --from=builder /app/.venv /app/.venv
-COPY ${SERVER}/ ./
-ENV PATH="/app/.venv/bin:$PATH"
-CMD ["python", "server.py"]
-```
-
-**构建示例**：
-
-```bash
-# 构建天气 MCP Server
-docker build --build-arg SERVER=weather \
-  -t aitown/mcp-weather \
-  packages/mcp-servers/
-```
-
-### 3.5 手动构建所有镜像
+### 3.4 手动构建所有镜像
 
 ```bash
 # 构建后端
@@ -219,13 +187,6 @@ docker build -t aitown/backend packages/backend/
 
 # 构建前端
 docker build -t aitown/frontend packages/frontend/
-
-# 构建 MCP Servers（逐个构建）
-for server in weather shop-simulator knowledge-base character-social; do
-  docker build --build-arg SERVER=$server \
-    -t aitown/mcp-$server \
-    packages/mcp-servers/
-done
 
 # 构建 PostgreSQL
 docker build -t aitown/postgres docker/postgres/
@@ -256,15 +217,11 @@ docker compose up -d postgres redis
 # 2. 启动应用层（后端 + 前端）
 docker compose up -d backend frontend
 
-# 3. 启动 MCP 工具服务（按需）
-docker compose --profile mcp up -d
-
-# 4. 启动可观测性栈（按需）
+# 3. 启动可观测性栈（按需）
 docker compose --profile observability up -d
-
-# 5. 一键启动全部（含可观测性和 MCP）
-docker compose --profile mcp --profile observability up -d
 ```
+
+> 工具已内联到后端进程，不再需要 `--profile mcp` 启动独立容器。
 
 ### 4.3 一键启动（最简部署）
 
@@ -273,7 +230,7 @@ docker compose --profile mcp --profile observability up -d
 cp .env.example .env
 # 编辑 .env 填写必要配置
 
-# 启动核心服务（不含可观测性和 MCP）
+# 启动核心服务（不含可观测性栈）
 docker compose up -d
 
 # 查看启动状态
@@ -349,19 +306,13 @@ backend:
 
 > **注意**：`.env` 文件中的 `DATABASE_URL`、`REDIS_URL` 在容器中会被覆盖为容器网络地址。其他变量（如 `OPENAI_API_KEY`）从 `.env` 继承。
 
-### 5.3 MCP Server 环境变量
+### 5.3 本地工具开关
 
-MCP Server 的连接地址需要在 `.env` 中配置为容器名：
+工具已内联到后端进程，无需配置 Server URL 环境变量。每个工具命名空间（shop / knowledge / social / world / self_info）可独立启用/禁用：
 
-```bash
-# 容器内部互相访问使用容器名
-MCP_WEATHER_SERVER=http://mcp-weather:8003
-MCP_SHOP_SERVER=http://mcp-shop-simulator:8004
-MCP_KB_SERVER=http://mcp-knowledge-base:8005
-MCP_SOCIAL_SERVER=http://mcp-character-social:8006
-```
-
-> **提示**：MCP 插件可在前端设置页单独启用/禁用，无需重启容器。状态存储在 Redis hash `mcp:enabled` 中。
+- **前端 Dashboard**：设置页 `工具命名空间` 卡片 toggle 控件；
+- **API 调用**：`PUT /api/v1/mcp/servers/{namespace}/enabled`；
+- **状态存储**：Redis hash `tools:enabled`，键为工具全名（如 `shop.buy_item`），值为 `"true"` / `"false"`，未配置时默认全部启用。
 
 ---
 
@@ -404,8 +355,8 @@ docker compose exec backend pytest
 5. **配置定期备份**
 
 ```bash
-# 生产环境启动（全量）
-docker compose --profile mcp --profile observability up -d
+# 生产环境启动（含可观测性栈）
+docker compose --profile observability up -d
 
 # 配置 PgBouncer（生产推荐）
 # 在 docker-compose.yml 中取消 pgbouncer 服务注释
@@ -538,19 +489,22 @@ docker compose exec frontend cat /etc/nginx/conf.d/default.conf
 docker compose exec frontend wget -qO- http://backend:8000/health
 ```
 
-#### MCP Server 连接失败
+#### 本地工具调用失败
 
 ```bash
-# 检查 MCP Server 是否运行
-docker compose --profile mcp ps
+# 检查后端容器是否运行
+docker compose ps backend
 
-# 检查健康状态
+# 检查工具命名空间健康状态（本地工具为进程内调用，始终在线）
 curl http://localhost:8000/api/v1/mcp/servers/health
 
-# 手动调用 MCP 工具测试
-curl -X POST http://localhost:8000/api/v1/mcp/tools/get_current_weather/invoke?server_name=weather \
+# 列出所有可用工具
+curl http://localhost:8000/api/v1/mcp/tools
+
+# 手动调用工具测试（如查询商店商品列表）
+curl -X POST http://localhost:8000/api/v1/mcp/tools/shop.list_items/invoke \
   -H "Content-Type: application/json" \
-  -d '{"city": "东京"}'
+  -d '{}'
 ```
 
 #### 数据库迁移失败

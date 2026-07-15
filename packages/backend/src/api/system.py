@@ -12,7 +12,7 @@ import secrets
 from fastapi import APIRouter, Depends, HTTPException
 from structlog import get_logger
 
-from src.api.mcp import _MCP_SERVERS_CONFIG
+from src.api.mcp import _NAMESPACES as _TOOL_NAMESPACES
 from src.auth import create_token
 from src.config import settings
 from src.runtime import (
@@ -210,13 +210,13 @@ async def list_modules():
         },
     ]
 
-    # 计算 MCP Server 模块状态
-    for cfg in _MCP_SERVERS_CONFIG:
+    # 计算工具命名空间模块状态（原 MCP Server，已内联到后端进程）
+    for cfg in _TOOL_NAMESPACES:
         modules.append(
             {
-                "name": cfg["name"],
-                "type": "mcp",
-                "status": "configured",
+                "name": f"tools.{cfg['name']}",
+                "type": "tools",
+                "status": "running",
                 "description": cfg["description"],
             }
         )

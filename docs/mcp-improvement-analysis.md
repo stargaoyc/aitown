@@ -1,5 +1,7 @@
 # MCP 方案改进分析
 
+> **历史说明（2026-07-15）**：本文档为历史分析文档。MCP Server 架构已于 2026-07-15 全部转换为本地工具调用（`src/tools/`），`packages/mcp-servers/` 与 `src/mcp/` 已删除。如需了解当前工具系统设计，请参阅 [architecture.md](architecture.md) 与 [module-system.md](module-system.md)。本文档保留以记录迁移决策过程。
+
 > 本文档对 aitown 当前 MCP（Model Context Protocol）工具调用方案进行优缺点分析，对比 yuiju 的工具调用方式，提出标准化改进建议，并给出工具的 MCP/内联归属判断与迁移路径。
 >
 > - 审查范围：`packages/mcp-servers/`（6 个 Server）、`packages/backend/src/mcp/`（客户端）、`packages/backend/src/api/mcp.py`（管理 API）、`packages/backend/src/core/character_tick.py`（集成点）

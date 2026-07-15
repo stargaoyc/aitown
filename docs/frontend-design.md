@@ -292,19 +292,19 @@ export function CharacterCard({ character }: { character: Character }) {
 | `/snapshots` 世界快照管理 | 快照列表、冷启动恢复 | 表格、操作按钮 |
 | `/character-cards` 角色卡预览 | 角色卡渲染预览 | 卡片组件 |
 | `/notifications` 通知中心 | 系统通知列表 | 列表 |
-| `/settings` 系统设置 | 模型配置、Prompt 编辑、**MCP 插件开关** | 表单、toggle 控件 |
-| `/settings/mcp` MCP 服务器管理 | MCP Server 列表、工具清单、启用状态 | 表格、toggle |
+| `/settings` 系统设置 | 模型配置、Prompt 编辑、**工具命名空间开关** | 表单、toggle 控件 |
+| `/settings/mcp` 工具命名空间管理 | 工具命名空间列表、工具清单、启用状态（路径保留以兼容前端） | 表格、toggle |
 
-### 3.1 MCP 插件开关 UI
+### 3.1 工具命名空间开关 UI
 
-设置页 `/settings` 中的 MCP 服务器卡片提供 toggle 开关：
+设置页 `/settings` 中的工具命名空间卡片提供 toggle 开关（原 MCP Server 卡片，2026-07-15 转换为本地工具）：
 
 - **启用状态**：sakura 色主题（樱花粉 #FF8FAB），显示"已启用"绿色标签；
 - **禁用状态**：灰色 + `opacity-70`，显示"已禁用"灰色标签；
-- **交互**：点击 toggle 立即调用 `PUT /api/v1/mcp/servers/{name}/enabled`，成功后 TanStack Query 自动刷新列表；
-- **数据流**：`useToggleMcpServer` mutation → `toggleMcpServer` API → 后端 Redis `hset mcp:enabled`。
+- **交互**：点击 toggle 立即调用 `PUT /api/v1/mcp/servers/{name}/enabled`（路径保留以兼容前端），成功后 TanStack Query 自动刷新列表；
+- **数据流**：`useToggleMcpServer` mutation → `toggleMcpServer` API → 后端 Redis `hset tools:enabled`。
 
-详见 [模块与 MCP 系统设计 - MCP 插件单独开关](module-system.md#51-mcp-插件单独开关redis-持久化)。
+详见 [模块与本地工具系统设计 - 工具命名空间单独开关](module-system.md#51-工具命名空间单独开关redis-持久化)。
 
 ---
 

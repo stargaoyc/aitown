@@ -6,13 +6,13 @@
 
 ## 一、设计目标
 
-| 目标 | 说明 |
-|------|------|
-| 全链路追踪 | 每个 Tick / Action / LLM 调用 / MCP 调用都有 Trace |
-| LLM 专用追踪 | Token / Cost / Prompt / Completion 可审计 |
-| 结构化日志 | 全部日志带 `trace_id`，可在 Grafana 与 Trace 联动跳转 |
-| 指标告警 | 关键指标超阈值自动告警 |
-| 调试友好 | 可基于 trace_id 回放角色决策全过程 |
+| 目标         | 说明                                                   |
+| ------------ | ------------------------------------------------------ |
+| 全链路追踪   | 每个 Tick / Action / LLM 调用 / 本地工具调用都有 Trace |
+| LLM 专用追踪 | Token / Cost / Prompt / Completion 可审计              |
+| 结构化日志   | 全部日志带 `trace_id`，可在 Grafana 与 Trace 联动跳转  |
+| 指标告警     | 关键指标超阈值自动告警                                 |
+| 调试友好     | 可基于 trace_id 回放角色决策全过程                     |
 
 ---
 
@@ -51,41 +51,41 @@
 
 ### 各组件职责
 
-| 组件 | 职责 | 版本 |
-|------|------|------|
-| OTel SDK | 应用层自动/手动埋点，生成 Span | 1.28+ |
-| Langfuse SDK | LLM 专用追踪（Prompt/Completion/Token/Cost） | 3.x |
-| structlog | 结构化 JSON 日志（含 trace_id） | 最新 |
-| OTel Collector | 接收 OTLP，批处理/采样/过滤，导出到后端 | 最新 |
-| Jaeger | 分布式链路追踪存储与查询 | 最新 |
-| Langfuse | LLM 调用观测（与 Jaeger 互补） | 3.x |
-| Prometheus | 指标采集与存储（拉取模式） | 最新 |
-| Grafana Alloy | 统一可观测性收集器（取代 Promtail），采集日志/指标/Trace | 最新 |
-| **Loki** | **日志聚合存储，LogQL 查询** | **3.x** |
-| Grafana | 统一可视化面板，Trace/Metrics/Logs 联动 | 12.x |
+| 组件           | 职责                                                     | 版本    |
+| -------------- | -------------------------------------------------------- | ------- |
+| OTel SDK       | 应用层自动/手动埋点，生成 Span                           | 1.28+   |
+| Langfuse SDK   | LLM 专用追踪（Prompt/Completion/Token/Cost）             | 3.x     |
+| structlog      | 结构化 JSON 日志（含 trace_id）                          | 最新    |
+| OTel Collector | 接收 OTLP，批处理/采样/过滤，导出到后端                  | 最新    |
+| Jaeger         | 分布式链路追踪存储与查询                                 | 最新    |
+| Langfuse       | LLM 调用观测（与 Jaeger 互补）                           | 3.x     |
+| Prometheus     | 指标采集与存储（拉取模式）                               | 最新    |
+| Grafana Alloy  | 统一可观测性收集器（取代 Promtail），采集日志/指标/Trace | 最新    |
+| **Loki**       | **日志聚合存储，LogQL 查询**                             | **3.x** |
+| Grafana        | 统一可视化面板，Trace/Metrics/Logs 联动                  | 12.x    |
 
 ---
 
 ## 三、埋点覆盖矩阵
 
-| 埋点位置 | Span 名称 | 关键属性 |
-|----------|-----------|----------|
-| World Tick | `world.tick` | `tick_id`, `weather`, `time_advance` |
-| Character Tick | `character.tick` | `character_id`, `tick_duration` |
-| 角色感知 | `character.perceive` | `character_id`, `memories_retrieved` |
-| 角色决策 | `character.decide` | `character_id`, `candidates_count`, `model` |
-| LLM 调用 | `llm.generate` | `model_name`, `tokens`, `temperature`, `cost` |
-| Action 决策 | `action.decision` | `character_id`, `action_name`, `reason` |
-| Action 执行 | `action.execute` | `action_id`, `duration`, `success`, `tx_id` |
-| 记忆写入 | `memory.write` | `character_id`, `importance`, `source_type` |
-| 记忆检索 | `memory.retrieve` | `character_id`, `query`, `top_k`, `latency_ms` |
-| 反思生成 | `memory.reflect` | `character_id`, `memory_count` |
-| MCP 工具调用 | `mcp.tool.call` | `tool_name`, `server_url`, `latency`, `success` |
-| 消息处理 | `message.process` | `platform`, `session_id`, `response_time` |
-| 消息推送 | `message.push` | `character_id`, `target_user_id`, `reason` |
-| 模块操作 | `module.{enable\|disable\|call}` | `module_name`, `status` |
-| 模块健康检查 | `module.health_check` | `module_name`, `status` |
-| DB 事务 | `db.tx` | `repo`, `op`, `latency_ms`, `rows` |
+| 埋点位置       | Span 名称                        | 关键属性                                                                 |
+| -------------- | -------------------------------- | ------------------------------------------------------------------------ |
+| World Tick     | `world.tick`                     | `tick_id`, `weather`, `time_advance`                                     |
+| Character Tick | `character.tick`                 | `character_id`, `tick_duration`                                          |
+| 角色感知       | `character.perceive`             | `character_id`, `memories_retrieved`                                     |
+| 角色决策       | `character.decide`               | `character_id`, `candidates_count`, `model`                              |
+| LLM 调用       | `llm.generate`                   | `model_name`, `tokens`, `temperature`, `cost`                            |
+| Action 决策    | `action.decision`                | `character_id`, `action_name`, `reason`                                  |
+| Action 执行    | `action.execute`                 | `action_id`, `duration`, `success`, `tx_id`                              |
+| 记忆写入       | `memory.write`                   | `character_id`, `importance`, `source_type`                              |
+| 记忆检索       | `memory.retrieve`                | `character_id`, `query`, `top_k`, `latency_ms`                           |
+| 反思生成       | `memory.reflect`                 | `character_id`, `memory_count`                                           |
+| 本地工具调用   | `tool.call`                      | `tool_name`（全名如 `shop.buy_item`）, `namespace`, `latency`, `success` |
+| 消息处理       | `message.process`                | `platform`, `session_id`, `response_time`                                |
+| 消息推送       | `message.push`                   | `character_id`, `target_user_id`, `reason`                               |
+| 模块操作       | `module.{enable\|disable\|call}` | `module_name`, `status`                                                  |
+| 模块健康检查   | `module.health_check`            | `module_name`, `status`                                                  |
+| DB 事务        | `db.tx`                          | `repo`, `op`, `latency_ms`, `rows`                                       |
 
 ---
 
@@ -100,7 +100,7 @@ trace_id: abc123
 │   │   └── span: memory.retrieve (top_k=10, latency=18ms)
 │   ├── span: character.decide (candidates_count=5, model=gpt-4o)
 │   │   ├── span: llm.generate (tokens=850, cost=0.012)
-│   │   └── span: mcp.tool.call (tool=search_web, latency=1.2s)
+│   │   └── span: tool.call (tool=knowledge.query_kb, latency=18ms)
 │   └── span: action.execute (action_id=move_to_cafe, tx_id=tx_456)
 │       ├── span: db.tx (repo=action_repo, op=insert, rows=1)
 │       ├── span: db.tx (repo=memory_repo, op=insert, rows=1)
@@ -149,13 +149,13 @@ logger.info("action_executed",
 
 ### 5.2 日志级别
 
-| 级别 | 适用 |
-|------|------|
-| `DEBUG` | 详细调试信息（默认不输出） |
-| `INFO` | 正常流程关键节点 |
-| `WARN` | 可恢复异常（重试、降级） |
-| `ERROR` | 错误（Action 失败、模块异常） |
-| `CRITICAL` | 系统级故障（DB 不可用） |
+| 级别       | 适用                          |
+| ---------- | ----------------------------- |
+| `DEBUG`    | 详细调试信息（默认不输出）    |
+| `INFO`     | 正常流程关键节点              |
+| `WARN`     | 可恢复异常（重试、降级）      |
+| `ERROR`    | 错误（Action 失败、模块异常） |
+| `CRITICAL` | 系统级故障（DB 不可用）       |
 
 ### 5.3 Grafana Alloy 采集配置
 
@@ -163,62 +163,62 @@ logger.info("action_executed",
 # alloy.config.alloy (Alloy 使用 .alloy 扩展名)
 // 日志采集 → Loki
 loki.write "default" {
-  endpoint {
-    url = "http://loki:3100/loki/api/v1/push"
-  }
+endpoint {
+url = "http://loki:3100/loki/api/v1/push"
+}
 }
 
 // Docker 容器日志发现
 discovery.docker "backend" {
-  host = "unix:///var/run/docker.sock"
-  filter {
-    name = "label"
-    values = ["com.docker.compose.service=backend"]
-  }
+host = "unix:///var/run/docker.sock"
+filter {
+name = "label"
+values = ["com.docker.compose.service=backend"]
+}
 }
 
 // 日志管道：JSON 解析 → 标签提取 → Loki 推送
 loki.source.docker "backend_logs" {
-  forward_to = [loki.process.backend_pipeline.receiver]
+forward_to = [loki.process.backend_pipeline.receiver]
 
-  discovery = discovery.docker.backend
+discovery = discovery.docker.backend
 }
 
 loki.process "backend_pipeline" {
-  forward_to = [loki.write.default.receiver]
+forward_to = [loki.write.default.receiver]
 
-  // JSON 解析
-  stage.json {
-    expressions = {
-      level = "level"
-      trace_id = "trace_id"
-      logger = "logger"
-      character_id = "character_id"
-    }
-  }
+// JSON 解析
+stage.json {
+expressions = {
+level = "level"
+trace_id = "trace_id"
+logger = "logger"
+character_id = "character_id"
+}
+}
 
-  // 提取为标签
-  stage.labels {
-    values = {
-      level = "level"
-      logger = "logger"
-    }
-  }
+// 提取为标签
+stage.labels {
+values = {
+level = "level"
+logger = "logger"
+}
+}
 
-  // 结构化元数据（Loki 3.x）
-  stage.static_labels {
-    values = {
-      service = "backend"
-    }
-  }
+// 结构化元数据（Loki 3.x）
+stage.static_labels {
+values = {
+service = "backend"
+}
+}
 
-  // 结构化元数据写入
-  stage.loki_metadata {
-    values = {
-      trace_id = "trace_id"
-      character_id = "character_id"
-    }
-  }
+// 结构化元数据写入
+stage.loki_metadata {
+values = {
+trace_id = "trace_id"
+character_id = "character_id"
+}
+}
 }
 ```
 
@@ -243,6 +243,7 @@ sum by (logger) (rate({service="backend", level="ERROR"}[5m]))
 ### 5.5 Grafana Trace ↔ Logs 联动
 
 Grafana 数据源配置：
+
 - Jaeger 数据源关联 Loki（`Trace to Logs`），点 Span 可直接跳转 Loki 查该 trace_id 日志；
 - Loki 数据源关联 Jaeger（`Logs to Trace`），日志中 `trace_id` 字段可跳转 Trace。
 
@@ -252,32 +253,32 @@ Grafana 数据源配置：
 
 ### 6.1 指标清单
 
-| 指标名 | 类型 | 说明 | 告警阈值 |
-|--------|------|------|----------|
-| `character_tick_duration` | Histogram | 角色 Tick 耗时 | p95 > 5s |
-| `llm_call_duration` | Histogram | LLM 调用延迟 | p95 > 10s |
-| `llm_token_usage` | Counter | Token 消耗 | 日环比 > 50% |
-| `llm_cost_total` | Counter | LLM 成本累计 | 日成本 > 预算 80% |
-| `mcp_tool_error_rate` | Gauge | MCP 工具错误率 | > 5% |
-| `mcp_tool_latency` | Histogram | MCP 工具延迟 | p95 > 5s |
-| `action_execution_failed` | Counter | Action 执行失败 | > 10/h |
-| `memory_retrieve_latency` | Histogram | 记忆检索延迟 | p95 > 200ms |
-| `db_tx_duration` | Histogram | DB 事务耗时 | p95 > 500ms |
-| `db_connection_pool_usage` | Gauge | 连接池占用率 | > 80% |
-| `module_unhealthy` | Gauge | 不健康模块数 | > 0 |
-| `active_characters` | Gauge | 活跃角色数 | — |
-| `message_response_time` | Histogram | 消息回复延迟 | p95 > 15s |
-| `redis_ops_per_sec` | Gauge | Redis QPS | — |
-| `loki_ingest_rate` | Gauge | Loki 日志摄入速率 | — |
+| 指标名                     | 类型      | 说明              | 告警阈值          |
+| -------------------------- | --------- | ----------------- | ----------------- |
+| `character_tick_duration`  | Histogram | 角色 Tick 耗时    | p95 > 5s          |
+| `llm_call_duration`        | Histogram | LLM 调用延迟      | p95 > 10s         |
+| `llm_token_usage`          | Counter   | Token 消耗        | 日环比 > 50%      |
+| `llm_cost_total`           | Counter   | LLM 成本累计      | 日成本 > 预算 80% |
+| `tool_error_rate`          | Gauge     | 本地工具错误率    | > 5%              |
+| `tool_latency`             | Histogram | 本地工具延迟      | p95 > 1s          |
+| `action_execution_failed`  | Counter   | Action 执行失败   | > 10/h            |
+| `memory_retrieve_latency`  | Histogram | 记忆检索延迟      | p95 > 200ms       |
+| `db_tx_duration`           | Histogram | DB 事务耗时       | p95 > 500ms       |
+| `db_connection_pool_usage` | Gauge     | 连接池占用率      | > 80%             |
+| `module_unhealthy`         | Gauge     | 不健康模块数      | > 0               |
+| `active_characters`        | Gauge     | 活跃角色数        | —                 |
+| `message_response_time`    | Histogram | 消息回复延迟      | p95 > 15s         |
+| `redis_ops_per_sec`        | Gauge     | Redis QPS         | —                 |
+| `loki_ingest_rate`         | Gauge     | Loki 日志摄入速率 | —                 |
 
 ### 6.2 自定义业务指标
 
-| 指标 | 说明 |
-|------|------|
-| `character_energy_avg` | 角色平均精力（健康度参考） |
+| 指标                           | 说明                                  |
+| ------------------------------ | ------------------------------------- |
+| `character_energy_avg`         | 角色平均精力（健康度参考）            |
 | `action_category_distribution` | Action 分类分布（生活/工作/社交占比） |
-| `relation_strength_avg` | 平均关系强度 |
-| `memory_reflection_rate` | 已反思记忆占比 |
+| `relation_strength_avg`        | 平均关系强度                          |
+| `memory_reflection_rate`       | 已反思记忆占比                        |
 
 ---
 
@@ -285,25 +286,25 @@ Grafana 数据源配置：
 
 ### 7.1 预置面板
 
-| 面板 | 内容 | 数据源 |
-|------|------|--------|
-| Overview | 活跃角色数、Tick QPS、LLM 调用 QPS、错误率 | Prometheus |
-| LLM | Token 用量、成本、模型分布、延迟分布 | Prometheus + Langfuse |
-| Character Tick | Tick 耗时分布、决策模型分布、Action 分类分布 | Prometheus |
-| Memory | 检索延迟、记忆总量、反思触发率 | Prometheus |
-| MCP | 工具调用 QPS、错误率、延迟、各 Server 健康 | Prometheus |
-| DB | 事务耗时、连接池、慢查询、分区表大小 | Prometheus |
-| Message | 消息量、回复延迟、推送量、平台分布 | Prometheus |
-| **Logs** | **实时日志流、按 service/level/trace_id 过滤** | **Loki** |
-| **Trace Detail** | **Trace 链路 + 关联日志** | **Jaeger + Loki** |
+| 面板             | 内容                                           | 数据源                |
+| ---------------- | ---------------------------------------------- | --------------------- |
+| Overview         | 活跃角色数、Tick QPS、LLM 调用 QPS、错误率     | Prometheus            |
+| LLM              | Token 用量、成本、模型分布、延迟分布           | Prometheus + Langfuse |
+| Character Tick   | Tick 耗时分布、决策模型分布、Action 分类分布   | Prometheus            |
+| Memory           | 检索延迟、记忆总量、反思触发率                 | Prometheus            |
+| 工具             | 本地工具调用 QPS、错误率、延迟、命名空间健康   | Prometheus            |
+| DB               | 事务耗时、连接池、慢查询、分区表大小           | Prometheus            |
+| Message          | 消息量、回复延迟、推送量、平台分布             | Prometheus            |
+| **Logs**         | **实时日志流、按 service/level/trace_id 过滤** | **Loki**              |
+| **Trace Detail** | **Trace 链路 + 关联日志**                      | **Jaeger + Loki**     |
 
 ### 7.2 告警通道
 
-| 通道 | 适用 |
-|------|------|
+| 通道       | 适用         |
+| ---------- | ------------ |
 | 飞书机器人 | 默认告警通道 |
-| 邮件 | 严重告警 |
-| PagerDuty | 生产事故升级 |
+| 邮件       | 严重告警     |
+| PagerDuty  | 生产事故升级 |
 
 ---
 
@@ -311,15 +312,15 @@ Grafana 数据源配置：
 
 ### 8.1 追踪内容
 
-| 字段 | 说明 |
-|------|------|
-| `name` | 调用场景（character.decide / message.reply） |
-| `model` | 模型名 |
-| `prompt` | 完整 Prompt（含记忆、状态） |
-| `completion` | LLM 输出 |
-| `tokens` | input / output tokens |
-| `cost` | 调用成本 |
-| `metadata` | character_id / trace_id / session_id |
+| 字段         | 说明                                         |
+| ------------ | -------------------------------------------- |
+| `name`       | 调用场景（character.decide / message.reply） |
+| `model`      | 模型名                                       |
+| `prompt`     | 完整 Prompt（含记忆、状态）                  |
+| `completion` | LLM 输出                                     |
+| `tokens`     | input / output tokens                        |
+| `cost`       | 调用成本                                     |
+| `metadata`   | character_id / trace_id / session_id         |
 
 ### 8.2 集成方式
 
@@ -362,15 +363,15 @@ Langfuse 与 OTel 通过 `trace_id` 关联，可在 Jaeger 中跳转到 Langfuse
 
 ## 十、采样策略
 
-| Span 类型 | 采样率 | 说明 |
-|-----------|--------|------|
-| 错误 Span | 100% | 所有错误必采 |
-| LLM 调用 | 100% | 通过 Langfuse 全量记录 |
-| World Tick | 10% | 高频，采样足够 |
-| Character Tick | 50% | 兼顾性能与可观测 |
-| MCP 工具调用 | 100% | 关键路径 |
-| DB 事务 | 10% | 高频，按需采样 |
-| 日志（Loki） | 100% | 全量采集，按需查询 |
+| Span 类型      | 采样率 | 说明                   |
+| -------------- | ------ | ---------------------- |
+| 错误 Span      | 100%   | 所有错误必采           |
+| LLM 调用       | 100%   | 通过 Langfuse 全量记录 |
+| World Tick     | 10%    | 高频，采样足够         |
+| Character Tick | 50%    | 兼顾性能与可观测       |
+| 本地工具调用   | 100%   | 关键路径               |     |
+| DB 事务        | 10%    | 高频，按需采样         |
+| 日志（Loki）   | 100%   | 全量采集，按需查询     |
 
 OTel Collector 配置 tail-based sampling，错误与慢请求优先保留。
 
@@ -382,26 +383,26 @@ OTel Collector 配置 tail-based sampling，错误与慢请求优先保留。
 
 ### 11.1 文件清单
 
-| 文件 | 说明 |
-|------|------|
-| `docker/observability/prometheus.yml` | Prometheus 采集配置（后端 /metrics + 自身 + Loki + Jaeger + Alloy） |
-| `docker/observability/loki-config.yml` | Loki 单节点配置（TSDB v13 schema，7 天保留，文件系统存储） |
-| `docker/observability/alloy.config.alloy` | Grafana Alloy 采集管道（Docker 日志 → JSON 解析 → Loki 推送） |
-| `docker/observability/grafana/datasources/datasources.yml` | Grafana 数据源自动配置（Prometheus + Loki + Jaeger，含 Trace↔Logs 联动） |
-| `docker/observability/grafana/dashboards.yml` | Grafana Dashboard Provider 配置 |
-| `docker/observability/grafana/dashboards/ai-town-overview.json` | 总览面板（指标 + 实时日志流） |
-| `docker/observability/grafana/dashboards/ai-town-llm.json` | LLM 监控面板（Token / Cost / 延迟 / 错误率） |
-| `docker/observability/grafana/dashboards/ai-town-character-tick.json` | 角色 Tick 面板（耗时 / 成败 / Action 分布） |
+| 文件                                                                  | 说明                                                                     |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `docker/observability/prometheus.yml`                                 | Prometheus 采集配置（后端 /metrics + 自身 + Loki + Jaeger + Alloy）      |
+| `docker/observability/loki-config.yml`                                | Loki 单节点配置（TSDB v13 schema，7 天保留，文件系统存储）               |
+| `docker/observability/alloy.config.alloy`                             | Grafana Alloy 采集管道（Docker 日志 → JSON 解析 → Loki 推送）            |
+| `docker/observability/grafana/datasources/datasources.yml`            | Grafana 数据源自动配置（Prometheus + Loki + Jaeger，含 Trace↔Logs 联动） |
+| `docker/observability/grafana/dashboards.yml`                         | Grafana Dashboard Provider 配置                                          |
+| `docker/observability/grafana/dashboards/ai-town-overview.json`       | 总览面板（指标 + 实时日志流）                                            |
+| `docker/observability/grafana/dashboards/ai-town-llm.json`            | LLM 监控面板（Token / Cost / 延迟 / 错误率）                             |
+| `docker/observability/grafana/dashboards/ai-town-character-tick.json` | 角色 Tick 面板（耗时 / 成败 / Action 分布）                              |
 
 ### 11.2 Docker Compose 服务
 
-| 服务 | 镜像 | 端口 | 说明 |
-|------|------|------|------|
-| `prometheus` | `prom/prometheus:latest` | 9090 | 指标采集与存储 |
-| `loki` | `grafana/loki:3.0.0` | 3100 | 日志聚合存储 |
-| `jaeger` | `jaegertracing/all-in-one:1.60` | 16686 (UI), 4318 (OTLP) | 链路追踪存储与查询 |
-| `alloy` | `grafana/alloy:latest` | 12345 | 统一日志采集器（Docker 容器日志 → Loki） |
-| `grafana` | `grafana/grafana:12.0.0` | 3000 | 统一可视化面板 |
+| 服务         | 镜像                            | 端口                    | 说明                                     |
+| ------------ | ------------------------------- | ----------------------- | ---------------------------------------- |
+| `prometheus` | `prom/prometheus:latest`        | 9090                    | 指标采集与存储                           |
+| `loki`       | `grafana/loki:3.0.0`            | 3100                    | 日志聚合存储                             |
+| `jaeger`     | `jaegertracing/all-in-one:1.60` | 16686 (UI), 4318 (OTLP) | 链路追踪存储与查询                       |
+| `alloy`      | `grafana/alloy:latest`          | 12345                   | 统一日志采集器（Docker 容器日志 → Loki） |
+| `grafana`    | `grafana/grafana:12.0.0`        | 3000                    | 统一可视化面板                           |
 
 ### 11.3 启动方式
 
@@ -415,13 +416,13 @@ docker compose -f docker-compose.infra.yml up -d
 
 ### 11.4 访问地址
 
-| 服务 | URL | 账号 |
-|------|-----|------|
-| Grafana | http://localhost:3000 | admin / admin123 |
-| Prometheus | http://localhost:9090 | — |
-| Jaeger UI | http://localhost:16686 | — |
-| Loki API | http://localhost:3100 | — |
-| Alloy UI | http://localhost:12345 | — |
+| 服务       | URL                    | 账号             |
+| ---------- | ---------------------- | ---------------- |
+| Grafana    | http://localhost:3000  | admin / admin123 |
+| Prometheus | http://localhost:9090  | —                |
+| Jaeger UI  | http://localhost:16686 | —                |
+| Loki API   | http://localhost:3100  | —                |
+| Alloy UI   | http://localhost:12345 | —                |
 
 ### 11.5 后端接入
 
@@ -436,6 +437,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 ### 11.6 Grafana 面板预览
 
 **AI Town Overview**（默认面板）包含：
+
 - 活跃角色数 / World Tick ID / Redis 状态 / LLM 费用 / HTTP QPS / 5xx 错误率（6 个 Stat）
 - World Tick 耗时 p50/p95/p99（Timeseries）
 - Character Tick 耗时 p50/p95/p99（Timeseries）
@@ -447,9 +449,11 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 - 实时日志流（Logs panel，Loki 数据源）
 
 **AI Town - LLM Monitor** 包含：
+
 - LLM QPS / 成本累计 / Token 速率 / 延迟分布 / 错误率 / LLM 日志流
 
 **AI Town - Character Tick** 包含：
+
 - Tick 耗时分布 / Tick 频率 / 错误次数 / Action 执行统计 / Tick 日志流
 
 ### 11.7 Trace ↔ Logs 联动
@@ -460,6 +464,7 @@ Grafana 数据源已配置双向联动：
 2. **Logs → Trace**：在 Loki 日志视图中，日志行的 `trace_id` 字段显示为可点击链接，跳转 Jaeger 查看完整链路
 
 配置位于 `datasources.yml`：
+
 - Loki 数据源 `derivedFields` 提取 `trace_id` 并关联 Jaeger（uid: `jaeger`）
 - Jaeger 数据源 `tracesToLogs` 关联 Loki（uid: `loki`），按 `trace_id` 标签过滤
 
@@ -481,14 +486,14 @@ GET /api/v1/admin/logs?lines=200&level=ERROR
 
 解析 `/metrics` Prometheus 文本格式，转换为按类别分组的 JSON：
 
-| 类别 | 包含指标 |
-|------|----------|
-| `world` | tick_total / tick_duration_p95 |
-| `character` | active_count / tick_duration_p95 |
-| `action` | success_rate / total |
-| `llm` | call_total / cost_total_usd / error_rate |
-| `message` | processed_total / response_time_p95 |
-| `http` | request_total / error_5xx_rate |
+| 类别        | 包含指标                                 |
+| ----------- | ---------------------------------------- |
+| `world`     | tick_total / tick_duration_p95           |
+| `character` | active_count / tick_duration_p95         |
+| `action`    | success_rate / total                     |
+| `llm`       | call_total / cost_total_usd / error_rate |
+| `message`   | processed_total / response_time_p95      |
+| `http`      | request_total / error_5xx_rate           |
 
 ### 12.3 前端 `/monitoring` 页面
 
@@ -502,13 +507,13 @@ GET /api/v1/admin/logs?lines=200&level=ERROR
 
 ### 14.1 级别定义
 
-| 级别 | 使用场景 | 示例 |
-|------|----------|------|
-| DEBUG | 开发调试信息，生产环境关闭 | `logger.debug("world_state_loaded", tick_id=self.tick_id)` |
-| INFO | 正常业务流程关键节点 | `logger.info("character_tick_completed", character_id=..., duration_ms=...)` |
-| WARNING | 异常但可恢复，需关注 | `logger.warning("rate_limit_exceeded", key=..., remaining=0)` |
-| ERROR | 异常且不可恢复，需立即处理 | `logger.error("redis_connection_failed", error=str(e), exc_info=True)` |
-| CRITICAL | 系统级故障，需紧急处理 | `logger.critical("all_llm_sources_unavailable")` |
+| 级别     | 使用场景                   | 示例                                                                         |
+| -------- | -------------------------- | ---------------------------------------------------------------------------- |
+| DEBUG    | 开发调试信息，生产环境关闭 | `logger.debug("world_state_loaded", tick_id=self.tick_id)`                   |
+| INFO     | 正常业务流程关键节点       | `logger.info("character_tick_completed", character_id=..., duration_ms=...)` |
+| WARNING  | 异常但可恢复，需关注       | `logger.warning("rate_limit_exceeded", key=..., remaining=0)`                |
+| ERROR    | 异常且不可恢复，需立即处理 | `logger.error("redis_connection_failed", error=str(e), exc_info=True)`       |
+| CRITICAL | 系统级故障，需紧急处理     | `logger.critical("all_llm_sources_unavailable")`                             |
 
 ### 14.2 强制规范
 
@@ -522,11 +527,11 @@ GET /api/v1/admin/logs?lines=200&level=ERROR
 
 ## 十三、相关文档
 
-| 主题 | 文档 |
-|------|------|
-| 世界引擎埋点 | [world-engine.md](world-engine.md) |
-| Action 系统埋点 | [action-system.md](action-system.md) |
-| 部署可观测组件 | [deployment.md](deployment.md) |
-| Docker 部署 | [docker-deployment.md](docker-deployment.md) |
-| 配置参考 | [config-reference.md](config-reference.md) |
-| API 端点 | [api-spec.md](api-spec.md) |
+| 主题            | 文档                                         |
+| --------------- | -------------------------------------------- |
+| 世界引擎埋点    | [world-engine.md](world-engine.md)           |
+| Action 系统埋点 | [action-system.md](action-system.md)         |
+| 部署可观测组件  | [deployment.md](deployment.md)               |
+| Docker 部署     | [docker-deployment.md](docker-deployment.md) |
+| 配置参考        | [config-reference.md](config-reference.md)   |
+| API 端点        | [api-spec.md](api-spec.md)                   |

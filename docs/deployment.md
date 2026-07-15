@@ -22,7 +22,8 @@
 ┌──────────▼──────────┐     ┌────────────▼──────────────┐
 │   前端 (Vite build) │     │     后端 (FastAPI)         │
 │   静态文件/CDN      │     │   World Engine + LangGraph │
-└─────────────────────┘     └────────────┬──────────────┘
+└─────────────────────┘     │   本地工具（ToolRegistry） │
+                            └────────────┬──────────────┘
                                          │
                     ┌────────────────────┐
                     │                    │
@@ -30,31 +31,27 @@
            │   PostgreSQL    │  │     Redis       │
            │   (+pgvector)   │  │  (缓存/队列)    │
            └─────────────────┘  └─────────────────┘
-                    │
-           ┌────────▼────────┐
-           │   MCP Servers   │
-           │  (多进程/Docker) │
-           └─────────────────┘
 ```
+
+> 工具已内联到后端进程（`src/tools/`），不再独立部署 MCP Server 容器。工具启用状态存储在 Redis hash `tools:enabled`。
 
 ### 组件清单
 
-| 组件              | 镜像/版本                              | 端口        | 说明                   |
-| ----------------- | -------------------------------------- | ----------- | ---------------------- |
-| Nginx             | `nginx:alpine`                         | 80/443      | 反向代理               |
-| 前端              | 自构 (Node 22)                         | 80 (容器内) | 静态文件               |
-| 后端              | 自构 (Python 3.13)                     | 8000        | FastAPI                |
-| PostgreSQL        | `pgvector/pgvector:pg17` + pg_uuidv7   | 5432        | 主数据库               |
-| PgBouncer         | `edoburu/pgbouncer`                    | 6432        | 连接池                 |
-| Redis             | `redis:8.0-alpine`                     | 6379        | 缓存/队列              |
-| MCP Servers       | 自构 + 社区                            | 8003–8006   | 工具服务               |
-| Jaeger            | `jaegertracing/all-in-one`             | 16686       | 链路追踪               |
-| Prometheus        | `prom/prometheus`                      | 9090        | 指标                   |
-| Grafana           | `grafana/grafana:12.x`                 | 3000        | 可视化                 |
-| OTel Collector    | `otel/opentelemetry-collector-contrib` | 4318        | 收集器                 |
-| Langfuse          | `langfuse/langfuse:3`                  | 3001        | LLM 追踪               |
-| **Loki**          | **`grafana/loki:3.x`**                 | **3100**    | **日志聚合**           |
-| **Grafana Alloy** | **`grafana/alloy`**                    | **12345**   | **统一可观测性收集器** |
+| 组件              | 镜像/版本                              | 端口        | 说明                    |
+| ----------------- | -------------------------------------- | ----------- | ----------------------- |
+| Nginx             | `nginx:alpine`                         | 80/443      | 反向代理                |
+| 前端              | 自构 (Node 22)                         | 80 (容器内) | 静态文件                |
+| 后端              | 自构 (Python 3.13)                     | 8000        | FastAPI（含本地工具层） |
+| PostgreSQL        | `pgvector/pgvector:pg17` + pg_uuidv7   | 5432        | 主数据库                |
+| PgBouncer         | `edoburu/pgbouncer`                    | 6432        | 连接池                  |
+| Redis             | `redis:8.0-alpine`                     | 6379        | 缓存/队列/工具开关      |
+| Jaeger            | `jaegertracing/all-in-one`             | 16686       | 链路追踪                |
+| Prometheus        | `prom/prometheus`                      | 9090        | 指标                    |
+| Grafana           | `grafana/grafana:12.x`                 | 3000        | 可视化                  |
+| OTel Collector    | `otel/opentelemetry-collector-contrib` | 4318        | 收集器                  |
+| Langfuse          | `langfuse/langfuse:3`                  | 3001        | LLM 追踪                |
+| **Loki**          | **`grafana/loki:3.x`**                 | **3100**    | **日志聚合**            |
+| **Grafana Alloy** | **`grafana/alloy`**                    | **12345**   | **统一可观测性收集器**  |
 
 ---
 
@@ -264,10 +261,9 @@ MODEL_CHAT=gpt-4o-mini
 MODEL_STRONG=gpt-4o
 MODEL_FLASH=gpt-3.5-turbo
 
-# ===== MCP Servers =====
-MCP_WEATHER_SERVER=http://localhost:8003
-MCP_SHOP_SERVER=http://localhost:8004
-MCP_KB_SERVER=http://localhost:8005
+# ===== 本地工具 =====
+# 工具已内联到后端进程，无需独立服务地址。
+# 工具命名空间开关持久化到 Redis hash `tools:enabled`，未配置时默认全部启用。
 
 # ===== 可观测性 =====
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
@@ -364,9 +360,13 @@ curl -X POST http://localhost:8000/api/v1/admin/partitions/precreate \
 - **方案 A（推荐）**：Redis 分布式锁选主，仅持锁实例运行 Tick，锁过期自动故障转移；
 - **方案 B**：服务拆分，`engine` 单实例运行 Tick 循环，`api` 多实例处理请求。
 
-### 5.4 MCP Server 扩展
+### 5.4 本地工具扩展
 
-各 MCP Server 无状态，可水平扩容，通过 Nginx/HAProxy 负载均衡。
+工具为进程内 async 函数调用，无独立服务进程，因此：
+
+- **无单点故障**：随 backend 实例存活，backend 多实例时每个实例都内置完整工具集；
+- **无网络开销**：直接函数调用，延迟在微秒级；
+- **开关状态共享**：所有 backend 实例读取同一 Redis hash `tools:enabled`，开关变更对所有实例生效。
 
 ---
 

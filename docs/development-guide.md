@@ -6,15 +6,15 @@
 
 ## 一、环境要求
 
-| 工具 | 版本 | 说明 |
-|------|------|------|
-| Python | 3.13+ | 后端 |
-| uv | 最新 | Python 包管理（替代 Poetry） |
-| Node.js | 22+ | 前端 |
-| pnpm | 11+ | 前端包管理 |
-| PostgreSQL | 17+ | 需启用 `pg_uuidv7`、`vector`、`pg_trgm` 扩展 |
-| Redis | 8.0+ | — |
-| Docker | 24+ | 容器化部署 |
+| 工具       | 版本  | 说明                                         |
+| ---------- | ----- | -------------------------------------------- |
+| Python     | 3.13+ | 后端                                         |
+| uv         | 最新  | Python 包管理（替代 Poetry）                 |
+| Node.js    | 22+   | 前端                                         |
+| pnpm       | 11+   | 前端包管理                                   |
+| PostgreSQL | 17+   | 需启用 `pg_uuidv7`、`vector`、`pg_trgm` 扩展 |
+| Redis      | 8.0+  | —                                            |
+| Docker     | 24+   | 容器化部署                                   |
 
 ---
 
@@ -49,13 +49,9 @@ pnpm dev                          # 启动 Vite 开发服务器
 
 访问 `http://localhost:5173`。
 
-### 2.4 MCP Servers（按需）
+### 2.4 本地工具（无需单独启动）
 
-```bash
-cd packages/mcp-servers/weather
-uv sync
-uv run server.py
-```
+工具已内联到后端进程（`src/tools/`），随后端启动自动加载，无需单独运行 MCP Server 容器。工具按命名空间组织（shop / knowledge / social / world / self_info），通过 Redis hash `tools:enabled` 控制启用状态。
 
 ---
 
@@ -75,10 +71,13 @@ packages/backend/src/
 ├── agents/                # LangGraph 角色实现
 ├── memory/                # 记忆/反思/规划服务
 ├── modules/               # 模块管理器
-├── tools/                 # MCP 集成
-│   ├── base.py            # Tool 抽象
-│   ├── registry.py        # ToolRegistry
-│   └── mcp_client.py      # MCP 客户端
+├── tools/                 # 本地工具（进程内 async 函数，替代原 MCP Server）
+│   ├── shop.py            # 商店工具（list_items / buy_item / sell_item ...）
+│   ├── knowledge.py       # 小镇设定库查询
+│   ├── social.py          # 角色社交（送礼 / 约会 / 冲突）
+│   ├── world.py           # 只读世界查询（场景 / 角色 / 天气）
+│   ├── self_info.py       # 只读自省（关系 / 记忆搜索）
+│   └── registry.py        # ToolRegistry（替代 MCPClient）
 ├── messaging/             # 消息服务
 │   ├── adapters/          # 平台适配器
 │   └── service.py
@@ -90,7 +89,7 @@ packages/backend/src/
 │   ├── messages.py        # 会话与消息
 │   ├── memory.py          # 记忆扩展（日记 / Person Memory）
 │   ├── notifications.py   # 通知中心
-│   ├── mcp.py             # MCP Server 管理
+│   ├── mcp.py             # 工具命名空间管理（路径保留以兼容前端）
 │   ├── system.py          # 系统设置
 │   ├── admin.py           # 运维端点（Tick / 快照 / 日志 / 指标）
 │   └── exceptions.py      # 全局异常处理器（统一错误响应 + trace_id）
@@ -314,31 +313,31 @@ def register(registry: ActionRegistry):
 
 在 `core/actions/__init__.py` 中调用 `register`。
 
-### 6.2 新增 MCP Server
+### 6.2 新增本地工具
 
-```bash
-mkdir packages/mcp-servers/my-server
-cd packages/mcp-servers/my-server
-uv init
-uv add mcp
+工具已内联到 `packages/backend/src/tools/`，无需创建独立 Server。新增工具步骤：
+
+1. 在 `src/tools/` 下新建模块（如 `my_tool.py`），实现 async 函数；
+2. 在 `src/tools/registry.py` 的 `TOOL_REGISTRY` 字典中注册工具，声明 `description`、`llm_params`、`injected_params`、`state_mutating`；
+3. 状态变更类工具需在 `core/character/tick.py` 的 `_apply_tool_deltas()` 中处理返回的 delta 字段。
+
+```python
+# src/tools/my_tool.py
+async def my_tool(query: str) -> dict:
+    """工具描述"""
+    return {"result": ...}
 ```
 
 ```python
-# server.py
-from mcp.server import Server, tool
-
-server = Server("my-server")
-
-@server.tool()
-async def my_tool(param: str) -> dict:
-    """工具描述"""
-    return {"result": ...}
-
-if __name__ == "__main__":
-    server.run()
+# src/tools/registry.py
+TOOL_REGISTRY["my_namespace.my_tool"] = {
+    "func": my_tool,
+    "description": "工具描述（LLM Prompt 中展示）",
+    "llm_params": {"query": "查询关键词"},
+    "injected_params": {},   # 需从角色状态注入的参数
+    "state_mutating": False,
+}
 ```
-
-在 `config.yaml` 与 `.env` 中注册模块。
 
 ### 6.3 新增 API 端点
 
@@ -372,11 +371,11 @@ app.include_router(my_resource_router)
 
 ### 7.1 Python
 
-| 工具 | 用途 |
-|------|------|
-| `ruff` | lint + format |
-| `mypy` | 类型检查 |
-| `black`（可选） | 备用格式化 |
+| 工具            | 用途          |
+| --------------- | ------------- |
+| `ruff`          | lint + format |
+| `mypy`          | 类型检查      |
+| `black`（可选） | 备用格式化    |
 
 ```bash
 uv run ruff check src/     # lint
@@ -386,11 +385,11 @@ uv run mypy src/           # 类型检查
 
 ### 7.2 TypeScript
 
-| 工具 | 用途 |
-|------|------|
-| `oxlint` | lint（Rust 内核，替代 ESLint） |
-| `prettier` | format |
-| `tsc --noEmit` | 类型检查 |
+| 工具           | 用途                           |
+| -------------- | ------------------------------ |
+| `oxlint`       | lint（Rust 内核，替代 ESLint） |
+| `prettier`     | format                         |
+| `tsc --noEmit` | 类型检查                       |
 
 ### 7.3 提交规范
 
@@ -411,11 +410,11 @@ chore: 升级依赖
 
 ### 8.1 后端测试
 
-| 类型 | 工具 | 说明 |
-|------|------|------|
-| 单元测试 | pytest | Repository / Service 逻辑 |
-| 集成测试 | pytest + testcontainers | 真实 PG + Redis |
-| API 测试 | httpx + pytest | FastAPI 端点 |
+| 类型     | 工具                    | 说明                      |
+| -------- | ----------------------- | ------------------------- |
+| 单元测试 | pytest                  | Repository / Service 逻辑 |
+| 集成测试 | pytest + testcontainers | 真实 PG + Redis           |
+| API 测试 | httpx + pytest          | FastAPI 端点              |
 
 ```bash
 cd packages/backend
@@ -448,11 +447,11 @@ async def test_memory_search(db):
 
 ### 8.2 前端测试
 
-| 类型 | 工具 |
-|------|------|
-| 单元测试 | Vitest |
+| 类型     | 工具            |
+| -------- | --------------- |
+| 单元测试 | Vitest          |
 | 组件测试 | Testing Library |
-| E2E | Playwright |
+| E2E      | Playwright      |
 
 ```bash
 cd packages/frontend
@@ -511,11 +510,11 @@ curl -X POST http://localhost:8000/api/v1/admin/tick \
 
 ## 十一、相关文档
 
-| 主题 | 文档 |
-|------|------|
-| 数据模型 | [data-model.md](data-model.md) |
-| 架构总览 | [architecture.md](architecture.md) |
-| 配置参考 | [config-reference.md](config-reference.md) |
-| 部署 | [deployment.md](deployment.md) |
-| Docker 部署 | [docker-deployment.md](docker-deployment.md) |
-| 新手学习指南 | [getting-started.md](getting-started.md) |
+| 主题         | 文档                                         |
+| ------------ | -------------------------------------------- |
+| 数据模型     | [data-model.md](data-model.md)               |
+| 架构总览     | [architecture.md](architecture.md)           |
+| 配置参考     | [config-reference.md](config-reference.md)   |
+| 部署         | [deployment.md](deployment.md)               |
+| Docker 部署  | [docker-deployment.md](docker-deployment.md) |
+| 新手学习指南 | [getting-started.md](getting-started.md)     |

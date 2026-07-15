@@ -44,12 +44,18 @@ def _decode(value: Any) -> str:
     """Redis 返回值统一解码为 str
 
     兼容 decode_responses=True/False 两种配置：bytes/bytearray/memoryview 解码，其余转 str。
+    world:state hash 中的值可能被 JSON 编码（如 '"spring"'），去除首尾引号还原原始字符串。
     """
     if isinstance(value, (bytes, bytearray)):
-        return value.decode("utf-8")
-    if isinstance(value, memoryview):
-        return value.tobytes().decode("utf-8")
-    return str(value)
+        s = value.decode("utf-8")
+    elif isinstance(value, memoryview):
+        s = value.tobytes().decode("utf-8")
+    else:
+        s = str(value)
+    # 去除 JSON 字符串的首尾引号（如 '"spring"' -> 'spring'）
+    if len(s) >= 2 and s.startswith('"') and s.endswith('"'):
+        s = s[1:-1]
+    return s
 
 
 def _load_scenes() -> list[dict[str, Any]]:
