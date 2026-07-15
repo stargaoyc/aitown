@@ -332,7 +332,7 @@ Phase 5: 前端 Dashboard        ✅ 已完成
 | knowledge-base（自研）    | 小镇设定库查询（世界规则/角色/场景/行动/记忆）                | ✅        |
 | weather（自研）           | OpenWeatherMap 集成                                           | ✅        |
 | ~~web-search（社区）~~    | ~~Tavily API 集成~~                                           | ❌ 已移除 |
-| 模块管理 API              | `/api/v1/modules`、`/api/v1/mcp/servers`、`/api/v1/mcp/tools` | ✅        |
+| 模块管理 API              | `/api/v1/modules`、`/api/v1/tools/servers`、`/api/v1/tools/tools` | ✅        |
 
 ---
 

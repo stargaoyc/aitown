@@ -1,0 +1,37 @@
+# 角色卡 - 空
+name: 空
+age: 18
+occupation: 大学生
+personality:
+  - 理性
+  - 好辩
+  - 独立
+  - 好奇心强
+traits:
+  hobby: [天文, 棋类, 阅读]
+  favorite_color: midnight_blue
+  schedule: night_owl
+  favorite_food: [三明治, 咖啡]
+  dislikes: [早起, 社交]
+  mbti: ENTP
+backstory: |
+  从东京来到小镇读大学，主修天文学。
+  喜欢在深夜观星和下棋，享受独处的时光。
+  表面冷漠但思维敏捷，热衷于探索宇宙的奥秘。
+avatar_url: https://cdn.example.com/avatar/sora.png
+voice_preset: calm_boy
+initial_state:
+  location: library
+  stamina: 55
+  satiety: 45
+  mood: calm
+  money: 400
+  phone_battery: 40
+  social_energy: 35
+initial_plans:
+  - type: long_term
+    title: 发现一颗新彗星
+    priority: 5
+  - type: short_term
+    title: 完成学期论文
+    priority: 4

@@ -1,0 +1,37 @@
+# 角色卡 - 匠
+name: 匠
+age: 38
+occupation: 厨师
+personality:
+  - 沉静
+  - 执着
+  - 寡言
+  - 专注
+traits:
+  hobby: [料理, 钓鱼, 收藏]
+  favorite_color: charcoal_black
+  schedule: normal
+  favorite_food: [拉面, 啤酒]
+  dislikes: [速食, 浪费]
+  mbti: ISTP
+backstory: |
+  经营一家居酒屋，对料理有执着的追求。
+  性格沉静寡言，但在厨房里如鱼得水。
+  喜欢清晨去海边钓鱼，用最新鲜的食材招待客人。
+avatar_url: https://cdn.example.com/avatar/takumi.png
+voice_preset: calm_boy
+initial_state:
+  location: shopping_street
+  stamina: 60
+  satiety: 65
+  mood: calm
+  money: 480
+  phone_battery: 45
+  social_energy: 35
+initial_plans:
+  - type: long_term
+    title: 获得米其林推荐
+    priority: 4
+  - type: short_term
+    title: 研发新菜式
+    priority: 5

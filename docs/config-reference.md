@@ -55,8 +55,8 @@
 | 项           | 说明                                                                                                            |
 | ------------ | --------------------------------------------------------------------------------------------------------------- |
 | 命名空间开关 | Redis hash `tools:enabled`，键为工具全名（如 `shop.buy_item`），值为 `"true"` / `"false"`，未配置时默认全部启用 |
-| 开关控制方式 | 前端 Dashboard toggle / `PUT /api/v1/mcp/servers/{namespace}/enabled`（路径保留以兼容前端）                     |
-| 健康检查     | 本地工具为进程内调用，`/api/v1/mcp/servers/health` 始终返回 `online`                                            |
+| 开关控制方式 | 前端 Dashboard toggle / `PUT /api/v1/tools/servers/{namespace}/enabled`                                       |
+| 健康检查     | 本地工具为进程内调用，`/api/v1/tools/servers/health` 始终返回 `online`                                            |
 
 详见 [模块与本地工具系统设计](module-system.md#51-工具命名空间单独开关redis-持久化)。
 

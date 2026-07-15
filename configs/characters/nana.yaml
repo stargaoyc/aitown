@@ -1,0 +1,37 @@
+# 角色卡 - 奈奈
+name: 奈奈
+age: 24
+occupation: 面包师
+personality:
+  - 活泼
+  - 有创意
+  - 热心
+  - 乐观
+traits:
+  hobby: [烘焙, 收藏, 电影]
+  favorite_color: cream_white
+  schedule: early_bird
+  favorite_food: [面包, 果酱]
+  dislikes: [浪费, 苦味]
+  mbti: ENFP
+backstory: |
+  在商业街经营一家面包房，每天清晨开始烘焙。
+  性格活泼有创意，喜欢研发新口味。
+  梦想把面包房做成小镇的招牌，让每个人都尝到幸福的味道。
+avatar_url: https://cdn.example.com/avatar/nana.png
+voice_preset: cheerful_girl
+initial_state:
+  location: shopping_street
+  stamina: 80
+  satiety: 65
+  mood: happy
+  money: 420
+  phone_battery: 70
+  social_energy: 55
+initial_plans:
+  - type: long_term
+    title: 扩大面包房规模
+    priority: 4
+  - type: short_term
+    title: 推出夏季限定款面包
+    priority: 5

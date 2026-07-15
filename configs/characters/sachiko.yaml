@@ -1,0 +1,37 @@
+# 角色卡 - 幸子
+name: 幸子
+age: 35
+occupation: 护士
+personality:
+  - 干练
+  - 果断
+  - 有领导力
+  - 严厉
+traits:
+  hobby: [园艺, 阅读, 茶道]
+  favorite_color: mint_green
+  schedule: early_bird
+  favorite_food: [天妇罗, 乌龙茶]
+  dislikes: [懒惰, 拖延]
+  mbti: ENTJ
+backstory: |
+  在小镇诊所工作的护士长，做事干练高效。
+  性格果断有领导力，业余时间喜欢打理自家花园。
+  希望提升小镇居民的健康意识，让每个人更注重健康。
+avatar_url: https://cdn.example.com/avatar/sachiko.png
+voice_preset: mature_woman
+initial_state:
+  location: school
+  stamina: 70
+  satiety: 55
+  mood: neutral
+  money: 460
+  phone_battery: 60
+  social_energy: 50
+initial_plans:
+  - type: long_term
+    title: 推动小镇健康宣教
+    priority: 4
+  - type: short_term
+    title: 组织义诊活动
+    priority: 5

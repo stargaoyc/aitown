@@ -228,23 +228,23 @@ POST /api/v1/modules/shop/enable
 { "code": 0, "data": { "name": "shop", "enabled": true, "health_check_status": "healthy" } }
 ```
 
-### 2.4 工具命名空间管理
+### 2.4 工具管理
 
-> **路径说明**：以下端点路径保留 `/api/v1/mcp/*` 以兼容前端，实际管理的是进程内本地工具命名空间（`src/tools/`），不再涉及独立 Server 容器。
+> **路径说明**：以下端点路径前缀为 `/api/v1/tools/*`，管理进程内本地工具命名空间（`src/tools/`），不涉及独立 Server 容器。
 
-| 端点                                        | 方法 | 说明                                                          |
+| 端点                                         | 方法 | 说明                                                          |
 | ------------------------------------------- | ---- | ------------------------------------------------------------- |
-| `/api/v1/mcp/servers`                       | GET  | 工具命名空间列表（含工具清单 + `enabled` 字段）               |
-| `/api/v1/mcp/servers/health`                | GET  | 健康检查（本地工具为进程内调用，始终返回 `online`）           |
-| `/api/v1/mcp/servers/{name}`                | GET  | 单个工具命名空间详情                                          |
-| `/api/v1/mcp/servers/{server_name}/enabled` | PUT  | **动态启用/禁用整个命名空间**（Redis `tools:enabled` 持久化） |
-| `/api/v1/mcp/tools`                         | GET  | 所有可用工具列表（仅返回已启用命名空间的工具）                |
-| `/api/v1/mcp/tools/{tool_name}/invoke`      | POST | 测试调用本地工具（管理调试用）                                |
+| `/api/v1/tools/servers`                     | GET  | 工具命名空间列表（含工具清单 + `enabled` 字段）               |
+| `/api/v1/tools/servers/health`              | GET  | 健康检查（本地工具为进程内调用，始终返回 `online`）           |
+| `/api/v1/tools/servers/{name}`              | GET  | 单个工具命名空间详情                                          |
+| `/api/v1/tools/servers/{server_name}/enabled` | PUT  | **动态启用/禁用整个命名空间**（Redis `tools:enabled` 持久化） |
+| `/api/v1/tools/tools`                       | GET  | 所有可用工具列表（仅返回已启用命名空间的工具）                |
+| `/api/v1/tools/tools/{tool_name}/invoke`    | POST | 测试调用本地工具（管理调试用）                                |
 
 #### 查询所有可用工具
 
 ```http
-GET /api/v1/mcp/tools
+GET /api/v1/tools/tools
 ```
 
 ```json
@@ -261,7 +261,7 @@ GET /api/v1/mcp/tools
 #### 切换工具命名空间启用状态
 
 ```http
-PUT /api/v1/mcp/servers/{server_name}/enabled
+PUT /api/v1/tools/servers/{server_name}/enabled
 Content-Type: application/json
 
 { "enabled": false }

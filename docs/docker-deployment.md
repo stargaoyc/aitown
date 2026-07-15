@@ -311,7 +311,7 @@ backend:
 工具已内联到后端进程，无需配置 Server URL 环境变量。每个工具命名空间（shop / knowledge / social / world / self_info）可独立启用/禁用：
 
 - **前端 Dashboard**：设置页 `工具命名空间` 卡片 toggle 控件；
-- **API 调用**：`PUT /api/v1/mcp/servers/{namespace}/enabled`；
+- **API 调用**：`PUT /api/v1/tools/servers/{namespace}/enabled`；
 - **状态存储**：Redis hash `tools:enabled`，键为工具全名（如 `shop.buy_item`），值为 `"true"` / `"false"`，未配置时默认全部启用。
 
 ---
@@ -496,13 +496,13 @@ docker compose exec frontend wget -qO- http://backend:8000/health
 docker compose ps backend
 
 # 检查工具命名空间健康状态（本地工具为进程内调用，始终在线）
-curl http://localhost:8000/api/v1/mcp/servers/health
+curl http://localhost:8000/api/v1/tools/servers/health
 
 # 列出所有可用工具
-curl http://localhost:8000/api/v1/mcp/tools
+curl http://localhost:8000/api/v1/tools/tools
 
 # 手动调用工具测试（如查询商店商品列表）
-curl -X POST http://localhost:8000/api/v1/mcp/tools/shop.list_items/invoke \
+curl -X POST http://localhost:8000/api/v1/tools/tools/shop.list_items/invoke \
   -H "Content-Type: application/json" \
   -d '{}'
 ```

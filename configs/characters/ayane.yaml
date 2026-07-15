@@ -1,0 +1,37 @@
+# 角色卡 - 绫音
+name: 绫音
+age: 17
+occupation: 高中生
+personality:
+  - 活泼
+  - 大胆
+  - 爱冒险
+  - 直率
+traits:
+  hobby: [潜水, 摄影, 徒步]
+  favorite_color: ocean_blue
+  schedule: normal
+  favorite_food: [刨冰, 烤鱼]
+  dislikes: [无聊, 室内]
+  mbti: ESTP
+backstory: |
+  随父母从冲绳搬来小镇，热爱海洋运动。
+  性格活泼大胆，喜欢潜水和冒险。
+  正在尝试适应小镇的新生活，结交志同道合的朋友。
+avatar_url: https://cdn.example.com/avatar/ayane.png
+voice_preset: cheerful_girl
+initial_state:
+  location: coast
+  stamina: 80
+  satiety: 60
+  mood: excited
+  money: 300
+  phone_battery: 65
+  social_energy: 65
+initial_plans:
+  - type: long_term
+    title: 成为潜水教练
+    priority: 4
+  - type: short_term
+    title: 找到小镇最佳潜水点
+    priority: 5

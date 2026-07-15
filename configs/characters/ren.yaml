@@ -1,0 +1,37 @@
+# 角色卡 - 莲
+name: 莲
+age: 23
+occupation: 木匠
+personality:
+  - 沉稳
+  - 踏实
+  - 一丝不苟
+  - 内敛
+traits:
+  hobby: [木工, 徒步, 收藏]
+  favorite_color: forest_green
+  schedule: early_bird
+  favorite_food: [饭团, 味噌汤]
+  dislikes: [浪费, 混乱]
+  mbti: ISTJ
+backstory: |
+  跟随祖父学习木工技艺，立志传承传统工艺。
+  性格沉稳踏实，做事一丝不苟，对手作有着执着的追求。
+  正在筹备自己的木工工作室，希望让更多人认识手作的温度。
+avatar_url: https://cdn.example.com/avatar/ren.png
+voice_preset: calm_boy
+initial_state:
+  location: plaza
+  stamina: 70
+  satiety: 60
+  mood: neutral
+  money: 380
+  phone_battery: 60
+  social_energy: 45
+initial_plans:
+  - type: long_term
+    title: 成立木工工作室
+    priority: 4
+  - type: short_term
+    title: 完成一张定制木桌
+    priority: 5

@@ -269,7 +269,7 @@ else:
 
 ### 3.2 Character Tick 循环
 
-Character Tick 是角色行为决策与执行的闭环，由 `CharacterTickEngine` 实现（`src/core/character_tick.py`）。它定期对所有活跃角色执行"感知→决策→执行→记忆→分享→反思"六阶段闭环。
+Character Tick 是角色行为决策与执行的闭环，由 `CharacterTickEngine` 实现（`src/core/character_tick.py`）。它定期对所有活跃角色执行"感知→决策→执行→记忆→分享→反思"六阶段闭环。其中决策阶段对 `action="use_tool"` 走 ReAct 循环（执行工具 → 观察结果回灌 Prompt → 再次决策，最多 3 轮），详见 [Action 系统 - ReAct 工具调用循环](action-system.md#33-react-工具调用循环)。
 
 #### 执行流程
 
@@ -323,6 +323,21 @@ Character Tick 是角色行为决策与执行的闭环，由 `CharacterTickEngin
         │      { action, reason, params, duration,     │
         │        plan_changes, proactive_share_intent }│
         │    - 防御性校验：action_id 必须在候选列表中   │
+        └─────────────────────────────────────────────┘
+                              │
+                              ▼
+        ┌─────────────────────────────────────────────┐
+        │ ②' ReAct 工具调用循环（仅 action=use_tool）  │
+        │    - 最多 3 轮：执行工具 → 观察结果回灌      │
+        │      Prompt → 再次 _decide                   │
+        │    - _execute_tool 调用 ToolRegistry         │
+        │      结果 append 到 tool_observations        │
+        │    - state_mutating 工具的 deltas 由         │
+        │      _apply_tool_deltas 立即写回 Redis/PG    │
+        │    - 工具结果写入 memory_episodes            │
+        │    - 3 轮后仍 use_tool → 强制改为 wait       │
+        │    详见 [Action 系统 - ReAct 循环]           │
+        │      (action-system.md#33-react-工具调用循环)│
         └─────────────────────────────────────────────┘
                               │
                               ▼

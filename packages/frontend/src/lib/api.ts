@@ -276,9 +276,9 @@ export const api = {
   // 模块列表
   getModules: () => request<{ data: ModuleEntry[]; total: number }>("/modules"),
 
-  // MCP 服务器
-  getMcpServers: () => request<{ data: McpServerEntry[] }>("/mcp/servers"),
-  getMcpTools: () => request<{ data: McpToolEntry[] }>("/mcp/tools"),
+  // 工具命名空间
+  getMcpServers: () => request<{ data: McpServerEntry[] }>("/tools/servers"),
+  getMcpTools: () => request<{ data: McpToolEntry[] }>("/tools/tools"),
   getMcpServersHealth: () =>
     request<{
       data: Array<{
@@ -291,7 +291,7 @@ export const api = {
       total: number;
       online: number;
       offline: number;
-    }>("/mcp/servers/health"),
+    }>("/tools/servers/health"),
   invokeMcpTool: (toolName: string, serverName: string, args: Record<string, unknown>) =>
     request<{
       success: boolean;
@@ -299,7 +299,7 @@ export const api = {
       result?: unknown;
       error?: string;
       endpoint: string;
-    }>(`/mcp/tools/${toolName}/invoke?server_name=${serverName}`, {
+    }>(`/tools/tools/${toolName}/invoke?server_name=${serverName}`, {
       method: "POST",
       body: JSON.stringify(args),
     }),
@@ -308,7 +308,7 @@ export const api = {
       success: boolean;
       server: string;
       enabled: boolean;
-    }>(`/mcp/servers/${serverName}/enabled`, {
+    }>(`/tools/servers/${serverName}/enabled`, {
       method: "PUT",
       body: JSON.stringify({ enabled }),
     }),

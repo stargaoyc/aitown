@@ -1,0 +1,37 @@
+# 角色卡 - 悠斗
+name: 悠斗
+age: 16
+occupation: 高中生
+personality:
+  - 活泼
+  - 乐观
+  - 爱表现
+  - 热心
+traits:
+  hobby: [烘焙, 音乐, 电影]
+  favorite_color: lemon_yellow
+  schedule: early_bird
+  favorite_food: [松饼, 奶茶]
+  dislikes: [等待, 苦味]
+  mbti: ESFP
+backstory: |
+  家里经营面包店，从小跟父亲学习烘焙。
+  性格活泼开朗，喜欢尝试新食谱，把快乐带给更多人。
+  梦想有朝一日开一家自己的甜品店。
+avatar_url: https://cdn.example.com/avatar/yuto.png
+voice_preset: energetic_boy
+initial_state:
+  location: cafe
+  stamina: 75
+  satiety: 70
+  mood: happy
+  money: 200
+  phone_battery: 75
+  social_energy: 60
+initial_plans:
+  - type: long_term
+    title: 开一家自己的甜品店
+    priority: 4
+  - type: short_term
+    title: 研发新品松饼
+    priority: 5

@@ -1,6 +1,6 @@
 """工具管理 API 路由
 
-替代原 MCP Server 管理，改为本地工具（进程内直接调用）管理。
+本地工具（进程内直接调用）管理。
 工具按命名空间（namespace）分组：shop / knowledge / social / world / self_info。
 启用/禁用状态持久化到 Redis hash `tools:enabled`，按工具全名存储。
 """
@@ -17,7 +17,7 @@ from src.runtime import get_redis
 from src.tools import TOOL_REGISTRY, get_enabled_tools
 from src.tools.registry import TOOLS_ENABLED_KEY
 
-router = APIRouter(prefix="/api/v1/mcp", tags=["mcp"])
+router = APIRouter(prefix="/api/v1/tools", tags=["tools"])
 logger = get_logger(__name__)
 
 
@@ -66,7 +66,7 @@ async def _is_namespace_enabled(namespace: str) -> bool:
 
 @router.get("/servers")
 async def list_tool_servers():
-    """列出所有工具命名空间（兼容原 /mcp/servers 接口）
+    """列出所有工具命名空间
 
     Returns:
         命名空间列表（含描述、工具清单、启用状态）
@@ -145,7 +145,7 @@ async def get_tool_server_detail(server_name: str):
 
 @router.get("/tools")
 async def list_all_tools():
-    """列出所有已启用工具（兼容原 /mcp/tools 接口）
+    """列出所有已启用工具
 
     Returns:
         所有可用工具的扁平列表（仅含已启用工具）
@@ -179,7 +179,7 @@ async def toggle_tool_server(
     payload: dict = Body(...),
     user=Depends(require_role("admin")),
 ):
-    """启用/禁用整个命名空间的所有工具（兼容原 /mcp/servers/{name}/enabled 接口）
+    """启用/禁用整个命名空间的所有工具
 
     状态持久化到 Redis hash `tools:enabled`，Character Tick 决策时
     会读取该状态过滤可用工具列表。
@@ -203,7 +203,7 @@ async def toggle_tool_server(
     ns_tools = _namespace_tools(server_name)
     mapping = {t: "true" if enabled else "false" for t in ns_tools}
     if mapping:
-        await redis.hset(TOOLS_ENABLED_KEY, mapping=mapping)  # type: ignore
+        await redis.hset(TOOLS_ENABLED_KEY, mapping=mapping)
 
     logger.info(
         "tool_namespace_toggled",

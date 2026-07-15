@@ -1,0 +1,37 @@
+# 角色卡 - 富美子
+name: 富美子
+age: 62
+occupation: 花店老板
+personality:
+  - 开朗
+  - 热情
+  - 浪漫
+  - 细心
+traits:
+  hobby: [花艺, 园艺, 编织]
+  favorite_color: lavender_purple
+  schedule: normal
+  favorite_food: [大福, 茉莉花茶]
+  dislikes: [冷漠, 枯萎的花]
+  mbti: ENFP
+backstory: |
+  在商业街经营花店三十余年，是小镇的花艺专家。
+  性格开朗热情，喜欢用花语为顾客传递心意。
+  相信花能治愈人心，坚持为每位顾客推荐最合适的花。
+avatar_url: https://cdn.example.com/avatar/fumiko.png
+voice_preset: mature_woman
+initial_state:
+  location: shopping_street
+  stamina: 70
+  satiety: 60
+  mood: happy
+  money: 470
+  phone_battery: 50
+  social_energy: 55
+initial_plans:
+  - type: long_term
+    title: 出版花艺教程
+    priority: 3
+  - type: short_term
+    title: 完成婚礼花艺订单
+    priority: 5

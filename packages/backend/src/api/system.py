@@ -12,7 +12,7 @@ import secrets
 from fastapi import APIRouter, Depends, HTTPException
 from structlog import get_logger
 
-from src.api.mcp import _NAMESPACES as _TOOL_NAMESPACES
+from src.api.tools import _NAMESPACES as _TOOL_NAMESPACES
 from src.auth import create_token
 from src.config import settings
 from src.runtime import (

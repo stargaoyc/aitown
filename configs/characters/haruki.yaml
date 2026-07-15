@@ -1,0 +1,37 @@
+# 角色卡 - 春树
+name: 春树
+age: 17
+occupation: 高中生
+personality:
+  - 热情
+  - 开朗
+  - 善于交际
+  - 有领导力
+traits:
+  hobby: [摄影, 电影, 徒步]
+  favorite_color: sunset_orange
+  schedule: normal
+  favorite_food: [咖喱饭, 炸鸡]
+  dislikes: [下雨, 独处]
+  mbti: ENFJ
+backstory: |
+  小镇本地人，校报摄影部的成员。
+  性格开朗热情，喜欢结交新朋友，梦想用镜头记录小镇的每一个动人瞬间。
+  和小春是青梅竹马，经常一起结伴出门拍照。
+avatar_url: https://cdn.example.com/avatar/haruki.png
+voice_preset: energetic_boy
+initial_state:
+  location: school
+  stamina: 80
+  satiety: 65
+  mood: happy
+  money: 350
+  phone_battery: 70
+  social_energy: 70
+initial_plans:
+  - type: long_term
+    title: 成为专业摄影师
+    priority: 4
+  - type: short_term
+    title: 完成校报的专题摄影
+    priority: 5

@@ -1,0 +1,37 @@
+# 角色卡 - 勇
+name: 勇
+age: 60
+occupation: 邮递员
+personality:
+  - 严谨
+  - 守时
+  - 负责
+  - 踏实
+traits:
+  hobby: [徒步, 观鸟, 收藏]
+  favorite_color: navy_blue
+  schedule: early_bird
+  favorite_food: [饭团, 味噌汤]
+  dislikes: [迟到, 不礼貌]
+  mbti: ESTJ
+backstory: |
+  小镇的邮递员，三十年来风雨无阻地送信。
+  性格严谨守时，对小镇每条街巷都了如指掌。
+  即将退休，希望培养接班人，让小镇的信件传递不停歇。
+avatar_url: https://cdn.example.com/avatar/isamu.png
+voice_preset: calm_boy
+initial_state:
+  location: plaza
+  stamina: 65
+  satiety: 55
+  mood: neutral
+  money: 380
+  phone_battery: 45
+  social_energy: 45
+initial_plans:
+  - type: long_term
+    title: 培养接班邮递员
+    priority: 4
+  - type: short_term
+    title: 整理送信路线图
+    priority: 3

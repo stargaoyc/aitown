@@ -2,7 +2,7 @@
 
 > 模块管理器是系统的可插拔能力中枢，负责所有功能模块的注册、开关控制和生命周期管理。本地工具调用层（`src/tools/`）以进程内 async 函数形式提供工具能力，替代原 MCP Server 架构，消除 HTTP/SSE 网络开销。
 >
-> **2026-07-15 更新**：原 MCP Server 架构已转换为本地工具。`packages/mcp-servers/` 下 4 个 Server（shop-simulator / knowledge-base / character-social / weather）已删除，`src/mcp/` 客户端模块已删除，`fastmcp` 依赖已移除。原工具能力收编为 `src/tools/` 下的进程内 async 函数，并新增 `world` / `self_info` 两类只读查询工具。API 路径保持兼容（仍为 `/api/v1/mcp/*`）。
+> **2026-07-15 更新**：原 MCP Server 架构已转换为本地工具。`packages/mcp-servers/` 下 4 个 Server（shop-simulator / knowledge-base / character-social / weather）已删除，`src/mcp/` 客户端模块已删除，`fastmcp` 依赖已移除。原工具能力收编为 `src/tools/` 下的进程内 async 函数，并新增 `world` / `self_info` 两类只读查询工具。API 路径前缀为 `/api/v1/tools/*`（原 `/api/v1/mcp/*` 已重命名）。
 
 ---
 
@@ -275,17 +275,17 @@ await self._apply_tool_deltas(character_id, result, context)
 
 ## 五、管理 API
 
-已实现的管理 API 端点（路径保留 `/api/v1/mcp/*` 以兼容前端，实际管理本地工具命名空间）：
+已实现的管理 API 端点（路径前缀 `/api/v1/tools/*`，管理本地工具命名空间）：
 
-| 端点                                        | 方法 | 说明                                                      | 状态 |
-| ------------------------------------------- | ---- | --------------------------------------------------------- | ---- |
-| `/api/v1/modules`                           | GET  | 模块列表（含运行状态，工具命名空间以 `tools.*` 形式展示） | ✅   |
-| `/api/v1/mcp/servers`                       | GET  | 工具命名空间列表（含工具清单 + `enabled` 字段）           | ✅   |
-| `/api/v1/mcp/servers/health`                | GET  | 健康检查（本地工具始终返回 `online`）                     | ✅   |
-| `/api/v1/mcp/servers/{name}`                | GET  | 单个工具命名空间详情                                      | ✅   |
-| `/api/v1/mcp/servers/{server_name}/enabled` | PUT  | **动态启用/禁用整个命名空间**（Redis 持久化）             | ✅   |
-| `/api/v1/mcp/tools`                         | GET  | 所有可用工具列表（仅返回已启用命名空间的工具）            | ✅   |
-| `/api/v1/mcp/tools/{tool_name}/invoke`      | POST | 测试调用本地工具（管理调试用）                            | ✅   |
+| 端点                                          | 方法 | 说明                                                      | 状态 |
+| --------------------------------------------- | ---- | --------------------------------------------------------- | ---- |
+| `/api/v1/modules`                             | GET  | 模块列表（含运行状态，工具命名空间以 `tools.*` 形式展示） | ✅   |
+| `/api/v1/tools/servers`                       | GET  | 工具命名空间列表（含工具清单 + `enabled` 字段）           | ✅   |
+| `/api/v1/tools/servers/health`                | GET  | 健康检查（本地工具始终返回 `online`）                     | ✅   |
+| `/api/v1/tools/servers/{name}`                | GET  | 单个工具命名空间详情                                      | ✅   |
+| `/api/v1/tools/servers/{server_name}/enabled` | PUT  | **动态启用/禁用整个命名空间**（Redis 持久化）             | ✅   |
+| `/api/v1/tools/tools`                         | GET  | 所有可用工具列表（仅返回已启用命名空间的工具）            | ✅   |
+| `/api/v1/tools/tools/{tool_name}/invoke`      | POST | 测试调用本地工具（管理调试用）                            | ✅   |
 
 详细请求/响应见 [API设计文档](api-spec.md)。
 
@@ -308,12 +308,12 @@ await self._apply_tool_deltas(character_id, result, context)
 │  │  └────────┘ └──────────┘ └────────┘ └──────────┘  │    │
 │  └──────────────────────────────────────────────────┘    │
 └────────────────────────┬─────────────────────────────────┘
-                         │ PUT /api/v1/mcp/servers/{namespace}/enabled
+                         │ PUT /api/v1/tools/servers/{namespace}/enabled
                          ▼
 ┌──────────────────────────────────────────────────────────┐
-│  后端 (src/api/mcp.py)                                   │
+│  后端 (src/api/tools.py)                                 │
 │  ┌──────────────────────────────────────────────────┐    │
-│  │  PUT /api/v1/mcp/servers/{namespace}/enabled     │    │
+│  │  PUT /api/v1/tools/servers/{namespace}/enabled   │    │
 │  │  → redis.hset("tools:enabled", mapping={         │    │
 │  │       tool_full_name: "true"|"false" for t in ns │    │
 │  │    })                                            │    │
@@ -353,20 +353,20 @@ await self._apply_tool_deltas(character_id, result, context)
 
 #### 关键代码位置
 
-| 文件                                        | 函数/方法/常量                                | 说明                                                            |
-| ------------------------------------------- | --------------------------------------------- | --------------------------------------------------------------- |
-| `src/tools/registry.py`                     | `TOOLS_ENABLED_KEY = "tools:enabled"`         | Redis hash key 常量（替代原 `mcp:enabled`）                     |
-| `src/tools/registry.py`                     | `get_enabled_tools()`                         | 读取 Redis hash，返回启用的工具全名集合（未配置时默认全部启用） |
-| `src/tools/registry.py`                     | `is_tool_enabled(full_name)`                  | 检查单个工具是否启用                                            |
-| `src/tools/registry.py`                     | `ToolRegistry.format_tools_for_prompt()`      | 仅注入已启用工具到 LLM Prompt                                   |
-| `src/tools/registry.py`                     | `ToolRegistry.call_tool_with_context()`       | 调用前检查启用状态，禁用则返回 `Tool is disabled`               |
-| `src/api/mcp.py`                            | `_NAMESPACES`                                 | 工具命名空间元数据（5 个）                                      |
-| `src/api/mcp.py`                            | `PUT /api/v1/mcp/servers/{namespace}/enabled` | 切换开关的 API 端点                                             |
-| `src/api/mcp.py`                            | `list_tool_servers()`                         | 响应中包含 `enabled` 字段                                       |
-| `src/api/system.py`                         | `_TOOL_NAMESPACES` 导入                       | 系统模块列表中以 `tools.{namespace}` 形式展示                   |
-| `packages/frontend/src/routes/settings.tsx` | 工具命名空间卡片 toggle                       | 前端 toggle 控件（sakura 色主题）                               |
-| `packages/frontend/src/lib/api.ts`          | `toggleMcpServer(name, enabled)`              | 前端 API 调用方法（函数名保留以兼容）                           |
-| `packages/frontend/src/lib/queries.ts`      | `useToggleMcpServer`                          | TanStack Query mutation hook                                    |
+| 文件                                        | 函数/方法/常量                                  | 说明                                                            |
+| ------------------------------------------- | ----------------------------------------------- | --------------------------------------------------------------- |
+| `src/tools/registry.py`                     | `TOOLS_ENABLED_KEY = "tools:enabled"`           | Redis hash key 常量（替代原 `mcp:enabled`）                     |
+| `src/tools/registry.py`                     | `get_enabled_tools()`                           | 读取 Redis hash，返回启用的工具全名集合（未配置时默认全部启用） |
+| `src/tools/registry.py`                     | `is_tool_enabled(full_name)`                    | 检查单个工具是否启用                                            |
+| `src/tools/registry.py`                     | `ToolRegistry.format_tools_for_prompt()`        | 仅注入已启用工具到 LLM Prompt                                   |
+| `src/tools/registry.py`                     | `ToolRegistry.call_tool_with_context()`         | 调用前检查启用状态，禁用则返回 `Tool is disabled`               |
+| `src/api/tools.py`                          | `_NAMESPACES`                                   | 工具命名空间元数据（5 个）                                      |
+| `src/api/tools.py`                          | `PUT /api/v1/tools/servers/{namespace}/enabled` | 切换开关的 API 端点                                             |
+| `src/api/tools.py`                          | `list_tool_servers()`                           | 响应中包含 `enabled` 字段                                       |
+| `src/api/system.py`                         | `_TOOL_NAMESPACES` 导入                         | 系统模块列表中以 `tools.{namespace}` 形式展示                   |
+| `packages/frontend/src/routes/settings.tsx` | 工具命名空间卡片 toggle                         | 前端 toggle 控件（sakura 色主题）                               |
+| `packages/frontend/src/lib/api.ts`          | `toggleMcpServer(name, enabled)`                | 前端 API 调用方法（函数名保留以兼容）                           |
+| `packages/frontend/src/lib/queries.ts`      | `useToggleMcpServer`                            | TanStack Query mutation hook                                    |
 
 #### 默认行为
 

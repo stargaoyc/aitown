@@ -1,0 +1,37 @@
+# 角色卡 - 大辅
+name: 大辅
+age: 40
+occupation: 医生
+personality:
+  - 严谨
+  - 理性
+  - 沉稳
+  - 责任感强
+traits:
+  hobby: [阅读, 棋类, 天文]
+  favorite_color: slate_gray
+  schedule: early_bird
+  favorite_food: [寿司, 绿茶]
+  dislikes: [噪音, 不守时]
+  mbti: INTJ
+backstory: |
+  小镇诊所的医生，从医近二十年。
+  性格严谨理性，下班后喜欢在书店看书下棋。
+  虽然外表严肃，但深受镇民信赖，是大家口中的好医生。
+avatar_url: https://cdn.example.com/avatar/daisuke.png
+voice_preset: calm_boy
+initial_state:
+  location: bookstore
+  stamina: 65
+  satiety: 50
+  mood: calm
+  money: 500
+  phone_battery: 55
+  social_energy: 40
+initial_plans:
+  - type: long_term
+    title: 培养接班医生
+    priority: 4
+  - type: short_term
+    title: 整理医学笔记
+    priority: 3

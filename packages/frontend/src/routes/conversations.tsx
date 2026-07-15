@@ -65,7 +65,7 @@ function platformBadge(platform: string): {
   color: string;
   status: "ok" | "idle";
 } {
-  const p = platform.toLowerCase();
+  const p = (platform || "").toLowerCase();
   if (p === "qq" || p === "onebot") {
     return {
       label: "QQ",
@@ -106,19 +106,22 @@ function ConversationsPage() {
     if (filter === "all") return sorted;
     if (filter === "qq") {
       return sorted.filter(
-        (c) => c.platform.toLowerCase() === "qq" || c.platform.toLowerCase() === "onebot",
+        (c) =>
+          (c.platform || "").toLowerCase() === "qq" ||
+          (c.platform || "").toLowerCase() === "onebot",
       );
     }
     // web
-    return sorted.filter((c) => c.platform.toLowerCase() === "web");
+    return sorted.filter((c) => (c.platform || "").toLowerCase() === "web");
   }, [conversations, filter]);
 
   // 统计：总会话数、QQ 会话数、Web 会话数
   const stats = useMemo(() => {
     const qq = conversations.filter(
-      (c) => c.platform.toLowerCase() === "qq" || c.platform.toLowerCase() === "onebot",
+      (c) =>
+        (c.platform || "").toLowerCase() === "qq" || (c.platform || "").toLowerCase() === "onebot",
     ).length;
-    const web = conversations.filter((c) => c.platform.toLowerCase() === "web").length;
+    const web = conversations.filter((c) => (c.platform || "").toLowerCase() === "web").length;
     return { total: conversations.length, qq, web };
   }, [conversations]);
 

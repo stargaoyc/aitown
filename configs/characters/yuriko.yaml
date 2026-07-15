@@ -1,0 +1,37 @@
+# 角色卡 - 百合子
+name: 百合子
+age: 58
+occupation: 画家
+personality:
+  - 浪漫
+  - 感性
+  - 自由
+  - 细腻
+traits:
+  hobby: [绘画, 阅读, 茶道]
+  favorite_color: watercolor_blue
+  schedule: normal
+  favorite_food: [可丽饼, 咖啡]
+  dislikes: [刻板, 灰色]
+  mbti: INFP
+backstory: |
+  从城市移居小镇的画家，被这里的风景所吸引。
+  性格浪漫感性，喜欢在公园写生。
+  正在创作一系列以小镇四季为主题的水彩画，记录这里的美。
+avatar_url: https://cdn.example.com/avatar/yuriko.png
+voice_preset: gentle_girl
+initial_state:
+  location: park
+  stamina: 55
+  satiety: 50
+  mood: calm
+  money: 340
+  phone_battery: 55
+  social_energy: 35
+initial_plans:
+  - type: long_term
+    title: 举办个人画展
+    priority: 4
+  - type: short_term
+    title: 完成夏日系列画作
+    priority: 5

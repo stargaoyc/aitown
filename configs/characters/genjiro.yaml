@@ -1,0 +1,37 @@
+# 角色卡 - 源太郎
+name: 源太郎
+age: 68
+occupation: 退休花匠
+personality:
+  - 温和
+  - 耐心
+  - 执着
+  - 慈祥
+traits:
+  hobby: [园艺, 花艺, 观鸟]
+  favorite_color: moss_green
+  schedule: early_bird
+  favorite_food: [寿司, 绿茶]
+  dislikes: [杂草, 害虫]
+  mbti: ISFJ
+backstory: |
+  退休的花匠，一辈子与花草打交道。
+  性格温和耐心，对植物有着深厚的感情。
+  每天清晨都会去公园照料花圃，是小镇公园的义务园丁。
+avatar_url: https://cdn.example.com/avatar/genjiro.png
+voice_preset: gentle_boy
+initial_state:
+  location: park
+  stamina: 60
+  satiety: 50
+  mood: calm
+  money: 300
+  phone_battery: 30
+  social_energy: 40
+initial_plans:
+  - type: long_term
+    title: 培育新品种花卉
+    priority: 3
+  - type: short_term
+    title: 准备花卉展览
+    priority: 4

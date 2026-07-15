@@ -1,0 +1,37 @@
+# 角色卡 - 浩
+name: 浩
+age: 45
+occupation: 渔夫
+personality:
+  - 豪爽
+  - 直率
+  - 坚韧
+  - 乐观
+traits:
+  hobby: [钓鱼, 徒步, 观鸟]
+  favorite_color: sea_blue
+  schedule: early_bird
+  favorite_food: [烤鱼, 日本酒]
+  dislikes: [风浪, 晕船药]
+  mbti: ESTP
+backstory: |
+  出身于渔夫世家，世代以海为生。
+  性格豪爽直率，对海洋了如指掌。
+  虽然辛苦，但享受海上生活，希望把捕鱼技艺传给下一代。
+avatar_url: https://cdn.example.com/avatar/hiroshi.png
+voice_preset: calm_boy
+initial_state:
+  location: coast
+  stamina: 75
+  satiety: 60
+  mood: calm
+  money: 430
+  phone_battery: 40
+  social_energy: 50
+initial_plans:
+  - type: long_term
+    title: 修缮老渔船
+    priority: 4
+  - type: short_term
+    title: 钓到一条大鱼
+    priority: 3

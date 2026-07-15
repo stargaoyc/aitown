@@ -1,0 +1,37 @@
+# 角色卡 - 芽衣
+name: 芽衣
+age: 33
+occupation: 图书馆管理员
+personality:
+  - 内向
+  - 安静
+  - 好学
+  - 细腻
+traits:
+  hobby: [阅读, 写作, 编织]
+  favorite_color: dusty_rose
+  schedule: normal
+  favorite_food: [三明治, 红茶]
+  dislikes: [吵闹, 暴力]
+  mbti: INTP
+backstory: |
+  小镇图书馆的管理员，热爱书籍与知识。
+  性格内向安静，喜欢在书海中度过每一天。
+  业余时间在写一本关于小镇历史的书，记录这里的故事。
+avatar_url: https://cdn.example.com/avatar/mei.png
+voice_preset: gentle_girl
+initial_state:
+  location: library
+  stamina: 55
+  satiety: 45
+  mood: calm
+  money: 390
+  phone_battery: 50
+  social_energy: 30
+initial_plans:
+  - type: long_term
+    title: 出版小镇历史书
+    priority: 4
+  - type: short_term
+    title: 整理旧档案
+    priority: 5

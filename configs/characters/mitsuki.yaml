@@ -1,0 +1,37 @@
+# 角色卡 - 美月
+name: 美月
+age: 16
+occupation: 高中生
+personality:
+  - 温柔
+  - 细心
+  - 传统
+  - 内敛
+traits:
+  hobby: [茶道, 花艺, 阅读]
+  favorite_color: sakura_pink
+  schedule: early_bird
+  favorite_food: [和果子, 抹茶]
+  dislikes: [吵闹, 辛辣食物]
+  mbti: ISFJ
+backstory: |
+  出生于传统茶道世家，从小学习茶道与花艺。
+  性格温柔细心，习惯清晨在神社练习茶道。
+  希望有朝一日继承家业，把茶道文化传承下去。
+avatar_url: https://cdn.example.com/avatar/mitsuki.png
+voice_preset: gentle_girl
+initial_state:
+  location: shrine
+  stamina: 70
+  satiety: 55
+  mood: calm
+  money: 250
+  phone_battery: 50
+  social_energy: 45
+initial_plans:
+  - type: long_term
+    title: 取得茶道师范资格
+    priority: 4
+  - type: short_term
+    title: 在神社茶会上献艺
+    priority: 5

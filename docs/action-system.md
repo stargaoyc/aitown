@@ -146,7 +146,62 @@ proactiveShareIntent.shouldShare?
               由消息 handler 决定发送到哪个平台（不暴露工程概念）
 ```
 
-### 3.3 事务化保证
+### 3.3 ReAct 工具调用循环
+
+当 LLM 决策返回 `action="use_tool"`（`params` 携带 `tool_name` 与 `tool_args`）时，Tick 引擎进入 **ReAct（Reasoning + Acting）循环**：执行工具 → 将观察结果回灌 Prompt → 再次决策，最多 3 轮，防止无限循环。
+
+#### 循环流程
+
+```text
+_decide（首次，tool_observations=[]）
+     │
+     ▼
+ decision.action == "use_tool" ?
+     ├─ 否 → 跳出循环，进入 ② Action 执行
+     └─ 是 → ③ 执行工具（_execute_tool）
+              ├─ ToolRegistry.call_tool_with_context(tool_name, tool_args, ctx)
+              ├─ 工具结果 append 到 tool_observations
+              │   {tool_name, tool_args, result, success}
+              ├─ 若 state_mutating=true：
+              │     _apply_tool_deltas() 立即写回
+              │     money/inventory/relation/mood deltas
+              │     （Redis 实时状态 + PG 关系表）
+              └─ 工具调用结果存入 memory_episodes（importance=7）
+                    │
+                    ▼
+              _decide（带 tool_observations，Prompt 注入
+                     "[工具调用观察（ReAct）]" 段落）
+                    │
+                    ▼
+              重复上述判断，最多 3 轮
+                    │
+                    ▼
+              若 3 轮后仍为 use_tool → 强制 action="wait"
+                logger.warning("react_max_iterations_reached")
+```
+
+#### 关键约束
+
+| 约束                     | 说明                                                                                                                                                                                                      |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **最大迭代次数**         | 3 轮。达到上限仍为 `use_tool` 时强制改为 `wait`，并记录 `react_max_iterations_reached` 告警                                                                                                               |
+| **状态 deltas 即时应用** | 状态变更类工具（`state_mutating=true`）的 `money_delta` / `inventory_delta` / `mood_delta` / `relation_strength_delta` 在每轮工具调用后立即由 `_apply_tool_deltas()` 写回，避免循环内重复执行导致状态丢失 |
+| **观察回灌 Prompt**      | 每轮的 `tool_observations` 会以 `[工具调用观察（ReAct）]` 段落追加到决策 Prompt，让 LLM 基于真实工具结果推理下一步（继续调用工具或转入 Action）                                                           |
+| **工具结果入记忆**       | 每次工具调用成功后写入一条 `memory_episodes`（`action_id="use_tool"`，`importance=7`），作为角色经历的不可变事实                                                                                          |
+| **LLM 决策边界不变**     | ReAct 循环内 LLM 仍只能在候选 Action 中选择，不能直接修改状态；状态变更由工具 deltas 与 Action executor 完成                                                                                              |
+
+#### 实现位置
+
+| 文件                         | 函数/段落                                                | 说明                                                                              |
+| ---------------------------- | -------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `src/core/character/tick.py` | `tick_character()` 内 `for _react_iter in range(3)` 循环 | ReAct 主循环                                                                      |
+| `src/core/character/tick.py` | `_decide(tool_observations=...)`                         | 接受前序工具观察，注入 `[工具调用观察（ReAct）]` 段落到 Prompt                    |
+| `src/core/character/tick.py` | `_execute_tool()`                                        | 调用 `ToolRegistry.call_tool_with_context`，结果存入记忆                          |
+| `src/core/character/tick.py` | `_apply_tool_deltas()`                                   | 应用 `money_delta` / `inventory_delta` / `mood_delta` / `relation_strength_delta` |
+
+> ReAct 让角色能够"先查询再行动"（如先 `shop.list_items` 看商品，再 `shop.buy_item` 购买，最后选择 `eat_meal` Action 进食），更接近真实人类的多步决策行为。
+
+### 3.4 事务化保证
 
 **事务化保证**：以下操作在**同一个 PG 事务**中完成，任一失败则整体回滚：
 
@@ -159,7 +214,7 @@ proactiveShareIntent.shouldShare?
 
 Redis 实时状态在事务提交后再写入（最终一致），失败时由 PG 镜像回灌。
 
-### 3.4 执行器伪代码
+### 3.5 执行器伪代码
 
 ```python
 async def execute_action(db: DB, redis: Redis, character_id: UUID, decision: Decision):
@@ -223,7 +278,7 @@ async def execute_action(db: DB, redis: Redis, character_id: UUID, decision: Dec
     await schedule_post_action_hooks(character_id, episode)
 ```
 
-### 3.5 多智能体交互：chat_with
+### 3.6 多智能体交互：chat_with
 
 `chat_with` 是参数化 SOCIAL Action，`params.target_character_id` 指定对话对象。执行层（`CharacterTickEngine._handle_character_chat`）在状态变更前完成多智能体交互闭环：
 

@@ -1,0 +1,37 @@
+# 角色卡 - 薰
+name: 薰
+age: 25
+occupation: 咖啡店店员
+personality:
+  - 温和
+  - 内敛
+  - 细腻
+  - 随性
+traits:
+  hobby: [料理, 阅读, 编织]
+  favorite_color: latte_brown
+  schedule: normal
+  favorite_food: [蛋糕, 红茶]
+  dislikes: [争吵, 咖啡因]
+  mbti: ISFP
+backstory: |
+  大学毕业后回到小镇，在咖啡馆工作。
+  性格温和内敛，喜欢在闲暇时编织和阅读。
+  享受小镇宁静的生活节奏，不愿去大城市奔波。
+avatar_url: https://cdn.example.com/avatar/kaoru.png
+voice_preset: gentle_girl
+initial_state:
+  location: cafe
+  stamina: 65
+  satiety: 50
+  mood: calm
+  money: 450
+  phone_battery: 55
+  social_energy: 40
+initial_plans:
+  - type: long_term
+    title: 开一家自己的手工杂货店
+    priority: 3
+  - type: short_term
+    title: 学会新的拉花技巧
+    priority: 4

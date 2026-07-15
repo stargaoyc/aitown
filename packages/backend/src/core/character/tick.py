@@ -120,13 +120,41 @@ class CharacterTickEngine:
             logger.warn("no_candidates", character_id=str(character_id))
             return
 
-        # 3. LLM 决策
-        decision = await self._decide(character_id, context, candidates)
+        # 3. LLM 决策（ReAct 循环：工具调用 → 观察结果 → 再次决策）
+        # 最多 3 轮工具调用，防止无限循环
+        tool_observations: list[dict[str, Any]] = []
+        decision = await self._decide(character_id, context, candidates, tool_observations)
 
-        # 3.5 工具调用（如果 LLM 决定使用工具）
+        for _react_iter in range(3):
+            if decision.action != "use_tool":
+                break
+
+            # 执行工具调用
+            tool_result = await self._execute_tool(character_id, decision, context)
+            if tool_result:
+                tool_observations.append(
+                    {
+                        "tool_name": decision.params.get("tool_name", ""),
+                        "tool_args": decision.params.get("tool_args", {}),
+                        "result": tool_result.get("result", tool_result),
+                        "success": tool_result.get("success", False),
+                    }
+                )
+
+            # 对状态变更类工具，应用 deltas
+            if tool_result and tool_result.get("state_mutating"):
+                await self._apply_tool_deltas(character_id, tool_result.get("result", {}), context)
+
+            # 再次决策（带工具观察结果）
+            decision = await self._decide(character_id, context, candidates, tool_observations)
+
+        # 如果 3 轮后仍在 use_tool，强制改为 wait
         if decision.action == "use_tool":
-            await self._execute_tool(character_id, decision, context)
-            # 工具调用后，继续执行一个默认 Action（如 wait）
+            logger.warning(
+                "react_max_iterations_reached",
+                character_id=str(character_id),
+                tool_observations=tool_observations,
+            )
             decision.action = "wait"
 
         # 4. 执行 Action
@@ -342,16 +370,26 @@ class CharacterTickEngine:
             "relations": relations_map,
         }
 
-    async def _decide(self, character_id: UUID, context: dict, candidates: list[Action]) -> DecisionResult:
-        """LLM 决策 - 结构化输出
+    async def _decide(
+        self,
+        character_id: UUID,
+        context: dict,
+        candidates: list[Action],
+        tool_observations: list[dict[str, Any]] | None = None,
+    ) -> DecisionResult:
+        """LLM 决策 - 结构化输出（ReAct 模式）
 
         使用 PromptTemplates.render() 生成决策 Prompt
         调用 LLMClient.structured_output() 获取结构化结果
+
+        ReAct 循环：当 LLM 决策为 use_tool 时，执行工具后将结果加入 tool_observations，
+        再次调用本方法让 LLM 基于工具结果推理下一步行动。
 
         Args:
             character_id: 角色 ID
             context: 感知环境结果
             candidates: 候选 Action 列表
+            tool_observations: 前序工具调用的观察结果（ReAct 模式）
 
         Returns:
             DecisionResult: 决策结果
@@ -432,6 +470,22 @@ class CharacterTickEngine:
             f'在 params 中填写 tool_name（如 "shop.buy_item"）和 tool_args（参数字典）。'
             f"标记为 [会改变状态] 的工具会直接修改你的金钱/库存/关系等状态。"
         )
+
+        # ReAct 模式：如果有前序工具调用结果，加入 Prompt 让 LLM 基于结果推理
+        if tool_observations:
+            obs_lines = []
+            for i, obs in enumerate(tool_observations, 1):
+                success_tag = "成功" if obs.get("success") else "失败"
+                result_str = str(obs.get("result", ""))[:800]
+                obs_lines.append(
+                    f"{i}. 调用 {obs['tool_name']}({obs.get('tool_args', {})}) [{success_tag}]\n   结果: {result_str}"
+                )
+            prompt += (
+                f"\n\n[工具调用观察（ReAct）]\n"
+                f"你刚才调用了以下工具，请基于结果决定下一步行动：\n"
+                f"{chr(10).join(obs_lines)}\n"
+                f"你可以继续调用其他工具，或选择一个 Action 执行。"
+            )
 
         # 定义决策结果 schema
         schema = {
@@ -535,10 +589,7 @@ class CharacterTickEngine:
                 result_preview=str(tool_result)[:200],
             )
 
-            # 对状态变更类工具，应用 deltas 到 Redis 实时状态
-            if result.get("state_mutating"):
-                await self._apply_tool_deltas(character_id, tool_result, context)
-
+            # 状态变更类工具的 deltas 由 ReAct 循环统一应用（避免重复）
             # 将工具结果存入角色记忆
             try:
                 async with db.session() as session:

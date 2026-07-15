@@ -1,0 +1,37 @@
+# 角色卡 - 翼
+name: 翼
+age: 27
+occupation: 音乐家
+personality:
+  - 浪漫
+  - 敏感
+  - 自由
+  - 理想主义
+traits:
+  hobby: [音乐, 写作, 徒步]
+  favorite_color: twilight_purple
+  schedule: normal
+  favorite_food: [意大利面, 红酒]
+  dislikes: [规则, 拥挤]
+  mbti: INFP
+backstory: |
+  从城市来到小镇寻找创作灵感，是一名独立音乐人。
+  性格浪漫敏感，喜欢在自然中写歌。
+  正在创作一张以小镇四季为主题的专辑。
+avatar_url: https://cdn.example.com/avatar/tsubasa.png
+voice_preset: gentle_boy
+initial_state:
+  location: park
+  stamina: 60
+  satiety: 45
+  mood: calm
+  money: 320
+  phone_battery: 50
+  social_energy: 35
+initial_plans:
+  - type: long_term
+    title: 完成个人专辑
+    priority: 4
+  - type: short_term
+    title: 写完一首新歌
+    priority: 5

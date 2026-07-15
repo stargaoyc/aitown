@@ -6,25 +6,25 @@
 
 ## 一、技术栈
 
-| 类别 | 技术 | 版本 | 说明 |
-|------|------|------|------|
-| UI 渲染 | React | 19.2 | 并发特性 + Actions |
-| 类型 | TypeScript | 7.0 | 类型系统 |
-| 构建 | Vite (Rolldown) | 8.1 | Rust 内核极速构建 |
-| 编译器 | React Compiler | 1.0 | 自动记忆化，免手写 useMemo/useCallback |
-| 路由 | TanStack Router | 1.170 | 类型安全路由，文件路由 |
-| 服务端状态 | TanStack Query | 5.101 | 缓存/重试/乐观更新 |
-| 校验 | Zod | 4.4 | 表单与 API 运行时校验 |
-| 客户端状态 | Zustand | 5.0 | 轻量全局状态 |
-| 组件库 | shadcn/ui | 最新 | Radix UI 基础 + 可定制 |
-| 样式 | Tailwind CSS | v4 | 原子化 CSS，零运行时 |
-| Lint | oxlint | 最新 | Rust 内核极速 lint（替代 ESLint） |
-| 格式化 | oxfmt | 最新 | Rust 内核极速格式化（替代 Prettier） |
-| 目标语法 | ES2024 | — | 使用最新 ECMAScript 特性（如 `Set.prototype.intersection`） |
-| 图表 | Recharts | 3.x | 数据可视化 |
-| 动效 | Framer Motion | 12.x | 二次元风格过渡动效 |
-| 图标 | Lucide React | 最新 | 现代图标库 |
-| 包管理 | pnpm | 11 | 硬链接节省磁盘 |
+| 类别       | 技术            | 版本  | 说明                                                        |
+| ---------- | --------------- | ----- | ----------------------------------------------------------- |
+| UI 渲染    | React           | 19.2  | 并发特性 + Actions                                          |
+| 类型       | TypeScript      | 7.0   | 类型系统                                                    |
+| 构建       | Vite (Rolldown) | 8.1   | Rust 内核极速构建                                           |
+| 编译器     | React Compiler  | 1.0   | 自动记忆化，免手写 useMemo/useCallback                      |
+| 路由       | TanStack Router | 1.170 | 类型安全路由，文件路由                                      |
+| 服务端状态 | TanStack Query  | 5.101 | 缓存/重试/乐观更新                                          |
+| 校验       | Zod             | 4.4   | 表单与 API 运行时校验                                       |
+| 客户端状态 | Zustand         | 5.0   | 轻量全局状态                                                |
+| 组件库     | shadcn/ui       | 最新  | Radix UI 基础 + 可定制                                      |
+| 样式       | Tailwind CSS    | v4    | 原子化 CSS，零运行时                                        |
+| Lint       | oxlint          | 最新  | Rust 内核极速 lint（替代 ESLint）                           |
+| 格式化     | oxfmt           | 最新  | Rust 内核极速格式化（替代 Prettier）                        |
+| 目标语法   | ES2024          | —     | 使用最新 ECMAScript 特性（如 `Set.prototype.intersection`） |
+| 图表       | Recharts        | 3.x   | 数据可视化                                                  |
+| 动效       | Framer Motion   | 12.x  | 二次元风格过渡动效                                          |
+| 图标       | Lucide React    | 最新  | 现代图标库                                                  |
+| 包管理     | pnpm            | 11    | 硬链接节省磁盘                                              |
 
 ### ES2024 特性示例
 
@@ -32,8 +32,8 @@
 
 ```typescript
 // Set 方法（ES2024）
-const activeChars = new Set(['yuina', 'koharu']);
-const cafeVisitors = new Set(['yuina', 'rin']);
+const activeChars = new Set(["yuina", "koharu"]);
+const cafeVisitors = new Set(["yuina", "rin"]);
 const intersection = activeChars.intersection(cafeVisitors); // Set {'yuina'}
 
 // Promise.withResolvers（ES2024）
@@ -102,7 +102,7 @@ const handler = (e) => onClick(e);
 `vite.config.ts` 启用：
 
 ```typescript
-import { reactCompiler } from 'babel-plugin-react-compiler';
+import { reactCompiler } from "babel-plugin-react-compiler";
 
 export default defineConfig({
   plugins: [react({ babel: { plugins: [reactCompiler] } })],
@@ -119,15 +119,15 @@ export default defineConfig({
 
 ### 2.2 视觉风格组合
 
-| 风格元素 | 说明 |
-|----------|------|
-| **玻璃拟态 (Glassmorphism)** | 半透明卡片 + 背景模糊 + 细边框，营造轻盈层次感 |
-| **柔和渐变** | 樱花粉→天蓝、暮光紫→粉，作为背景与大色块 |
-| **角色卡牌化** | 角色以"卡牌"形式展示，hover 翻转/浮起，呼应抽卡/立绘文化 |
-| **圆角与阴影** | 大圆角（12–20px）+ 多层柔和阴影，避免尖锐感 |
-| **微动效** | Framer Motion 实现入场、悬停、状态切换的弹性动效 |
-| **二次元配色** | 主色樱粉 `#FF8FAB`、辅色天蓝 `#7EC8E3`、点缀暮紫 `#B19CD9` |
-| **字体** | 中文用思源黑体/HarmonyOS Sans，英文用 Inter，标题可选衬线增加质感 |
+| 风格元素                     | 说明                                                              |
+| ---------------------------- | ----------------------------------------------------------------- |
+| **玻璃拟态 (Glassmorphism)** | 半透明卡片 + 背景模糊 + 细边框，营造轻盈层次感                    |
+| **柔和渐变**                 | 樱花粉→天蓝、暮光紫→粉，作为背景与大色块                          |
+| **角色卡牌化**               | 角色以"卡牌"形式展示，hover 翻转/浮起，呼应抽卡/立绘文化          |
+| **圆角与阴影**               | 大圆角（12–20px）+ 多层柔和阴影，避免尖锐感                       |
+| **微动效**                   | Framer Motion 实现入场、悬停、状态切换的弹性动效                  |
+| **二次元配色**               | 主色樱粉 `#FF8FAB`、辅色天蓝 `#7EC8E3`、点缀暮紫 `#B19CD9`        |
+| **字体**                     | 中文用思源黑体/HarmonyOS Sans，英文用 Inter，标题可选衬线增加质感 |
 
 ### 2.3 配色系统（Tailwind v4 CSS 变量）
 
@@ -137,7 +137,7 @@ export default defineConfig({
 
 @theme {
   /* 主色调 - 樱花粉 */
-  --color-sakura-50:  #fff5f8;
+  --color-sakura-50: #fff5f8;
   --color-sakura-500: #ff8fab;
   --color-sakura-600: #f472a3;
 
@@ -150,17 +150,17 @@ export default defineConfig({
   --color-twilight-500: #9b7ed6;
 
   /* 玻璃拟态 */
-  --color-glass-bg:     rgba(255, 255, 255, 0.55);
+  --color-glass-bg: rgba(255, 255, 255, 0.55);
   --color-glass-border: rgba(255, 255, 255, 0.35);
-  --color-glass-blur:   16px;
+  --color-glass-blur: 16px;
 
   /* 圆角 */
   --radius-card: 16px;
   --radius-pill: 9999px;
 
   /* 阴影 */
-  --shadow-soft:  0 4px 20px rgba(255, 143, 171, 0.12);
-  --shadow-hover: 0 8px 32px rgba(255, 143, 171, 0.20);
+  --shadow-soft: 0 4px 20px rgba(255, 143, 171, 0.12);
+  --shadow-hover: 0 8px 32px rgba(255, 143, 171, 0.2);
 }
 ```
 
@@ -168,20 +168,20 @@ export default defineConfig({
 
 ```tsx
 // components/ui/glass-card.tsx
-import { motion } from 'framer-motion';
-import { cn } from '@/lib/utils';
+import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 export function GlassCard({ children, className, hover = true }: GlassCardProps) {
   return (
     <motion.div
       whileHover={hover ? { y: -4, scale: 1.01 } : undefined}
-      transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+      transition={{ type: "spring", stiffness: 300, damping: 24 }}
       className={cn(
-        'rounded-[--radius-card] border border-[--color-glass-border]',
-        'bg-[--color-glass-bg] backdrop-blur-[--color-glass-blur]',
-        'shadow-[--shadow-soft] hover:shadow-[--shadow-hover]',
-        'transition-shadow',
-        className
+        "rounded-[--radius-card] border border-[--color-glass-border]",
+        "bg-[--color-glass-bg] backdrop-blur-[--color-glass-blur]",
+        "shadow-[--shadow-soft] hover:shadow-[--shadow-hover]",
+        "transition-shadow",
+        className,
       )}
     >
       {children}
@@ -194,8 +194,8 @@ export function GlassCard({ children, className, hover = true }: GlassCardProps)
 
 ```tsx
 // components/characters/character-card.tsx
-import { motion } from 'framer-motion';
-import { GlassCard } from '@/components/ui/glass-card';
+import { motion } from "framer-motion";
+import { GlassCard } from "@/components/ui/glass-card";
 
 export function CharacterCard({ character }: { character: Character }) {
   return (
@@ -209,8 +209,10 @@ export function CharacterCard({ character }: { character: Character }) {
                      transition-transform duration-500 group-hover:scale-105"
         />
         {/* 状态徽章 */}
-        <span className="absolute top-3 right-3 px-3 py-1 rounded-full
-                         bg-white/80 backdrop-blur text-xs font-medium">
+        <span
+          className="absolute top-3 right-3 px-3 py-1 rounded-full
+                         bg-white/80 backdrop-blur text-xs font-medium"
+        >
           {character.mood}
         </span>
       </div>
@@ -220,9 +222,12 @@ export function CharacterCard({ character }: { character: Character }) {
         <h3 className="text-lg font-semibold">{character.name}</h3>
         <p className="text-sm text-muted-foreground">{character.occupation}</p>
         <div className="mt-3 flex flex-wrap gap-1.5">
-          {character.personality.map(tag => (
-            <span key={tag} className="px-2 py-0.5 text-xs rounded-full
-                         bg-sakura-500/15 text-sakura-600">
+          {character.personality.map((tag) => (
+            <span
+              key={tag}
+              className="px-2 py-0.5 text-xs rounded-full
+                         bg-sakura-500/15 text-sakura-600"
+            >
               {tag}
             </span>
           ))}
@@ -268,32 +273,32 @@ export function CharacterCard({ character }: { character: Character }) {
 
 实际已实现 24 个页面，覆盖完整的管理与监控场景：
 
-| 页面路由 | 核心功能 | 关键组件 |
-|----------|----------|----------|
-| `/` 仪表盘 | 总览卡片、趋势图、最近事件流、世界时钟 | GlassCard、Recharts、滚动列表 |
-| `/characters` 角色列表 | 角色卡牌墙、状态/位置/当前行为 | CharacterCard、状态条 |
-| `/characters/$characterId` 角色详情 | 状态、记忆、计划、关系、行为日志 | 标签页切换、Recharts |
-| `/characters/import` 角色导入 | YAML/JSON 角色卡导入 | 表单、文件上传 |
-| `/characters/compare` 角色对比 | 多角色状态对比 | 对比表格、Recharts |
-| `/map` 小镇地图 | 场景热力图、拥挤度可视化 | 可视化地图 |
-| `/memory` 记忆时间线 | 记忆查询、重要程度筛选 | 时间线、向量检索 |
-| `/memory/$characterId/reflections` 反思查看器 | 反思列表、来源记忆追溯 | 卡片列表 |
-| `/memory/vector-search` 向量检索测试 | 输入查询、查看相似记忆 | 搜索表单、结果列表 |
-| `/plans` 规划系统 | 角色计划列表、进度跟踪 | 看板、进度条 |
-| `/relations` 关系图谱 | 角色关系网络可视化 | 关系图、力导向图 |
-| `/events` 世界事件时间线 | 事件流、可展开 EventCard | Framer Motion AnimatePresence |
-| `/actions` 角色行为日志 | 行为历史、参数详情 | 表格、JSON 查看器 |
-| `/messages` QQ 消息监控 | 消息列表、会话详情 | 聊天气泡、消息编辑器 |
-| `/messages/proactive` 主动分享历史 | 分享记录、文案查看 | 卡片列表 |
-| `/messages/export` 聊天记录导出 | 导出会话记录 | 表单、下载 |
-| `/conversations` 会话管理 | 多渠道会话列表 | 表格 |
-| `/monitoring` 监控 | Grafana 集成 + 原生日志/指标面板 | iframe、GlassCard |
-| `/monitoring/llm-cost` LLM 成本仪表盘 | Token 消耗、成本趋势 | Recharts |
-| `/snapshots` 世界快照管理 | 快照列表、冷启动恢复 | 表格、操作按钮 |
-| `/character-cards` 角色卡预览 | 角色卡渲染预览 | 卡片组件 |
-| `/notifications` 通知中心 | 系统通知列表 | 列表 |
-| `/settings` 系统设置 | 模型配置、Prompt 编辑、**工具命名空间开关** | 表单、toggle 控件 |
-| `/settings/mcp` 工具命名空间管理 | 工具命名空间列表、工具清单、启用状态（路径保留以兼容前端） | 表格、toggle |
+| 页面路由                                      | 核心功能                                    | 关键组件                      |
+| --------------------------------------------- | ------------------------------------------- | ----------------------------- |
+| `/` 仪表盘                                    | 总览卡片、趋势图、最近事件流、世界时钟      | GlassCard、Recharts、滚动列表 |
+| `/characters` 角色列表                        | 角色卡牌墙、状态/位置/当前行为              | CharacterCard、状态条         |
+| `/characters/$characterId` 角色详情           | 状态、记忆、计划、关系、行为日志            | 标签页切换、Recharts          |
+| `/characters/import` 角色导入                 | YAML/JSON 角色卡导入                        | 表单、文件上传                |
+| `/characters/compare` 角色对比                | 多角色状态对比                              | 对比表格、Recharts            |
+| `/map` 小镇地图                               | 场景热力图、拥挤度可视化                    | 可视化地图                    |
+| `/memory` 记忆时间线                          | 记忆查询、重要程度筛选                      | 时间线、向量检索              |
+| `/memory/$characterId/reflections` 反思查看器 | 反思列表、来源记忆追溯                      | 卡片列表                      |
+| `/memory/vector-search` 向量检索测试          | 输入查询、查看相似记忆                      | 搜索表单、结果列表            |
+| `/plans` 规划系统                             | 角色计划列表、进度跟踪                      | 看板、进度条                  |
+| `/relations` 关系图谱                         | 角色关系网络可视化                          | 关系图、力导向图              |
+| `/events` 世界事件时间线                      | 事件流、可展开 EventCard                    | Framer Motion AnimatePresence |
+| `/actions` 角色行为日志                       | 行为历史、参数详情                          | 表格、JSON 查看器             |
+| `/messages` QQ 消息监控                       | 消息列表、会话详情                          | 聊天气泡、消息编辑器          |
+| `/messages/proactive` 主动分享历史            | 分享记录、文案查看                          | 卡片列表                      |
+| `/messages/export` 聊天记录导出               | 导出会话记录                                | 表单、下载                    |
+| `/conversations` 会话管理                     | 多渠道会话列表                              | 表格                          |
+| `/monitoring` 监控                            | Grafana 集成 + 原生日志/指标面板            | iframe、GlassCard             |
+| `/monitoring/llm-cost` LLM 成本仪表盘         | Token 消耗、成本趋势                        | Recharts                      |
+| `/snapshots` 世界快照管理                     | 快照列表、冷启动恢复                        | 表格、操作按钮                |
+| `/character-cards` 角色卡预览                 | 角色卡渲染预览                              | 卡片组件                      |
+| `/notifications` 通知中心                     | 系统通知列表                                | 列表                          |
+| `/settings` 系统设置                          | 模型配置、Prompt 编辑、**工具命名空间开关** | 表单、toggle 控件             |
+| `/settings/tools` 工具命名空间管理            | 工具命名空间列表、工具清单、启用状态        | 表格、toggle                  |
 
 ### 3.1 工具命名空间开关 UI
 
@@ -301,7 +306,7 @@ export function CharacterCard({ character }: { character: Character }) {
 
 - **启用状态**：sakura 色主题（樱花粉 #FF8FAB），显示"已启用"绿色标签；
 - **禁用状态**：灰色 + `opacity-70`，显示"已禁用"灰色标签；
-- **交互**：点击 toggle 立即调用 `PUT /api/v1/mcp/servers/{name}/enabled`（路径保留以兼容前端），成功后 TanStack Query 自动刷新列表；
+- **交互**：点击 toggle 立即调用 `PUT /api/v1/tools/servers/{name}/enabled`，成功后 TanStack Query 自动刷新列表；
 - **数据流**：`useToggleMcpServer` mutation → `toggleMcpServer` API → 后端 Redis `hset tools:enabled`。
 
 详见 [模块与本地工具系统设计 - 工具命名空间单独开关](module-system.md#51-工具命名空间单独开关redis-持久化)。
@@ -387,20 +392,20 @@ packages/frontend/
 
 ### 5.1 状态分层
 
-| 层 | 工具 | 职责 |
-|----|------|------|
-| 服务端状态 | TanStack Query | 角色列表、模块列表、消息历史等可缓存数据 |
-| 实时状态 | Zustand + WebSocket | 角色实时位置/精力、世界天气、模块健康 |
-| UI 状态 | Zustand | 侧边栏折叠、当前选中角色、模态框开关 |
+| 层         | 工具                | 职责                                     |
+| ---------- | ------------------- | ---------------------------------------- |
+| 服务端状态 | TanStack Query      | 角色列表、模块列表、消息历史等可缓存数据 |
+| 实时状态   | Zustand + WebSocket | 角色实时位置/精力、世界天气、模块健康    |
+| UI 状态    | Zustand             | 侧边栏折叠、当前选中角色、模态框开关     |
 
 ### 5.2 WebSocket Hook
 
 ```typescript
 // hooks/use-websocket.ts
-import { useEffect } from 'react';
-import { useWebSocketStore } from '@/stores/websocket-store';
-import { useCharacterStore } from '@/stores/character-store';
-import { useWorldStore } from '@/stores/world-store';
+import { useEffect } from "react";
+import { useWebSocketStore } from "@/stores/websocket-store";
+import { useCharacterStore } from "@/stores/character-store";
+import { useWorldStore } from "@/stores/world-store";
 
 export function useDashboardSocket() {
   const ws = useWebSocketStore((s) => s.ws);
@@ -412,16 +417,16 @@ export function useDashboardSocket() {
     const handler = (event: MessageEvent) => {
       const msg = JSON.parse(event.data);
       switch (msg.type) {
-        case 'character.state_update':
+        case "character.state_update":
           upsertCharacter(msg.data);
           break;
-        case 'world.state_update':
+        case "world.state_update":
           setWorld(msg.data);
           break;
       }
     };
-    ws.addEventListener('message', handler);
-    return () => ws.removeEventListener('message', handler);
+    ws.addEventListener("message", handler);
+    return () => ws.removeEventListener("message", handler);
   }, [ws, upsertCharacter, setWorld]);
 }
 ```
@@ -430,9 +435,9 @@ export function useDashboardSocket() {
 
 ```typescript
 // api/hooks/use-characters.ts
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { z } from 'zod';
-import { api } from '../client';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { z } from "zod";
+import { api } from "../client";
 
 const CharacterSchema = z.object({
   id: z.string().uuid(),
@@ -440,15 +445,15 @@ const CharacterSchema = z.object({
   age: z.number(),
   occupation: z.string(),
   personality: z.array(z.string()),
-  status: z.enum(['active', 'archived', 'deleted']),
+  status: z.enum(["active", "archived", "deleted"]),
 });
 
 export function useCharacters() {
   return useQuery({
-    queryKey: ['characters'],
+    queryKey: ["characters"],
     queryFn: async () => {
       const raw = await api.characters.list();
-      return z.array(CharacterSchema).parse(raw);   // 运行时校验
+      return z.array(CharacterSchema).parse(raw); // 运行时校验
     },
   });
 }
@@ -473,17 +478,19 @@ pnpm exec openapi-typescript http://localhost:8000/openapi.json \
 ```tsx
 // components/layout/dynamic-background.tsx
 const GRADIENTS = {
-  dawn:      'from-[#FFE5B4] via-[#FFCCE5] to-[#B19CD9]',  // 清晨粉橙
-  day:       'from-[#A8D8FF] via-[#C7CEEA] to-[#E0C3FC]',  // 正午天蓝
-  dusk:      'from-[#FFB088] via-[#FF8FAB] to-[#B19CD9]',  // 黄昏紫粉
-  night:     'from-[#2C3E50] via-[#4A4063] to-[#6C5B7B]',  // 深夜靛蓝
+  dawn: "from-[#FFE5B4] via-[#FFCCE5] to-[#B19CD9]", // 清晨粉橙
+  day: "from-[#A8D8FF] via-[#C7CEEA] to-[#E0C3FC]", // 正午天蓝
+  dusk: "from-[#FFB088] via-[#FF8FAB] to-[#B19CD9]", // 黄昏紫粉
+  night: "from-[#2C3E50] via-[#4A4063] to-[#6C5B7B]", // 深夜靛蓝
 };
 
 export function DynamicBackground({ worldTime }: { worldTime: Date }) {
-  const phase = getDayPhase(worldTime);  // dawn | day | dusk | night
+  const phase = getDayPhase(worldTime); // dawn | day | dusk | night
   return (
-    <div className={`fixed inset-0 -z-10 bg-gradient-to-br ${GRADIENTS[phase]}
-                     transition-all duration-[3000ms]`} />
+    <div
+      className={`fixed inset-0 -z-10 bg-gradient-to-br ${GRADIENTS[phase]}
+                     transition-all duration-[3000ms]`}
+    />
   );
 }
 ```
@@ -546,20 +553,20 @@ pnpm preview                # 预览生产构建
 
 ### 8.4 测试
 
-| 类型 | 工具 |
-|------|------|
-| 单元测试 | Vitest |
-| 组件测试 | Testing Library |
-| E2E | Playwright |
+| 类型     | 工具                          |
+| -------- | ----------------------------- |
+| 单元测试 | Vitest                        |
+| 组件测试 | Testing Library               |
+| E2E      | Playwright                    |
 | 视觉回归 | Storybook + Chromatic（可选） |
 
 ---
 
 ## 九、相关文档
 
-| 主题 | 文档 |
-|------|------|
-| API 端点 | [api-spec.md](api-spec.md) |
-| 可观测性前端展示 | [observability.md](observability.md) |
-| 部署 | [deployment.md](deployment.md) |
-| Docker 部署 | [docker-deployment.md](docker-deployment.md) |
+| 主题             | 文档                                         |
+| ---------------- | -------------------------------------------- |
+| API 端点         | [api-spec.md](api-spec.md)                   |
+| 可观测性前端展示 | [observability.md](observability.md)         |
+| 部署             | [deployment.md](deployment.md)               |
+| Docker 部署      | [docker-deployment.md](docker-deployment.md) |

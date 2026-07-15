@@ -89,7 +89,7 @@ packages/backend/src/
 │   ├── messages.py        # 会话与消息
 │   ├── memory.py          # 记忆扩展（日记 / Person Memory）
 │   ├── notifications.py   # 通知中心
-│   ├── mcp.py             # 工具命名空间管理（路径保留以兼容前端）
+│   ├── tools.py            # 工具命名空间管理（路径前缀 /api/v1/tools）
 │   ├── system.py          # 系统设置
 │   ├── admin.py           # 运维端点（Tick / 快照 / 日志 / 指标）
 │   └── exceptions.py      # 全局异常处理器（统一错误响应 + trace_id）

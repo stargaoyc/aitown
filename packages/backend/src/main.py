@@ -34,11 +34,11 @@ from src.adapters import OneBotAdapter
 from src.api.actions import router as actions_router
 from src.api.admin import router as admin_router
 from src.api.characters import router as characters_router
-from src.api.mcp import router as mcp_router
 from src.api.memory import router as memory_ext_router
 from src.api.messages import router as messages_router
 from src.api.notifications import router as notifications_router
 from src.api.system import router as system_router
+from src.api.tools import router as tools_router
 from src.api.town import router as town_router
 from src.api.world import router as world_router
 from src.config import settings
@@ -730,8 +730,8 @@ app.include_router(onebot_adapter.router)
 # 注册通知中心 API 路由（/api/v1/notifications）
 app.include_router(notifications_router)
 
-# 注册 MCP Server 管理 API 路由（/api/v1/mcp）
-app.include_router(mcp_router)
+# 注册工具管理 API 路由（/api/v1/tools）
+app.include_router(tools_router)
 
 # 注册记忆扩展 API 路由（日记 + 角色对用户的记忆）
 app.include_router(memory_ext_router)
