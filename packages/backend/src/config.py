@@ -27,9 +27,6 @@ class Settings(BaseSettings):
     llm_max_retries: int = 2
     embedding_dim: int = 1536
 
-    # MCP
-    mcp_tool_timeout: int = 30
-
     # Observability
     otel_endpoint: str | None = None
     otel_service_name: str = "ai-town-backend"

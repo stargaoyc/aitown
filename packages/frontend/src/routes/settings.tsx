@@ -67,7 +67,7 @@ function mapModuleStatus(status: string): "ok" | "error" | "warning" | "idle" {
 }
 
 function SettingsPage() {
-  // 获取系统状态、健康检查、模块列表、MCP 服务器与工具
+  // 获取系统状态、健康检查、模块列表、工具命名空间与工具
   const { data: adminStatus, isLoading: adminLoading, error: adminError } = useAdminStatus();
   const { data: health } = useHealth();
   const { data: modulesData, isLoading: modulesLoading, error: modulesError } = useModules();
@@ -343,8 +343,8 @@ function SettingsPage() {
       {/* 顶部统计 */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard title="模块总数" value={modules.length} icon="📦" color="sakura" />
-        <StatCard title="MCP 服务器" value={mcpServers.length} icon="🖥️" color="sky" />
-        <StatCard title="MCP 工具" value={mcpTools.length} icon="🔧" color="twilight" />
+        <StatCard title="工具命名空间" value={mcpServers.length} icon="🖥️" color="sky" />
+        <StatCard title="可用工具" value={mcpTools.length} icon="🔧" color="twilight" />
         <StatCard
           title="运行中模块"
           value={modules.filter((m) => mapModuleStatus(m.status) === "ok").length}
@@ -353,14 +353,14 @@ function SettingsPage() {
         />
       </div>
 
-      {/* MCP 服务器列表 */}
+      {/* 工具命名空间列表 */}
       <motion.div variants={container} initial="hidden" animate="show">
         <motion.div variants={item}>
           <GlassCard hover={false}>
             <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
               <h3 className="font-semibold text-sakura-600 flex items-center gap-2 text-lg">
                 <Server className="w-5 h-5" />
-                MCP 服务器
+                工具命名空间（本地内联）
               </h3>
               {healthData && (
                 <div className="flex items-center gap-3 text-xs">
@@ -376,9 +376,9 @@ function SettingsPage() {
               )}
             </div>
             {serversError && <ErrorDisplay error={serversError} />}
-            {serversLoading && !serversError && <LoadingSpinner text="正在加载 MCP 服务器..." />}
+            {serversLoading && !serversError && <LoadingSpinner text="正在加载工具命名空间..." />}
             {!serversLoading && !serversError && mcpServers.length === 0 && (
-              <EmptyState icon="🖥️" title="暂无 MCP 服务器" subtitle="未配置任何 MCP 服务器" />
+              <EmptyState icon="🖥️" title="暂无工具命名空间" subtitle="未配置任何工具命名空间" />
             )}
             {mcpServers.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -455,18 +455,18 @@ function SettingsPage() {
         </motion.div>
       </motion.div>
 
-      {/* MCP 工具列表 */}
+      {/* 工具列表 */}
       <motion.div variants={container} initial="hidden" animate="show">
         <motion.div variants={item}>
           <GlassCard hover={false}>
             <h3 className="font-semibold text-sakura-600 mb-4 flex items-center gap-2 text-lg">
               <Wrench className="w-5 h-5" />
-              MCP 工具
+              可用工具
             </h3>
             {toolsError && <ErrorDisplay error={toolsError} />}
-            {toolsLoading && !toolsError && <LoadingSpinner text="正在加载 MCP 工具..." />}
+            {toolsLoading && !toolsError && <LoadingSpinner text="正在加载工具列表..." />}
             {!toolsLoading && !toolsError && mcpTools.length === 0 && (
-              <EmptyState icon="🔧" title="暂无 MCP 工具" subtitle="未注册任何 MCP 工具" />
+              <EmptyState icon="🔧" title="暂无工具" subtitle="未注册任何工具" />
             )}
             {mcpTools.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">

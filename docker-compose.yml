@@ -86,63 +86,9 @@ services:
     networks: [aitown-net]
 
   # ============================================================
-  # MCP Server 层（按需启用）
-  # 已移除 code-executor 和 web-search（外部能力，非内部业务所需）
+  # 工具层已内联到后端进程（src/tools/），无需独立容器
+  # 原 MCP Server 已迁移为本地 async 函数调用，消除 HTTP/SSE 网络开销
   # ============================================================
-
-  mcp-weather:
-    build:
-      context: ./packages/mcp-servers
-      dockerfile: Dockerfile
-      args:
-        SERVER: weather
-    container_name: aitown-mcp-weather
-    restart: unless-stopped
-    environment:
-      OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY:-}
-    ports:
-      - "8003:8003"
-    networks: [aitown-net]
-    profiles: [mcp]
-
-  mcp-shop-simulator:
-    build:
-      context: ./packages/mcp-servers
-      dockerfile: Dockerfile
-      args:
-        SERVER: shop-simulator
-    container_name: aitown-mcp-shop
-    restart: unless-stopped
-    ports:
-      - "8004:8004"
-    networks: [aitown-net]
-    profiles: [mcp]
-
-  mcp-knowledge-base:
-    build:
-      context: ./packages/mcp-servers
-      dockerfile: Dockerfile
-      args:
-        SERVER: knowledge-base
-    container_name: aitown-mcp-kb
-    restart: unless-stopped
-    ports:
-      - "8005:8005"
-    networks: [aitown-net]
-    profiles: [mcp]
-
-  mcp-character-social:
-    build:
-      context: ./packages/mcp-servers
-      dockerfile: Dockerfile
-      args:
-        SERVER: character-social
-    container_name: aitown-mcp-social
-    restart: unless-stopped
-    ports:
-      - "8006:8006"
-    networks: [aitown-net]
-    profiles: [mcp]
 
   # ============================================================
   # 可观测性层（通过 --profile observability 启用）

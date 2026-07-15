@@ -1,7 +1,7 @@
-"""MCP Character Social Server - 角色社交系统
+"""角色社交工具模块 - 送礼/约会/冲突解决
 
-为 AI Town 角色提供"送礼 / 约会 / 冲突解决"的工具能力。
-角色通过 LLM 决策调用此 MCP Server 完成社交交互。
+从 MCP Server 迁移为直接工具调用，消除 HTTP/SSE 网络开销。
+所有函数签名与返回结构保持不变，仅移除 FastMCP 依赖。
 
 设计：
 - 无状态：每次调用由 caller 传入角色当前 relation_strength / inventory / mood
@@ -25,26 +25,26 @@ caller（Action executor）拿到结果后：
     new_relation = current_relation + relation_strength_delta
     new_inventory = merge(current_inventory, inventory_delta)
 """
+
 from __future__ import annotations
 
 import random
 from typing import Any
 
 import structlog
-from fastmcp import FastMCP  # FastMCP 2.0+ 导入方式
 from pydantic import BaseModel, Field
 
 logger = structlog.get_logger()
-
-mcp = FastMCP("character-social")
 
 
 # ============================================================
 # 礼物目录数据模型
 # ============================================================
 
+
 class GiftItem(BaseModel):
     """可赠送礼物定义"""
+
     item_id: str = Field(description="物品唯一标识")
     name: str = Field(description="物品显示名")
     value: int = Field(ge=0, description="物品价值（用于关系校验与好感度计算）")
@@ -55,28 +55,18 @@ class GiftItem(BaseModel):
 # 生产环境可通过配置文件覆盖
 DEFAULT_GIFT_CATALOG: list[GiftItem] = [
     # 低价值礼物（适合 stranger）
-    GiftItem(item_id="greeting_card", name="贺卡", value=10,
-             description="手写贺卡，表达心意"),
-    GiftItem(item_id="flower", name="花束", value=25,
-             description="一束鲜花，简单温馨"),
-    GiftItem(item_id="snack", name="零食", value=15,
-             description="一袋零食，轻松随意"),
+    GiftItem(item_id="greeting_card", name="贺卡", value=10, description="手写贺卡，表达心意"),
+    GiftItem(item_id="flower", name="花束", value=25, description="一束鲜花，简单温馨"),
+    GiftItem(item_id="snack", name="零食", value=15, description="一袋零食，轻松随意"),
     # 中等价值礼物（适合 acquaintance 以上）
-    GiftItem(item_id="chocolate", name="巧克力", value=35,
-             description="盒装巧克力，甜蜜之选"),
-    GiftItem(item_id="book", name="书籍", value=45,
-             description="一本好书，知识分享"),
-    GiftItem(item_id="plush_toy", name="毛绒玩具", value=60,
-             description="毛绒玩具，可爱暖心"),
-    GiftItem(item_id="cake", name="蛋糕", value=50,
-             description="精致蛋糕，分享甜蜜"),
+    GiftItem(item_id="chocolate", name="巧克力", value=35, description="盒装巧克力，甜蜜之选"),
+    GiftItem(item_id="book", name="书籍", value=45, description="一本好书，知识分享"),
+    GiftItem(item_id="plush_toy", name="毛绒玩具", value=60, description="毛绒玩具，可爱暖心"),
+    GiftItem(item_id="cake", name="蛋糕", value=50, description="精致蛋糕，分享甜蜜"),
     # 高价值礼物（适合 friend 以上）
-    GiftItem(item_id="gift_box", name="礼物盒", value=100,
-             description="精美礼物盒，郑重其事"),
-    GiftItem(item_id="jewelry", name="首饰", value=150,
-             description="精致首饰，珍贵心意"),
-    GiftItem(item_id="watch", name="手表", value=120,
-             description="一块手表，长久陪伴"),
+    GiftItem(item_id="gift_box", name="礼物盒", value=100, description="精美礼物盒，郑重其事"),
+    GiftItem(item_id="jewelry", name="首饰", value=150, description="精致首饰，珍贵心意"),
+    GiftItem(item_id="watch", name="手表", value=120, description="一块手表，长久陪伴"),
 ]
 
 
@@ -123,9 +113,9 @@ BASE_CONFLICT_RECOVERY = 50
 # 冲突类型定义：(恢复率, 是否需要高关系强度)
 CONFLICT_TYPES: dict[str, tuple[float, int | None]] = {
     # (基础恢复率, 尝试所需最低关系强度；None 表示无门槛)
-    "argument": (0.8, None),          # 争吵：基础恢复 80%
+    "argument": (0.8, None),  # 争吵：基础恢复 80%
     "misunderstanding": (0.9, None),  # 误会：基础恢复 90%
-    "betrayal": (0.2, 60),            # 背叛：基础恢复 20%，需要关系强度 >= 60
+    "betrayal": (0.2, 60),  # 背叛：基础恢复 20%，需要关系强度 >= 60
 }
 
 # 关系强度 bonus：每点关系强度提供的额外恢复率
@@ -139,6 +129,7 @@ RELATION_MAX = 100
 # ============================================================
 # 辅助函数
 # ============================================================
+
 
 def _get_gift_catalog_dict() -> dict[str, GiftItem]:
     """获取礼物 ID → GiftItem 映射"""
@@ -174,17 +165,17 @@ def _clamp(value: float, low: float, high: float) -> float:
 
 
 # ============================================================
-# MCP Tools
+# 工具函数
 # ============================================================
 
-@mcp.tool()
+
 async def give_gift(
     character_id: str,
     target_id: str,
     item_id: str,
     current_relation_strength: int,
     current_inventory: dict[str, int] | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """模拟角色给另一个角色送礼
 
     校验：物品在库存中、关系强度允许该价值礼物（stranger 不能送贵重礼物）
@@ -224,13 +215,17 @@ async def give_gift(
     # 校验角色 ID
     if not character_id or not target_id:
         return _gift_error_result(
-            character_id, target_id, item_id,
+            character_id,
+            target_id,
+            item_id,
             current_relation_strength,
             "character_id and target_id are required",
         )
     if character_id == target_id:
         return _gift_error_result(
-            character_id, target_id, item_id,
+            character_id,
+            target_id,
+            item_id,
             current_relation_strength,
             "Cannot give gift to self",
         )
@@ -240,7 +235,9 @@ async def give_gift(
     gift = catalog.get(item_id)
     if gift is None:
         return _gift_error_result(
-            character_id, target_id, item_id,
+            character_id,
+            target_id,
+            item_id,
             current_relation_strength,
             f"Gift item not found in catalog: {item_id}",
         )
@@ -249,7 +246,9 @@ async def give_gift(
     have_quantity = current_inventory.get(item_id, 0)
     if have_quantity < 1:
         return _gift_error_result(
-            character_id, target_id, item_id,
+            character_id,
+            target_id,
+            item_id,
             current_relation_strength,
             f"Item not in inventory: {item_id} (have {have_quantity})",
         )
@@ -257,7 +256,9 @@ async def give_gift(
     # 校验关系强度范围
     if current_relation_strength < RELATION_MIN or current_relation_strength > RELATION_MAX:
         return _gift_error_result(
-            character_id, target_id, item_id,
+            character_id,
+            target_id,
+            item_id,
             current_relation_strength,
             f"relation_strength must be in [{RELATION_MIN}, {RELATION_MAX}]",
         )
@@ -268,10 +269,11 @@ async def give_gift(
     # 校验礼物价值是否在该关系等级允许范围内
     if max_value is not None and gift.value >= max_value:
         return _gift_error_result(
-            character_id, target_id, item_id,
+            character_id,
+            target_id,
+            item_id,
             current_relation_strength,
-            f"Gift too valuable for tier '{tier_name}': "
-            f"item value {gift.value} >= limit {max_value}",
+            f"Gift too valuable for tier '{tier_name}': item value {gift.value} >= limit {max_value}",
         )
 
     # 计算好感度增量
@@ -307,14 +309,13 @@ async def give_gift(
     }
 
 
-@mcp.tool()
 async def invite_date(
     character_id: str,
     target_id: str,
     scene_id: str,
     current_relation_strength: int,
     current_mood: str,
-) -> dict:
+) -> dict[str, Any]:
     """模拟角色邀请另一个角色约会
 
     校验：关系强度 >= 40（friend 以上）、目标场景适合约会
@@ -353,36 +354,44 @@ async def invite_date(
     # 校验角色 ID
     if not character_id or not target_id:
         return _date_error_result(
-            character_id, target_id, scene_id,
+            character_id,
+            target_id,
+            scene_id,
             "character_id and target_id are required",
         )
     if character_id == target_id:
         return _date_error_result(
-            character_id, target_id, scene_id,
+            character_id,
+            target_id,
+            scene_id,
             "Cannot invite self to a date",
         )
 
     # 校验关系强度
     if current_relation_strength < DATE_RELATION_THRESHOLD:
         return _date_error_result(
-            character_id, target_id, scene_id,
-            f"Relation strength too low: have {current_relation_strength}, "
-            f"need >= {DATE_RELATION_THRESHOLD}",
+            character_id,
+            target_id,
+            scene_id,
+            f"Relation strength too low: have {current_relation_strength}, need >= {DATE_RELATION_THRESHOLD}",
         )
 
     # 校验关系强度范围
     if current_relation_strength > RELATION_MAX:
         return _date_error_result(
-            character_id, target_id, scene_id,
+            character_id,
+            target_id,
+            scene_id,
             f"relation_strength exceeds max ({RELATION_MAX})",
         )
 
     # 校验场景
     if scene_id not in DATE_SCENES:
         return _date_error_result(
-            character_id, target_id, scene_id,
-            f"Scene not suitable for date: {scene_id}. "
-            f"Allowed: {sorted(DATE_SCENES)}",
+            character_id,
+            target_id,
+            scene_id,
+            f"Scene not suitable for date: {scene_id}. Allowed: {sorted(DATE_SCENES)}",
         )
 
     # 计算基础成功率
@@ -430,13 +439,12 @@ async def invite_date(
     }
 
 
-@mcp.tool()
 async def resolve_conflict(
     character_id: str,
     target_id: str,
     conflict_type: str,
     current_relation_strength: int,
-) -> dict:
+) -> dict[str, Any]:
     """模拟角色解决与另一个角色的冲突
 
     冲突类型：argument（争吵）, misunderstanding（误会）, betrayal（背叛）
@@ -471,13 +479,17 @@ async def resolve_conflict(
     # 校验角色 ID
     if not character_id or not target_id:
         return _conflict_error_result(
-            character_id, target_id, conflict_type,
+            character_id,
+            target_id,
+            conflict_type,
             current_relation_strength,
             "character_id and target_id are required",
         )
     if character_id == target_id:
         return _conflict_error_result(
-            character_id, target_id, conflict_type,
+            character_id,
+            target_id,
+            conflict_type,
             current_relation_strength,
             "Cannot resolve conflict with self",
         )
@@ -486,10 +498,11 @@ async def resolve_conflict(
     conflict_info = CONFLICT_TYPES.get(conflict_type)
     if conflict_info is None:
         return _conflict_error_result(
-            character_id, target_id, conflict_type,
+            character_id,
+            target_id,
+            conflict_type,
             current_relation_strength,
-            f"Unknown conflict_type: {conflict_type}. "
-            f"Allowed: {sorted(CONFLICT_TYPES.keys())}",
+            f"Unknown conflict_type: {conflict_type}. Allowed: {sorted(CONFLICT_TYPES.keys())}",
         )
 
     recovery_rate, min_relation = conflict_info
@@ -497,7 +510,9 @@ async def resolve_conflict(
     # 校验关系强度范围
     if current_relation_strength < RELATION_MIN or current_relation_strength > RELATION_MAX:
         return _conflict_error_result(
-            character_id, target_id, conflict_type,
+            character_id,
+            target_id,
+            conflict_type,
             current_relation_strength,
             f"relation_strength must be in [{RELATION_MIN}, {RELATION_MAX}]",
         )
@@ -505,7 +520,9 @@ async def resolve_conflict(
     # 校验冲突类型的关系强度门槛
     if min_relation is not None and current_relation_strength < min_relation:
         return _conflict_error_result(
-            character_id, target_id, conflict_type,
+            character_id,
+            target_id,
+            conflict_type,
             current_relation_strength,
             f"Conflict type '{conflict_type}' requires relation_strength >= "
             f"{min_relation}, have {current_relation_strength}",
@@ -547,6 +564,7 @@ async def resolve_conflict(
 # ============================================================
 # 错误返回辅助函数
 # ============================================================
+
 
 def _gift_error_result(
     character_id: str,
@@ -608,7 +626,3 @@ def _conflict_error_result(
         "new_relation_strength": current_relation_strength,
         "error": error,
     }
-
-
-if __name__ == "__main__":
-    mcp.run()

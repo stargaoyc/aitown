@@ -1,7 +1,7 @@
-"""MCP Shop Simulator Server - 角色商店购买模拟
+"""商店工具模块 - 角色商店购买模拟
 
-为 AI Town 角色提供"逛商店 → 购买/出售"的工具能力。
-角色通过 LLM 决策调用此 MCP Server 完成虚拟经济交互。
+从 MCP Server 迁移为直接工具调用，消除 HTTP/SSE 网络开销。
+所有函数签名与返回结构保持不变，仅移除 FastMCP 依赖。
 
 设计：
 - 无状态：每次调用由 caller 传入角色当前 money + inventory
@@ -26,26 +26,26 @@ caller（Action executor）拿到结果后：
     new_money = current_money + money_delta
     new_inventory = merge(current_inventory, inventory_delta)
 """
+
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import structlog
-from fastmcp import FastMCP  # FastMCP 2.0+ 导入方式
 from pydantic import BaseModel, Field
 
 logger = structlog.get_logger()
-
-mcp = FastMCP("shop-simulator")
 
 
 # ============================================================
 # 商店目录数据模型
 # ============================================================
 
+
 class ShopItem(BaseModel):
     """商店商品定义"""
+
     item_id: str = Field(description="商品唯一标识")
     name: str = Field(description="商品显示名")
     category: str = Field(description="分类：food/drink/book/toy/medicine/clothing/other")
@@ -61,62 +61,51 @@ class ShopItem(BaseModel):
 # 生产环境可通过 YAML 配置文件覆盖
 DEFAULT_CATALOG: list[ShopItem] = [
     # 食物
-    ShopItem(item_id="bread", name="面包", category="food", base_price=15,
-             description="新鲜出炉的面包，恢复 20 饱腹度"),
-    ShopItem(item_id="rice_ball", name="饭团", category="food", base_price=20,
-             description="海苔饭团，恢复 25 饱腹度"),
-    ShopItem(item_id="cake", name="蛋糕", category="food", base_price=50,
-             description="草莓蛋糕，恢复 40 饱腹度并提升情绪"),
-    ShopItem(item_id="bento", name="便当", category="food", base_price=35,
-             description="精致便当，恢复 35 饱腹度"),
+    ShopItem(
+        item_id="bread", name="面包", category="food", base_price=15, description="新鲜出炉的面包，恢复 20 饱腹度"
+    ),
+    ShopItem(item_id="rice_ball", name="饭团", category="food", base_price=20, description="海苔饭团，恢复 25 饱腹度"),
+    ShopItem(
+        item_id="cake", name="蛋糕", category="food", base_price=50, description="草莓蛋糕，恢复 40 饱腹度并提升情绪"
+    ),
+    ShopItem(item_id="bento", name="便当", category="food", base_price=35, description="精致便当，恢复 35 饱腹度"),
     # 饮料
-    ShopItem(item_id="water", name="矿泉水", category="drink", base_price=10,
-             description="解渴，无特殊效果"),
-    ShopItem(item_id="coffee", name="咖啡", category="drink", base_price=25,
-             description="恢复 15 精力"),
-    ShopItem(item_id="juice", name="果汁", category="drink", base_price=18,
-             description="恢复 10 精力并小幅提升情绪"),
-    ShopItem(item_id="tea", name="茶", category="drink", base_price=15,
-             description="温和恢复 8 精力"),
+    ShopItem(item_id="water", name="矿泉水", category="drink", base_price=10, description="解渴，无特殊效果"),
+    ShopItem(item_id="coffee", name="咖啡", category="drink", base_price=25, description="恢复 15 精力"),
+    ShopItem(item_id="juice", name="果汁", category="drink", base_price=18, description="恢复 10 精力并小幅提升情绪"),
+    ShopItem(item_id="tea", name="茶", category="drink", base_price=15, description="温和恢复 8 精力"),
     # 书籍
-    ShopItem(item_id="novel", name="小说", category="book", base_price=45,
-             description="阅读可提升情绪与社交能量"),
-    ShopItem(item_id="textbook", name="教科书", category="book", base_price=80,
-             description="学习用，长时间阅读恢复较多社交能量"),
-    ShopItem(item_id="comic", name="漫画", category="book", base_price=30,
-             description="轻松阅读，大幅提升情绪"),
+    ShopItem(item_id="novel", name="小说", category="book", base_price=45, description="阅读可提升情绪与社交能量"),
+    ShopItem(
+        item_id="textbook",
+        name="教科书",
+        category="book",
+        base_price=80,
+        description="学习用，长时间阅读恢复较多社交能量",
+    ),
+    ShopItem(item_id="comic", name="漫画", category="book", base_price=30, description="轻松阅读，大幅提升情绪"),
     # 玩具
-    ShopItem(item_id="puzzle", name="拼图", category="toy", base_price=40,
-             description="休闲益智，小幅恢复精力"),
-    ShopItem(item_id="plush_toy", name="毛绒玩具", category="toy", base_price=60,
-             description="提升情绪，可送礼"),
+    ShopItem(item_id="puzzle", name="拼图", category="toy", base_price=40, description="休闲益智，小幅恢复精力"),
+    ShopItem(item_id="plush_toy", name="毛绒玩具", category="toy", base_price=60, description="提升情绪，可送礼"),
     # 药品
-    ShopItem(item_id="medicine", name="感冒药", category="medicine", base_price=70,
-             description="治疗疾病状态"),
-    ShopItem(item_id="vitamin", name="维生素", category="medicine", base_price=35,
-             description="提升体力上限 5（持续 1 天）"),
-    ShopItem(item_id="bandage", name="创可贴", category="medicine", base_price=12,
-             description="处理小伤口"),
+    ShopItem(item_id="medicine", name="感冒药", category="medicine", base_price=70, description="治疗疾病状态"),
+    ShopItem(
+        item_id="vitamin", name="维生素", category="medicine", base_price=35, description="提升体力上限 5（持续 1 天）"
+    ),
+    ShopItem(item_id="bandage", name="创可贴", category="medicine", base_price=12, description="处理小伤口"),
     # 服装
-    ShopItem(item_id="tshirt", name="T恤", category="clothing", base_price=55,
-             description="基础服装，无特殊效果"),
-    ShopItem(item_id="dress", name="连衣裙", category="clothing", base_price=120,
-             description="提升情绪与自信"),
-    ShopItem(item_id="hat", name="帽子", category="clothing", base_price=38,
-             description="装饰用，小幅提升情绪"),
+    ShopItem(item_id="tshirt", name="T恤", category="clothing", base_price=55, description="基础服装，无特殊效果"),
+    ShopItem(item_id="dress", name="连衣裙", category="clothing", base_price=120, description="提升情绪与自信"),
+    ShopItem(item_id="hat", name="帽子", category="clothing", base_price=38, description="装饰用，小幅提升情绪"),
     # 其他
-    ShopItem(item_id="flower", name="花束", category="other", base_price=45,
-             description="可送礼，大幅提升对方好感"),
-    ShopItem(item_id="gift_box", name="礼物盒", category="other", base_price=100,
-             description="通用礼物，提升对方好感"),
-    ShopItem(item_id="phone_charger", name="手机充电器", category="other", base_price=28,
-             description="恢复手机电量 30"),
-    ShopItem(item_id="umbrella", name="雨伞", category="other", base_price=42,
-             description="下雨天必备"),
-    ShopItem(item_id="notebook", name="笔记本", category="other", base_price=22,
-             description="记录用，无特殊效果"),
-    ShopItem(item_id="pen", name="钢笔", category="other", base_price=35,
-             description="书写工具"),
+    ShopItem(item_id="flower", name="花束", category="other", base_price=45, description="可送礼，大幅提升对方好感"),
+    ShopItem(item_id="gift_box", name="礼物盒", category="other", base_price=100, description="通用礼物，提升对方好感"),
+    ShopItem(
+        item_id="phone_charger", name="手机充电器", category="other", base_price=28, description="恢复手机电量 30"
+    ),
+    ShopItem(item_id="umbrella", name="雨伞", category="other", base_price=42, description="下雨天必备"),
+    ShopItem(item_id="notebook", name="笔记本", category="other", base_price=22, description="记录用，无特殊效果"),
+    ShopItem(item_id="pen", name="钢笔", category="other", base_price=35, description="书写工具"),
 ]
 
 
@@ -134,21 +123,19 @@ def _compute_current_price(item: ShopItem) -> int:
 
     使用日期作为种子，同一天价格稳定，跨天有变化，模拟市场波动。
     """
-    today_seed = datetime.now(timezone.utc).timetuple().tm_yday
+    today_seed = datetime.now(UTC).timetuple().tm_yday
     # 简单确定性浮动：基于 item_id 哈希与日期
     item_hash = sum(ord(c) for c in item.item_id)
-    float_factor = 1.0 + (
-        ((today_seed + item_hash) % 100) / 100.0 - 0.5
-    ) * 2 * PRICE_FLOAT_RATIO
+    float_factor = 1.0 + (((today_seed + item_hash) % 100) / 100.0 - 0.5) * 2 * PRICE_FLOAT_RATIO
     return max(1, int(item.base_price * float_factor))
 
 
 # ============================================================
-# MCP Tools
+# 工具函数
 # ============================================================
 
-@mcp.tool()
-async def list_items(category: str | None = None) -> dict:
+
+async def list_items(category: str | None = None) -> dict[str, Any]:
     """列出商店所有商品（可按分类过滤）
 
     Args:
@@ -170,21 +157,22 @@ async def list_items(category: str | None = None) -> dict:
             "total": int,
         }
     """
-    catalog = _get_catalog_dict()
     items = []
     for item in DEFAULT_CATALOG:
         if category and item.category != category:
             continue
         current_price = _compute_current_price(item)
-        items.append({
-            "item_id": item.item_id,
-            "name": item.name,
-            "category": item.category,
-            "current_price": current_price,
-            "base_price": item.base_price,
-            "description": item.description,
-            "sellable": item.sellable,
-        })
+        items.append(
+            {
+                "item_id": item.item_id,
+                "name": item.name,
+                "category": item.category,
+                "current_price": current_price,
+                "base_price": item.base_price,
+                "description": item.description,
+                "sellable": item.sellable,
+            }
+        )
 
     logger.info(
         "list_items_called",
@@ -198,8 +186,7 @@ async def list_items(category: str | None = None) -> dict:
     }
 
 
-@mcp.tool()
-async def get_item_details(item_id: str) -> dict:
+async def get_item_details(item_id: str) -> dict[str, Any]:
     """查询单个商品详情
 
     Args:
@@ -238,13 +225,12 @@ async def get_item_details(item_id: str) -> dict:
     }
 
 
-@mcp.tool()
 async def buy_item(
     item_id: str,
     quantity: int,
     current_money: int,
     current_inventory: dict[str, int] | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """模拟购买商品事务
 
     校验：商品存在、数量合法、金钱充足
@@ -293,7 +279,9 @@ async def buy_item(
     # 校验金钱
     if current_money < total_price:
         return _error_result(
-            "buy", item_id, quantity,
+            "buy",
+            item_id,
+            quantity,
             f"Insufficient money: have {current_money}, need {total_price}",
             unit_price=unit_price,
         )
@@ -326,13 +314,12 @@ async def buy_item(
     }
 
 
-@mcp.tool()
 async def sell_item(
     item_id: str,
     quantity: int,
     current_money: int,
     current_inventory: dict[str, int] | None = None,
-) -> dict:
+) -> dict[str, Any]:
     """模拟出售商品事务
 
     校验：商品存在且 sellable=True、角色库存足够
@@ -367,7 +354,9 @@ async def sell_item(
     have_quantity = current_inventory.get(item_id, 0)
     if have_quantity < quantity:
         return _error_result(
-            "sell", item_id, quantity,
+            "sell",
+            item_id,
+            quantity,
             f"Insufficient inventory: have {have_quantity}, need {quantity}",
         )
 
@@ -403,8 +392,7 @@ async def sell_item(
     }
 
 
-@mcp.tool()
-async def get_shop_categories() -> dict:
+async def get_shop_categories() -> dict[str, Any]:
     """列出商店所有商品分类（供 LLM 角色浏览目录）
 
     Returns:
@@ -422,11 +410,13 @@ async def get_shop_categories() -> dict:
     categories = []
     for cat, items in catalog_by_cat.items():
         prices = [_compute_current_price(i) for i in items]
-        categories.append({
-            "name": cat,
-            "item_count": len(items),
-            "price_range": [min(prices), max(prices)],
-        })
+        categories.append(
+            {
+                "name": cat,
+                "item_count": len(items),
+                "price_range": [min(prices), max(prices)],
+            }
+        )
 
     return {
         "categories": categories,
@@ -437,6 +427,7 @@ async def get_shop_categories() -> dict:
 # ============================================================
 # 辅助函数
 # ============================================================
+
 
 def _error_result(
     action: str,
@@ -459,7 +450,3 @@ def _error_result(
         "new_money": None,
         "error": error,
     }
-
-
-if __name__ == "__main__":
-    mcp.run()

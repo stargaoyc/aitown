@@ -1,83 +1,89 @@
-"""MCP Server 管理 API 路由"""
+"""工具管理 API 路由
 
-import asyncio
-import os
+替代原 MCP Server 管理，改为本地工具（进程内直接调用）管理。
+工具按命名空间（namespace）分组：shop / knowledge / social / world / self_info。
+启用/禁用状态持久化到 Redis hash `tools:enabled`，按工具全名存储。
+"""
+
+from __future__ import annotations
+
+from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 from structlog import get_logger
 
 from src.auth.rbac import require_role
-from src.config import settings
 from src.runtime import get_redis
+from src.tools import TOOL_REGISTRY, get_enabled_tools
+from src.tools.registry import TOOLS_ENABLED_KEY
 
 router = APIRouter(prefix="/api/v1/mcp", tags=["mcp"])
 logger = get_logger(__name__)
 
 
-# MCP Server 配置映射（环境变量 → 服务器元数据）
-# 已移除 code-executor 和 web-search（外部能力，非内部业务所需）
-_MCP_SERVERS_CONFIG = [
+# 命名空间元数据（用于 /servers 端点展示）
+# category: self-developed（自研业务工具） / read-only（只读查询工具）
+_NAMESPACES: list[dict[str, Any]] = [
     {
-        "name": "weather",
-        "env_key": "MCP_WEATHER_SERVER",
-        "default_port": 8003,
-        "type": "community",
-        "tools": ["get_current_weather", "get_forecast", "get_weather_by_coords"],
-        "description": "天气查询（OpenWeatherMap 集成）",
+        "name": "shop",
+        "type": "self-developed",
+        "description": "商店模拟（购买/出售/查询商品，24 件默认商品）",
     },
     {
-        "name": "shop-simulator",
-        "env_key": "MCP_SHOP_SERVER",
-        "default_port": 8004,
+        "name": "knowledge",
         "type": "self-developed",
-        "tools": ["list_items", "get_item_details", "buy_item", "sell_item", "get_shop_categories"],
-        "description": "商店模拟（小镇经济系统，24 件默认商品）",
-    },
-    {
-        "name": "knowledge-base",
-        "env_key": "MCP_KB_SERVER",
-        "default_port": 8005,
-        "type": "self-developed",
-        "tools": ["query_kb", "list_categories"],
         "description": "小镇设定库查询（世界规则/角色/场景/行动/记忆系统）",
     },
     {
-        "name": "character-social",
-        "env_key": "MCP_SOCIAL_SERVER",
-        "default_port": 8006,
+        "name": "social",
         "type": "self-developed",
-        "tools": ["give_gift", "invite_date", "resolve_conflict"],
-        "description": "角色社交系统（送礼/约会/冲突解决）",
+        "description": "角色社交（送礼/约会/冲突解决）",
+    },
+    {
+        "name": "world",
+        "type": "read-only",
+        "description": "世界状态查询（虚拟时间/天气/场景/角色查找）",
+    },
+    {
+        "name": "self_info",
+        "type": "read-only",
+        "description": "角色自省（关系查询/记忆搜索）",
     },
 ]
 
 
+def _namespace_tools(namespace: str) -> list[str]:
+    """获取命名空间下的所有工具全名"""
+    return [name for name in TOOL_REGISTRY if name.startswith(f"{namespace}.")]
+
+
+async def _is_namespace_enabled(namespace: str) -> bool:
+    """检查命名空间是否启用（命名空间下所有工具均启用才算启用）"""
+    enabled = await get_enabled_tools()
+    tools = _namespace_tools(namespace)
+    return all(t in enabled for t in tools) if tools else False
+
+
 @router.get("/servers")
-async def list_mcp_servers():
-    """列出所有已配置的 MCP Server
+async def list_tool_servers():
+    """列出所有工具命名空间（兼容原 /mcp/servers 接口）
 
     Returns:
-        MCP Server 列表（含连接地址、工具清单、类型、启用状态）
+        命名空间列表（含描述、工具清单、启用状态）
     """
-    from src.mcp import get_enabled_servers
-
-    enabled_set = await get_enabled_servers()
+    enabled = await get_enabled_tools()
     servers = []
-    for cfg in _MCP_SERVERS_CONFIG:
-        endpoint = getattr(settings, cfg["env_key"].lower(), None)
-        if not endpoint:
-            # 尝试从环境变量读取（settings 中可能未定义该字段）
-            endpoint = os.environ.get(cfg["env_key"], f"http://localhost:{cfg['default_port']}")
-
+    for ns in _NAMESPACES:
+        ns_tools = _namespace_tools(ns["name"])
+        ns_enabled = all(t in enabled for t in ns_tools) if ns_tools else False
         servers.append(
             {
-                "name": cfg["name"],
-                "endpoint": endpoint,
-                "type": cfg["type"],
-                "description": cfg["description"],
-                "tools": cfg["tools"],
-                "tool_count": len(cfg["tools"]),
-                "enabled": cfg["name"] in enabled_set,
+                "name": ns["name"],
+                "type": ns["type"],
+                "description": ns["description"],
+                "tools": ns_tools,
+                "tool_count": len(ns_tools),
+                "enabled": ns_enabled,
             }
         )
 
@@ -88,66 +94,78 @@ async def list_mcp_servers():
 
 
 @router.get("/servers/health")
-async def check_mcp_servers_health():
-    """检查所有 MCP Server 的健康状态（路由入口）
+async def check_tool_servers_health():
+    """检查所有工具命名空间的健康状态
 
-    注意：此路由必须在 /servers/{server_name} 之前注册，
-    否则会被 {server_name} 参数捕获。
+    本地工具为进程内调用，始终在线。
     """
-    return await _check_mcp_servers_health_impl()
+    results = []
+    for ns in _NAMESPACES:
+        results.append(
+            {
+                "name": ns["name"],
+                "endpoint": "in-process",
+                "status": "online",
+                "latency_ms": 0,
+                "http_status": None,
+            }
+        )
+    return {
+        "data": results,
+        "total": len(results),
+        "online": len(results),
+        "offline": 0,
+    }
 
 
 @router.get("/servers/{server_name}")
-async def get_mcp_server_detail(server_name: str):
-    """获取单个 MCP Server 详情
+async def get_tool_server_detail(server_name: str):
+    """获取单个命名空间详情
 
     Args:
-        server_name: Server 名称
-
-    Returns:
-        Server 详细信息（含工具清单）
+        server_name: 命名空间名称（如 "shop"）
     """
-    # 健康检查特殊路由（避免被 {server_name} 捕获）
     if server_name == "health":
-        return await _check_mcp_servers_health_impl()
-    cfg = next((c for c in _MCP_SERVERS_CONFIG if c["name"] == server_name), None)
-    if cfg is None:
-        raise HTTPException(status_code=404, detail=f"MCP Server '{server_name}' not found")
+        return await check_tool_servers_health()
 
-    endpoint = os.environ.get(cfg["env_key"], f"http://localhost:{cfg['default_port']}")
+    ns = next((n for n in _NAMESPACES if n["name"] == server_name), None)
+    if ns is None:
+        raise HTTPException(status_code=404, detail=f"Tool namespace '{server_name}' not found")
 
+    ns_tools = _namespace_tools(server_name)
     return {
-        "name": cfg["name"],
-        "endpoint": endpoint,
-        "type": cfg["type"],
-        "description": cfg["description"],
-        "tools": [{"name": tool_name, "server": cfg["name"]} for tool_name in cfg["tools"]],
-        "tool_count": len(cfg["tools"]),
+        "name": ns["name"],
+        "endpoint": "in-process",
+        "type": ns["type"],
+        "description": ns["description"],
+        "tools": [{"name": t, "server": ns["name"], "description": TOOL_REGISTRY[t]["description"]} for t in ns_tools],
+        "tool_count": len(ns_tools),
     }
 
 
 @router.get("/tools")
-async def list_all_mcp_tools():
-    """列出所有已启用 MCP Server 提供的工具
+async def list_all_tools():
+    """列出所有已启用工具（兼容原 /mcp/tools 接口）
 
     Returns:
-        所有可用工具的扁平列表（含所属 Server，仅含已启用 Server 的工具）
+        所有可用工具的扁平列表（仅含已启用工具）
     """
-    from src.mcp import get_enabled_servers
-
-    enabled_set = await get_enabled_servers()
+    enabled = await get_enabled_tools()
     tools = []
-    for cfg in _MCP_SERVERS_CONFIG:
-        if cfg["name"] not in enabled_set:
+    for full_name, meta in TOOL_REGISTRY.items():
+        if full_name not in enabled:
             continue
-        for tool_name in cfg["tools"]:
-            tools.append(
-                {
-                    "name": tool_name,
-                    "server": cfg["name"],
-                    "server_type": cfg["type"],
-                }
-            )
+        namespace = full_name.split(".", 1)[0]
+        ns_meta = next((n for n in _NAMESPACES if n["name"] == namespace), None)
+        tools.append(
+            {
+                "name": full_name,
+                "server": namespace,
+                "server_type": ns_meta["type"] if ns_meta else "unknown",
+                "description": meta["description"],
+                "state_mutating": meta["state_mutating"],
+            }
+        )
 
     return {
         "data": tools,
@@ -155,87 +173,43 @@ async def list_all_mcp_tools():
     }
 
 
-async def _check_mcp_servers_health_impl():
-    """检查所有 MCP Server 的健康状态（实现）
-
-    对每个配置的 MCP Server 发起 HTTP 连接检测，
-    返回在线/离线状态及响应延迟。
-
-    Returns:
-        各 Server 的健康状态列表
-    """
-    import httpx
-
-    async def check_one(cfg: dict) -> dict:
-        endpoint = os.environ.get(cfg["env_key"], f"http://localhost:{cfg['default_port']}")
-        start = asyncio.get_event_loop().time()
-        try:
-            async with httpx.AsyncClient(timeout=3.0) as client:
-                # 尝试连接 SSE 端点（FastMCP 默认 SSE 路径 /sse）
-                resp = await client.get(f"{endpoint}/sse", follow_redirects=False)
-                latency_ms = int((asyncio.get_event_loop().time() - start) * 1000)
-                return {
-                    "name": cfg["name"],
-                    "endpoint": endpoint,
-                    "status": "online",
-                    "latency_ms": latency_ms,
-                    "http_status": resp.status_code,
-                }
-        except Exception:
-            latency_ms = int((asyncio.get_event_loop().time() - start) * 1000)
-            return {
-                "name": cfg["name"],
-                "endpoint": endpoint,
-                "status": "offline",
-                "latency_ms": latency_ms,
-                "http_status": None,
-            }
-
-    results = await asyncio.gather(*[check_one(cfg) for cfg in _MCP_SERVERS_CONFIG])
-    return {
-        "data": results,
-        "total": len(results),
-        "online": sum(1 for r in results if r["status"] == "online"),
-        "offline": sum(1 for r in results if r["status"] == "offline"),
-    }
-
-
 @router.put("/servers/{server_name}/enabled")
-async def toggle_mcp_server(
+async def toggle_tool_server(
     server_name: str,
     payload: dict = Body(...),
     user=Depends(require_role("admin")),
 ):
-    """启用/禁用单个 MCP Server（前端控制开关）
+    """启用/禁用整个命名空间的所有工具（兼容原 /mcp/servers/{name}/enabled 接口）
 
-    状态持久化到 Redis hash `mcp:enabled`，Character Tick 决策时
+    状态持久化到 Redis hash `tools:enabled`，Character Tick 决策时
     会读取该状态过滤可用工具列表。
 
     Args:
-        server_name: MCP Server 名称
+        server_name: 命名空间名称
         payload: {"enabled": true|false}
 
     Returns:
         更新后的启用状态
     """
-    from src.mcp.client import MCP_ENABLED_KEY
-
-    cfg = next((c for c in _MCP_SERVERS_CONFIG if c["name"] == server_name), None)
-    if cfg is None:
-        raise HTTPException(status_code=404, detail=f"MCP Server '{server_name}' not found")
+    ns = next((n for n in _NAMESPACES if n["name"] == server_name), None)
+    if ns is None:
+        raise HTTPException(status_code=404, detail=f"Tool namespace '{server_name}' not found")
 
     enabled = bool(payload.get("enabled", True))
     redis = get_redis()
     if redis is None:
         raise HTTPException(500, "Redis not available")
 
-    # 写入 Redis hash（值为字符串 "true" / "false"）
-    await redis.hset(MCP_ENABLED_KEY, server_name, "true" if enabled else "false")
+    ns_tools = _namespace_tools(server_name)
+    mapping = {t: "true" if enabled else "false" for t in ns_tools}
+    if mapping:
+        await redis.hset(TOOLS_ENABLED_KEY, mapping=mapping)
 
     logger.info(
-        "mcp_server_toggled",
-        server=server_name,
+        "tool_namespace_toggled",
+        namespace=server_name,
         enabled=enabled,
+        tool_count=len(ns_tools),
     )
 
     return {
@@ -246,74 +220,53 @@ async def toggle_mcp_server(
 
 
 @router.post("/tools/{tool_name}/invoke")
-async def invoke_mcp_tool(
+async def invoke_tool(
     tool_name: str,
-    server_name: str,
-    args: dict = Body(...),
+    server_name: str | None = None,
+    args: dict = Body(default={}),
+    user=Depends(require_role("admin")),
 ):
-    """调用 MCP Server 的工具（测试用）
+    """调用本地工具（测试用）
 
     Args:
-        tool_name: 工具名称
-        server_name: 服务器名称
+        tool_name: 工具全名（如 "shop.buy_item"）或简短名（如 "buy_item"）
+        server_name: 可选命名空间（用于消歧）
         args: 工具参数（JSON body）
 
     Returns:
         工具执行结果
     """
-    import httpx
+    # 解析工具全名
+    full_name = tool_name
+    if "." not in tool_name and server_name:
+        full_name = f"{server_name}.{tool_name}"
 
-    cfg = next((c for c in _MCP_SERVERS_CONFIG if c["name"] == server_name), None)
-    if cfg is None:
-        raise HTTPException(status_code=404, detail=f"MCP Server '{server_name}' not found")
+    if full_name not in TOOL_REGISTRY:
+        raise HTTPException(status_code=404, detail=f"Tool '{full_name}' not found")
 
-    if tool_name not in cfg["tools"]:
-        raise HTTPException(status_code=404, detail=f"Tool '{tool_name}' not found in server '{server_name}'")
+    meta = TOOL_REGISTRY[full_name]
 
-    endpoint = os.environ.get(cfg["env_key"], f"http://localhost:{cfg['default_port']}")
-
+    # 测试调用：只传 LLM 可填参数，不注入角色状态
+    # 状态变更类工具会因缺少 current_money 等参数而返回错误，这是预期行为
     try:
-        # 通过 MCP SSE 协议调用工具
-        # FastMCP 2.0+ SSE 端点：POST /messages/ 调用工具
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            # 先连接 SSE 获取 session
-            sse_resp = await client.get(f"{endpoint}/sse", follow_redirects=False)
-            if sse_resp.status_code != 200:
-                return {
-                    "success": False,
-                    "error": f"MCP Server offline or SSE endpoint not available (HTTP {sse_resp.status_code})",
-                    "endpoint": endpoint,
-                }
-
-            # 调用工具
-            invoke_resp = await client.post(
-                f"{endpoint}/messages/",
-                json={
-                    "method": "tools/call",
-                    "params": {
-                        "name": tool_name,
-                        "arguments": args,
-                    },
-                },
-                timeout=30.0,
-            )
-            return {
-                "success": True,
-                "status_code": invoke_resp.status_code,
-                "result": invoke_resp.json()
-                if invoke_resp.headers.get("content-type", "").startswith("application/json")
-                else invoke_resp.text,
-                "endpoint": endpoint,
-            }
-    except httpx.ConnectError:
+        result = await meta["func"](**args)
+        return {
+            "success": True,
+            "tool": full_name,
+            "result": result,
+            "state_mutating": meta["state_mutating"],
+        }
+    except TypeError as e:
         return {
             "success": False,
-            "error": f"Cannot connect to MCP Server at {endpoint}. Is it running?",
-            "endpoint": endpoint,
+            "tool": full_name,
+            "error": f"参数错误: {e}",
+            "hint": "状态变更类工具需要 current_money/current_inventory 等参数，"
+            "请在角色 Tick 中通过 LLM 决策调用，或补全必需参数。",
         }
     except Exception as e:
         return {
             "success": False,
+            "tool": full_name,
             "error": str(e),
-            "endpoint": endpoint,
         }

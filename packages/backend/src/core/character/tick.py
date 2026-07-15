@@ -123,9 +123,9 @@ class CharacterTickEngine:
         # 3. LLM 决策
         decision = await self._decide(character_id, context, candidates)
 
-        # 3.5 MCP 工具调用（如果 LLM 决定使用工具）
+        # 3.5 工具调用（如果 LLM 决定使用工具）
         if decision.action == "use_tool":
-            await self._execute_mcp_tool(character_id, decision, context)
+            await self._execute_tool(character_id, decision, context)
             # 工具调用后，继续执行一个默认 Action（如 wait）
             decision.action = "wait"
 
@@ -258,6 +258,22 @@ class CharacterTickEngine:
                 error=str(e),
             )
 
+        # 加载角色全部关系映射（target_id -> strength），供工具调用注入 current_relation_strength
+        relations_map: dict[str, int] = {}
+        try:
+            async with db.session() as session:
+                from src.db.repositories import RelationRepository
+
+                rel_repo = RelationRepository(session)
+                rels = await rel_repo.get_relations(character_id)
+                relations_map = {str(r.target_id): r.strength for r in rels}
+        except Exception as e:
+            logger.warning(
+                "relations_load_failed_continue",
+                character_id=str(character_id),
+                error=str(e),
+            )
+
         # 感知同场景其他角色（多智能体交互关键）
         # 提供角色名、性格、当前动作、关系强度，供 LLM 决策是否发起社交
         nearby_characters: list[dict] = []
@@ -323,6 +339,7 @@ class CharacterTickEngine:
             "memories": memories,
             "plans": plans,
             "nearby_characters": nearby_characters,
+            "relations": relations_map,
         }
 
     async def _decide(self, character_id: UUID, context: dict, candidates: list[Action]) -> DecisionResult:
@@ -348,14 +365,14 @@ class CharacterTickEngine:
             [f"- {a.id}: {a.name}（耗时{a.duration_minutes}分钟，体力消耗{a.energy_cost}）" for a in candidates]
         )
 
-        # 构建 MCP 工具列表文本（角色可调用外部工具获取信息）
+        # 构建工具列表文本（角色可调用本地工具获取信息或执行操作）
         try:
-            from src.mcp import MCPClient
+            from src.tools import ToolRegistry
 
-            mcp_client = MCPClient()
-            mcp_tools_text = await mcp_client.format_tools_for_prompt()
+            tool_registry = ToolRegistry()
+            tools_text = await tool_registry.format_tools_for_prompt()
         except Exception:
-            mcp_tools_text = "（MCP 工具不可用）"
+            tools_text = "（工具不可用）"
 
         # 构建记忆文本
         memories_text = (
@@ -406,13 +423,14 @@ class CharacterTickEngine:
             nearby_characters=nearby_text,
         )
 
-        # 追加 MCP 工具信息到 Prompt
+        # 追加工具信息到 Prompt
         prompt += (
-            f"\n\n[可用工具（MCP）]\n"
+            f"\n\n[可用工具]\n"
             f"你可以在行动中使用以下工具获取信息或执行操作：\n"
-            f"{mcp_tools_text}\n"
+            f"{tools_text}\n"
             f'如需使用工具，在 action 字段填写 "use_tool"，'
-            f'在 params 中填写 tool_name（如 "weather.get_current_weather"）和 tool_args（参数字典）。'
+            f'在 params 中填写 tool_name（如 "shop.buy_item"）和 tool_args（参数字典）。'
+            f"标记为 [会改变状态] 的工具会直接修改你的金钱/库存/关系等状态。"
         )
 
         # 定义决策结果 schema
@@ -466,48 +484,60 @@ class CharacterTickEngine:
             proactive_share_intent=proactive_share_intent,
         )
 
-    async def _execute_mcp_tool(self, character_id: UUID, decision: DecisionResult, context: dict) -> dict | None:
-        """执行 MCP 工具调用
+    async def _execute_tool(self, character_id: UUID, decision: DecisionResult, context: dict) -> dict | None:
+        """执行工具调用
 
-        当 LLM 决定使用工具时，通过 MCPClient 调用对应 MCP Server，
-        将工具结果存入角色记忆，供后续决策使用。
+        当 LLM 决定使用工具时，通过 ToolRegistry 直接调用本地 async 函数，
+        将工具结果存入角色记忆，并对状态变更类工具应用 deltas 到角色状态。
 
         Args:
             character_id: 角色 ID
             decision: 决策结果（params 中包含 tool_name 和 tool_args）
-            context: 感知环境结果
+            context: 感知环境结果（含 state、relations）
 
         Returns:
             工具返回结果字典，失败时返回 None
         """
-        from src.mcp import MCPClient
+        from src.tools import ToolRegistry
 
         tool_name = decision.params.get("tool_name", "")
         tool_args = decision.params.get("tool_args", {})
 
         if not tool_name:
-            logger.warning("mcp_tool_call_no_tool_name", character_id=str(character_id))
+            logger.warning("tool_call_no_tool_name", character_id=str(character_id))
             return None
 
         character = context["character"]
         logger.info(
-            "mcp_tool_call_start",
+            "tool_call_start",
             character_id=str(character_id),
             character_name=character.name,
             tool_name=tool_name,
             tool_args=tool_args,
         )
 
-        client = MCPClient()
-        result = await client.call_tool_by_full_name(tool_name, tool_args)
+        # 构建工具上下文：character_id + state + relations（供注入参数）
+        tool_context = {
+            "character_id": str(character_id),
+            "state": context["state"],
+            "relations": context.get("relations", {}),
+        }
+
+        registry = ToolRegistry()
+        result = await registry.call_tool_with_context(tool_name, tool_args, tool_context)
 
         if result.get("success"):
+            tool_result = result.get("result", {})
             logger.info(
-                "mcp_tool_call_success",
+                "tool_call_success",
                 character_id=str(character_id),
                 tool_name=tool_name,
-                result_preview=str(result.get("result", ""))[:200],
+                result_preview=str(tool_result)[:200],
             )
+
+            # 对状态变更类工具，应用 deltas 到 Redis 实时状态
+            if result.get("state_mutating"):
+                await self._apply_tool_deltas(character_id, tool_result, context)
 
             # 将工具结果存入角色记忆
             try:
@@ -516,7 +546,7 @@ class CharacterTickEngine:
                     episode_service = EpisodeService(self.llm, mem_repo)
                     await episode_service.create_episode(
                         character_id,
-                        f"[工具调用] {tool_name}({tool_args}) → {str(result.get('result', ''))[:500]}",
+                        f"[工具调用] {tool_name}({tool_args}) → {str(tool_result)[:500]}",
                         action_id="use_tool",
                         location=context["state"].get("location"),
                         importance=7,
@@ -527,19 +557,130 @@ class CharacterTickEngine:
                     await session.commit()
             except Exception as e:
                 logger.warning(
-                    "mcp_tool_memory_save_failed",
+                    "tool_memory_save_failed",
                     character_id=str(character_id),
                     error=str(e),
                 )
         else:
             logger.warning(
-                "mcp_tool_call_failed",
+                "tool_call_failed",
                 character_id=str(character_id),
                 tool_name=tool_name,
                 error=result.get("error"),
             )
 
         return result
+
+    async def _apply_tool_deltas(
+        self,
+        character_id: UUID,
+        tool_result: dict[str, Any],
+        context: dict,
+    ) -> None:
+        """将工具返回的状态 deltas 应用到角色 Redis 实时状态
+
+        支持的 delta 字段：
+        - money_delta: 金钱变化（正=收入，负=支出）
+        - inventory_delta: {item_id: quantity_change}（正=增加，负=减少）
+        - relation_strength_delta: 好感度变化（需配合 target_id）
+        - mood_delta: 情绪变化（字符串，如 "happy"）
+
+        Args:
+            character_id: 角色 ID
+            tool_result: 工具返回的结果字典
+            context: 感知环境结果
+        """
+        state_key = f"char:{character_id}:state"
+        updates: dict[str, str] = {}
+        state = context["state"]
+
+        # 金钱变化
+        money_delta = tool_result.get("money_delta")
+        if money_delta and isinstance(money_delta, int | float):
+            current_money = int(state.get("money", 0) or 0)
+            new_money = max(0, current_money + int(money_delta))
+            updates["money"] = str(new_money)
+            state["money"] = new_money
+            logger.info(
+                "tool_delta_money",
+                character_id=str(character_id),
+                delta=money_delta,
+                new_money=new_money,
+            )
+
+        # 库存变化
+        inventory_delta = tool_result.get("inventory_delta")
+        if inventory_delta and isinstance(inventory_delta, dict):
+            current_inventory: dict[str, int] = state.get("inventory") or {}
+            if not isinstance(current_inventory, dict):
+                current_inventory = {}
+            for item_id, qty_change in inventory_delta.items():
+                current_qty = int(current_inventory.get(item_id, 0) or 0)
+                new_qty = max(0, current_qty + int(qty_change))
+                if new_qty > 0:
+                    current_inventory[item_id] = new_qty
+                elif item_id in current_inventory:
+                    del current_inventory[item_id]
+            # 序列化为 JSON 存储
+            import json
+
+            updates["inventory"] = json.dumps(current_inventory, ensure_ascii=False)
+            state["inventory"] = current_inventory
+            logger.info(
+                "tool_delta_inventory",
+                character_id=str(character_id),
+                delta=inventory_delta,
+                new_inventory=current_inventory,
+            )
+
+        # 情绪变化
+        mood_delta = tool_result.get("mood_delta")
+        if mood_delta and isinstance(mood_delta, str):
+            updates["mood"] = mood_delta
+            state["mood"] = mood_delta
+            logger.info(
+                "tool_delta_mood",
+                character_id=str(character_id),
+                new_mood=mood_delta,
+            )
+
+        # 关系强度变化（需写入 PG relations 表）
+        relation_delta = tool_result.get("relation_strength_delta")
+        target_id = tool_result.get("target_id")
+        if relation_delta and target_id:
+            try:
+                async with db.session() as session:
+                    from src.db.repositories import RelationRepository
+
+                    rel_repo = RelationRepository(session)
+                    rel = await rel_repo.get_or_create(character_id, UUID(target_id))
+                    new_strength = max(0, min(100, rel.strength + int(relation_delta)))
+                    await rel_repo.update_relation(
+                        character_id,
+                        UUID(target_id),
+                        strength=new_strength,
+                    )
+                    # 更新 context 中的关系映射
+                    relations = context.get("relations", {})
+                    relations[str(target_id)] = new_strength
+                    logger.info(
+                        "tool_delta_relation",
+                        character_id=str(character_id),
+                        target_id=str(target_id),
+                        delta=relation_delta,
+                        new_strength=new_strength,
+                    )
+            except Exception as e:
+                logger.warning(
+                    "tool_relation_update_failed",
+                    character_id=str(character_id),
+                    target_id=str(target_id),
+                    error=str(e),
+                )
+
+        # 批量写入 Redis
+        if updates:
+            await self.redis.hset(state_key, mapping=updates)  # type: ignore[arg-type]
 
     async def _execute_action(self, character_id: UUID, decision: DecisionResult, context: dict) -> None:
         """执行 Action - 事务化

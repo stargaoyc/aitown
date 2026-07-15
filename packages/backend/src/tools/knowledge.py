@@ -1,4 +1,7 @@
-"""MCP Knowledge Base Server - 小镇设定库查询
+"""知识库工具模块 - 小镇设定库查询
+
+从 MCP Server 迁移为直接工具调用，消除 HTTP/SSE 网络开销。
+所有函数签名与返回结构保持不变，仅移除 FastMCP 依赖。
 
 为 AI Town 角色（LLM）提供小镇设定检索能力，覆盖世界规则、角色系统、场景系统、
 行动系统、记忆系统等核心设定。
@@ -28,25 +31,25 @@
         "error": str | None,
     }
 """
+
 from __future__ import annotations
 
 from typing import Any
 
 import structlog
-from fastmcp import FastMCP  # FastMCP 2.0+ 导入方式
 from pydantic import BaseModel, Field
 
 logger = structlog.get_logger()
-
-mcp = FastMCP("knowledge-base")
 
 
 # ============================================================
 # 知识库数据模型
 # ============================================================
 
+
 class KBEntry(BaseModel):
     """知识库条目定义"""
+
     id: str = Field(description="条目唯一标识")
     category: str = Field(description="类别：world_rules/character_system/scene_system/action_system/memory_system")
     title: str = Field(description="条目标题")
@@ -104,7 +107,6 @@ DEFAULT_KB: list[KBEntry] = [
         ),
         keywords=["tick", "redis", "分布式锁", "单实例", "world:tick:lock", "锁"],
     ),
-
     # ----------------------------------------------------------
     # 角色系统（character_system）
     # ----------------------------------------------------------
@@ -116,7 +118,19 @@ DEFAULT_KB: list[KBEntry] = [
             "角色核心属性：stamina(体力)、satiety(饱腹)、mood(情绪)、money(金钱)、social_energy(社交能量)。"
             "属性随行动消耗/恢复，过低会触发负面状态（如体力为 0 强制休息）。"
         ),
-        keywords=["属性", "stamina", "体力", "satiety", "饱腹", "mood", "情绪", "money", "金钱", "social_energy", "社交能量"],
+        keywords=[
+            "属性",
+            "stamina",
+            "体力",
+            "satiety",
+            "饱腹",
+            "mood",
+            "情绪",
+            "money",
+            "金钱",
+            "social_energy",
+            "社交能量",
+        ],
     ),
     KBEntry(
         id="character_sleep_schedule",
@@ -137,7 +151,20 @@ DEFAULT_KB: list[KBEntry] = [
             "→ close_friend(密友) → best_friend(挚友)。"
             "关系等级影响社交行动成功率与可触发的特殊事件。"
         ),
-        keywords=["关系", "relationship", "stranger", "陌生人", "acquaintance", "熟人", "friend", "朋友", "close_friend", "密友", "best_friend", "挚友"],
+        keywords=[
+            "关系",
+            "relationship",
+            "stranger",
+            "陌生人",
+            "acquaintance",
+            "熟人",
+            "friend",
+            "朋友",
+            "close_friend",
+            "密友",
+            "best_friend",
+            "挚友",
+        ],
     ),
     KBEntry(
         id="character_state_storage",
@@ -150,7 +177,6 @@ DEFAULT_KB: list[KBEntry] = [
         ),
         keywords=["存储", "redis", "postgresql", "pg", "实时", "持久化", "快照", "状态"],
     ),
-
     # ----------------------------------------------------------
     # 场景系统（scene_system）
     # ----------------------------------------------------------
@@ -163,7 +189,30 @@ DEFAULT_KB: list[KBEntry] = [
             "restaurant(餐厅)、cinema(电影院)、beach(海滩)、shrine(神社)、library(图书馆)。"
             "每个场景支持特定类别的行动。"
         ),
-        keywords=["场景", "scene", "home", "家", "cafe", "咖啡馆", "park", "公园", "school", "学校", "shop", "商店", "restaurant", "餐厅", "cinema", "电影院", "beach", "海滩", "shrine", "神社", "library", "图书馆"],
+        keywords=[
+            "场景",
+            "scene",
+            "home",
+            "家",
+            "cafe",
+            "咖啡馆",
+            "park",
+            "公园",
+            "school",
+            "学校",
+            "shop",
+            "商店",
+            "restaurant",
+            "餐厅",
+            "cinema",
+            "电影院",
+            "beach",
+            "海滩",
+            "shrine",
+            "神社",
+            "library",
+            "图书馆",
+        ],
     ),
     KBEntry(
         id="scene_crowdness",
@@ -195,7 +244,6 @@ DEFAULT_KB: list[KBEntry] = [
         ),
         keywords=["移动", "move", "matrix", "dijkstra", "最短路径", "邻接", "耗时", "矩阵"],
     ),
-
     # ----------------------------------------------------------
     # 行动系统（action_system）
     # ----------------------------------------------------------
@@ -229,7 +277,6 @@ DEFAULT_KB: list[KBEntry] = [
         ),
         keywords=["事务", "transaction", "postgresql", "pg", "redis", "回滚", "原子", "一致", "日志"],
     ),
-
     # ----------------------------------------------------------
     # 记忆系统（memory_system）
     # ----------------------------------------------------------
@@ -281,8 +328,8 @@ CATEGORY_DESCRIPTIONS: dict[str, str] = {
 # ============================================================
 
 # 检索匹配权重
-SCORE_KEYWORD_MATCH = 3.0   # keywords 完全匹配
-SCORE_TITLE_CONTAIN = 2.0   # title 包含关键词
+SCORE_KEYWORD_MATCH = 3.0  # keywords 完全匹配
+SCORE_TITLE_CONTAIN = 2.0  # title 包含关键词
 SCORE_CONTENT_CONTAIN = 1.0  # content 包含关键词
 
 
@@ -360,28 +407,30 @@ def _query_kb_internal(
     # 取 top N
     results: list[dict[str, Any]] = []
     for score, entry in scored[:limit]:
-        results.append({
-            "id": entry.id,
-            "category": entry.category,
-            "title": entry.title,
-            "content": entry.content,
-            "keywords": list(entry.keywords),
-            "score": score,
-        })
+        results.append(
+            {
+                "id": entry.id,
+                "category": entry.category,
+                "title": entry.title,
+                "content": entry.content,
+                "keywords": list(entry.keywords),
+                "score": score,
+            }
+        )
 
     return results
 
 
 # ============================================================
-# MCP Tools
+# 工具函数
 # ============================================================
 
-@mcp.tool()
+
 async def query_kb(
     query: str,
     category: str | None = None,
     limit: int = 5,
-) -> dict:
+) -> dict[str, Any]:
     """关键词检索小镇设定库
 
     支持按类别过滤，返回加权排序后的匹配条目。
@@ -466,8 +515,7 @@ async def query_kb(
     }
 
 
-@mcp.tool()
-async def list_categories() -> dict:
+async def list_categories() -> dict[str, Any]:
     """列出知识库所有类别及其条目数量
 
     Returns:
@@ -485,11 +533,13 @@ async def list_categories() -> dict:
 
     categories: list[dict[str, Any]] = []
     for name, desc in CATEGORY_DESCRIPTIONS.items():
-        categories.append({
-            "name": name,
-            "entry_count": count_by_cat.get(name, 0),
-            "description": desc,
-        })
+        categories.append(
+            {
+                "name": name,
+                "entry_count": count_by_cat.get(name, 0),
+                "description": desc,
+            }
+        )
 
     logger.info("list_categories_called", total_categories=len(categories))
 
@@ -497,7 +547,3 @@ async def list_categories() -> dict:
         "categories": categories,
         "total": len(categories),
     }
-
-
-if __name__ == "__main__":
-    mcp.run()
