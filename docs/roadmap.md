@@ -9,7 +9,7 @@
 ```text
 Phase 0: 项目初始化           ✅ 已完成
    ├─ 创建项目结构（monorepo）
-   ├─ 初始化 packages（backend / frontend / mcp-servers）
+   ├─ 初始化 packages（backend / frontend）
    ├─ 配置依赖管理与构建脚本
    └─ 数据库 DDL 迁移脚本
         ↓
@@ -36,7 +36,7 @@ Phase 2.5: 性能与数据完整性优化 ✅ 已完成
 Phase 3: 外部交互              ✅ 已完成
    ├─ 消息服务（QQ/飞书/Web WebSocket）
    ├─ 主动分享链路
-   ├─ MCP Server 自研（weather / shop-simulator / character-social / knowledge-base）
+   ├─ 本地工具自研（shop / knowledge / social / world / self_info，原 MCP Server 已迁移为进程内调用）
    └─ ~~MCP Server 社区集成（web-search）~~ ❌ 已移除
         ↓
 Phase 3.5: 安全与可靠性        ✅ 已完成
@@ -259,7 +259,7 @@ Phase 5: 前端 Dashboard        ✅ 已完成
 | world_snapshots（定期快照） | —                         | ~500 MB/年（每 1000 Tick 一次）               | 冷启动恢复用，启动时间恒定 |
 | 建议冷热分离                | —                         | 3 个月前 action_records.params 迁移至对象存储 | PG 仅存轻量索引字段        |
 
-### 第九轮审查（v8 → v9）— Phase 3 启动：消息服务 + MCP Server + P1 延后项处理
+### 第九轮审查（v8 → v9）— Phase 3 启动：消息服务 + 本地工具 + P1 延后项处理
 
 | #   | 问题                                                                               | 严重度  | 解决方案                                                                  | 状态       |
 | --- | ---------------------------------------------------------------------------------- | ------- | ------------------------------------------------------------------------- | ---------- |
@@ -283,9 +283,9 @@ Phase 5: 前端 Dashboard        ✅ 已完成
 | 91  | Phase 3: 创建 MessageService 消息服务层                                            | Phase 3 | 新增 src/messaging/service.py（含上下文压缩 + LLM 回复生成）              | ✅         |
 | 92  | Phase 3: 消息 API 路由                                                             | Phase 3 | 新增 /api/v1/messages/send、/history、/stats 与 /api/v1/conversations     | ✅         |
 | 93  | ~~Phase 3: MCP code-executor 实现~~                                                | Phase 3 | ~~实现沙箱执行（subprocess 隔离 + 模块白名单 + 超时保护）~~               | ❌ 已移除  |
-| 94  | Phase 3: MCP shop-simulator 实现                                                   | Phase 3 | 实现商品目录 + 购买/出售事务校验（24 件默认商品）                         | ✅         |
+| 94  | Phase 3: MCP shop-simulator 实现（已迁移为 `src/tools/shop.py`）                  | Phase 3 | 实现商品目录 + 购买/出售事务校验（24 件默认商品）                         | ✅         |
 
-> **v9 核心结论**：Phase 3 主体（消息服务 + MCP Server）已完成。P1 延后项（#77 分区调度、#78 向量化失败处理）已落地。剩余架构层面问题统一延后至 Phase 4。
+> **v9 核心结论**：Phase 3 主体（消息服务 + 本地工具）已完成。P1 延后项（#77 分区调度、#78 向量化失败处理）已落地。剩余架构层面问题统一延后至 Phase 4。
 
 ### 新增/修改文件（Phase 3）
 
@@ -303,9 +303,8 @@ Phase 5: 前端 Dashboard        ✅ 已完成
 | `src/scheduler/__init__.py`                          | 调度器模块入口                                                                                        |
 | `src/scheduler/partition_scheduler.py`               | PartitionScheduler（APScheduler 月度分区预创建）                                                      |
 | `src/main.py`                                        | 集成 MessageService API + PartitionScheduler lifespan + admin status                                  |
-| ~~`packages/mcp-servers/code-executor/server.py`~~   | ~~MCP 沙箱执行（subprocess + 模块白名单）~~ ❌ 已移除                                                 |
-| `packages/mcp-servers/shop-simulator/server.py`      | MCP 商店模拟（24 件商品 + 购买/出售事务）                                                             |
-| `packages/mcp-servers/shop-simulator/pyproject.toml` | shop-simulator 包配置                                                                                 |
+| ~~`packages/mcp-servers/code-executor/server.py`~~   | ~~MCP 沙箱执行（subprocess + 模块白名单）~~ ❌ 已移除（2026-07-14）                                   |
+| ~~`packages/mcp-servers/shop-simulator/`~~            | ~~MCP 商店模拟~~ ❌ 已迁移为 `src/tools/shop.py` 本地工具（2026-07-15）                                |
 | `pyproject.toml`                                     | 新增 apscheduler>=3.11 依赖                                                                           |
 
 ---
@@ -322,17 +321,18 @@ Phase 5: 前端 Dashboard        ✅ 已完成
 | 回复生成           | LLM 生成自然语言回复               | ✅   |
 | 主动分享链路       | 分享意图评估 + 文案生成 + 发送调度 | ✅   |
 
-### 6.2 MCP Servers
+### 6.2 本地工具（原 MCP Servers，2026-07-15 迁移为进程内调用）
 
-| 任务                      | 说明                                                          | 状态      |
-| ------------------------- | ------------------------------------------------------------- | --------- |
-| ~~code-executor（自研）~~ | ~~Python 代码沙箱执行（subprocess 隔离 + 模块白名单）~~       | ❌ 已移除 |
-| shop-simulator（自研）    | 商店购买模拟（24 件商品 + 购买/出售事务）                     | ✅        |
-| character-social（自研）  | 角色社交（送礼/约会/冲突解决）                                | ✅        |
-| knowledge-base（自研）    | 小镇设定库查询（世界规则/角色/场景/行动/记忆）                | ✅        |
-| weather（自研）           | OpenWeatherMap 集成                                           | ✅        |
-| ~~web-search（社区）~~    | ~~Tavily API 集成~~                                           | ❌ 已移除 |
-| 模块管理 API              | `/api/v1/modules`、`/api/v1/tools/servers`、`/api/v1/tools/tools` | ✅        |
+| 任务                      | 说明                                                              | 状态      |
+| ------------------------- | ----------------------------------------------------------------- | --------- |
+| ~~code-executor（自研）~~ | ~~Python 代码沙箱执行（subprocess 隔离 + 模块白名单）~~           | ❌ 已移除 |
+| shop（原 shop-simulator） | 商店购买模拟（24 件商品 + 购买/出售事务），现为 `src/tools/shop.py` | ✅        |
+| social（原 character-social） | 角色社交（送礼/约会/冲突解决），现为 `src/tools/social.py`     | ✅        |
+| knowledge（原 knowledge-base） | 小镇设定库查询（世界规则/角色/场景/行动/记忆），现为 `src/tools/knowledge.py` | ✅ |
+| world（新增，含原 weather） | 世界状态/场景/角色查找，现为 `src/tools/world.py`                | ✅        |
+| self_info（新增）         | 角色自省（关系/记忆搜索），现为 `src/tools/self_info.py`         | ✅        |
+| ~~web-search（社区）~~    | ~~Tavily API 集成~~                                               | ❌ 已移除 |
+| 工具管理 API              | `/api/v1/modules`、`/api/v1/tools/servers`、`/api/v1/tools/tools` | ✅        |
 
 ---
 
@@ -346,7 +346,7 @@ Phase 5: 前端 Dashboard        ✅ 已完成
 | ------------------- | -------------------------------- | ---------------------- |
 | API 鉴权            | JWT + API Key，管理 API 强制鉴权 | 未授权请求被拒绝       |
 | Prompt 注入防护     | 用户消息过滤 + 系统提示隔离      | 注入测试不泄露系统信息 |
-| MCP Server 通信加密 | mTLS 或共享密钥                  | 抓包看不到明文         |
+| ~~MCP Server 通信加密~~ | ~~mTLS 或共享密钥~~（本地工具为进程内调用，无网络通信，不再需要） | ~~抓包看不到明文~~ |
 | 用户消息加密存储    | 敏感字段 AES 加密                | DB 直接查询看不到明文  |
 
 ### 7.2 LLM 成本控制
@@ -455,7 +455,7 @@ Phase 5: 前端 Dashboard        ✅ 已完成
 | 问题             | 严重度 | 影响                  | 解决方案           | 阶段      |
 | ---------------- | ------ | --------------------- | ------------------ | --------- |
 | 管理 API 无鉴权  | 高     | 任何人可调用 /admin/* | JWT + API Key      | Phase 3.5 |
-| MCP 通信未加密   | 中     | 内网抓包可篡改        | mTLS               | Phase 3.5 |
+| ~~MCP 通信未加密~~   | ~~中~~ | ~~内网抓包可篡改~~    | ~~mTLS~~（已迁移为本地工具，无网络通信） | ✅ 已解决 |
 | 用户消息明文存储 | 中     | DB 泄露暴露隐私       | 敏感字段 AES 加密  | Phase 3.5 |
 | CORS 配置过宽    | 低     | 跨站请求伪造          | 限制 origin 白名单 | Phase 3.5 |
 
@@ -486,7 +486,7 @@ Phase 5: 前端 Dashboard        ✅ 已完成
 | **M1: 世界可运行** | 2 周     | World Tick + Character Tick + Action 10+                     | ✅   |
 | **M2: 角色有生活** | 1 周     | 角色卡 + 小镇 + 作息 + 关系                                  | ✅   |
 | **M2.5: 性能优化** | 1 周     | 分区 + 异步 embedding + 差分快照                             | ✅   |
-| **M3: 可外部交互** | 2 周     | QQ/飞书/Web + MCP 4 Server + 模块管理 API                    | ✅   |
+| **M3: 可外部交互** | 2 周     | QQ/飞书/Web + 本地工具（5 命名空间 16 工具） + 模块管理 API    | ✅   |
 | **M3.5: 安全可靠** | 1 周     | 鉴权 + 成本控制 + 一致性                                     | ✅   |
 | **M4: 可观测完整** | 1 周     | Trace/Metrics/Logs + Langfuse                                | ✅   |
 | **M5: 前端可用**   | 2 周     | Dashboard 6 页面 + 实时数据 + ErrorBoundary + WebSocket 重连 | ✅   |
@@ -502,7 +502,7 @@ Phase 5: 前端 Dashboard        ✅ 已完成
 | pg_uuidv7 扩展未安装                                     | UUID v4 索引碎片化     | 应用层 `uuid6` 库兜底                                           | ✅ 已缓解             |
 | LLM 调用超时/失败                                        | Tick 阻塞              | 强制超时 + 重试 + 默认"等待"回退                                | ✅ 已解决             |
 | PgBouncer prepared statements                            | 与事务模式冲突         | `DB_PREPARED_STATEMENT_CACHE_SIZE=0`                            | ✅ 已缓解             |
-| MCP Server 不稳定                                        | 工具调用失败           | 超时 + fallback + 告警                                          | ✅ 已解决             |
+| ~~MCP Server 不稳定~~                                    | ~~工具调用失败~~       | ~~超时 + fallback + 告警~~（已迁移为本地工具，无网络故障风险） | ✅ 已解决             |
 | 角色 Tick 并发过多                                       | 资源耗尽               | 信号量限制 + 优先级调度                                         | ✅ 部分（信号量已有） |
 | HNSW 召回率崩塌                                          | 记忆检索空结果         | HASH 分区（16）+ 父表 HNSW                                      | ✅ 已解决             |
 | Embedding 阻塞 Tick                                      | 角色卡顿               | 异步 worker + materialized 标志                                 | ✅ 已解决             |
@@ -539,7 +539,7 @@ Phase 5: 前端 Dashboard        ✅ 已完成
 
 1. ~~**生产部署**：Docker Compose 编排 + Nginx 反向代理 + HTTPS~~ ✅ 已完成（详见 [Docker 部署指南](docker-deployment.md)）
 2. ~~**Grafana 统一面板**：集成 Prometheus + Loki + Jaeger 数据源~~ ✅ 已完成（3 个预置 Dashboard + Trace↔Logs 联动）
-3. ~~**MCP 插件单独开关**：前端 Dashboard 控制~~ ✅ 已完成（Redis 持久化 + toggle UI）
+3. ~~**本地工具单独开关**：前端 Dashboard 控制~~ ✅ 已完成（Redis hash `tools:enabled` 持久化 + toggle UI）
 4. ~~**LLM 记忆重要程度评分**：`MEMORY_LLM_SCORING_ENABLED` 开关~~ ✅ 已完成
 5. ~~**前端监控页面集成**：`/monitoring` + `/admin/logs` + `/admin/metrics-detail`~~ ✅ 已完成
 6. **告警规则**：5xx 错误率 / Tick 延迟 / LLM 失败率 → 飞书通知

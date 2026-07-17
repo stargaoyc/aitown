@@ -203,7 +203,7 @@ async def toggle_tool_server(
     ns_tools = _namespace_tools(server_name)
     mapping = {t: "true" if enabled else "false" for t in ns_tools}
     if mapping:
-        await redis.hset(TOOLS_ENABLED_KEY, mapping=mapping)
+        await redis.hset(TOOLS_ENABLED_KEY, mapping=mapping)  # type: ignore
 
     logger.info(
         "tool_namespace_toggled",

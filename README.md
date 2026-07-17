@@ -8,46 +8,47 @@
 
 ## 项目特性
 
-| 特性 | 说明 |
-|------|------|
-| 多角色共居 | 支持 10–50 个 AI 角色同时在小镇中生活、决策、交互 |
-| 世界持续运行 | 世界状态推进不依赖用户消息，角色在用户不在时依然生活 |
-| 记忆与演化 | 角色拥有记忆流、反思能力和长期规划，行为长期一致且可演化 |
-| 可插拔能力 | 功能模块（代码执行、搜索、绘图等）可动态启用/禁用，热插拔 |
-| **MCP 插件单独开关** | 每个 MCP Server 都可在前端 Dashboard 单独启用/禁用（Redis 持久化开关状态），无需重启后端，精细控制角色可调用的工具集 |
-| 全链路可观测 | 每个决策周期可追踪、可审计、可调试 |
-| 多端触达 | 支持 Web Dashboard、QQ、飞书等多渠道交互 |
-| **QQ 群聊智能回复** | 不再局限于被 @ 时才回复——读取所有群消息，结合角色名命中、疑问/情绪启发式与轻量级 LLM 判断智能决策是否插话，自然融入群聊 |
-| **多段回复** | 长回复自动按段落拆分为多条消息依次发送，段间附带打字间隔，更像真人说话节奏 |
-| **主动分享** | 角色在 Tick 中产生分享意图时（`proactiveShareIntent`），会主动把小镇中刚发生的事推送给你，无需你先开口 |
-| **反思系统** | 角色定期从记忆流中归纳出高层认知（`ReflectionService.check_and_reflect`），影响后续决策，让陪伴更"懂你" |
-| **LLM 记忆评分** | 通过 `MEMORY_LLM_SCORING_ENABLED` 开关启用 LLM 对事件重要程度进行 1-10 分评分（基于情感强度、关系影响、稀缺性、后续影响），替代默认固定分值 5 |
-| **角色日记** | 基于一段时间内的记忆事件，由 LLM 生成第一人称叙事日记（日/周/月/年四种周期），作为角色情感与经历的浓缩归档，不替代事件级真相源 |
-| **Person Memory** | 角色对不同用户的专属记忆归档，记录偏好、互动历史与情感连接，按热度排序，让角色在后续对话中体现「我记得你」 |
-| **通知系统** | 角色主动分享、系统事件等通过通知中心推送给用户，支持单条/全部已读标记 |
-| **Docker 一键部署** | 提供完整的 Docker Compose 编排（多阶段构建 + Nginx 反代 + Profile 按需启动），支持开发/生产/可观测性多种部署模式 |
+| 特性                 | 说明                                                                                                                                                      |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 多角色共居           | 24 个 AI 角色（4 原始 + 20 新增，覆盖 16 种 MBTI、20 种职业）在小镇中生活、决策、交互，可扩展至 50 个                                                     |
+| 世界持续运行         | 世界状态推进不依赖用户消息，角色在用户不在时依然生活                                                                                                      |
+| 记忆与演化           | 角色拥有记忆流、反思能力和长期规划，行为长期一致且可演化                                                                                                  |
+| 可插拔能力           | 功能模块（代码执行、搜索、绘图等）可动态启用/禁用，热插拔                                                                                                 |
+| **本地工具单独开关** | 16 个本地工具（5 命名空间：shop/knowledge/social/world/self_info）可在前端 Dashboard 单独启用/禁用，状态持久化到 Redis hash `tools:enabled`，无需重启后端 |
+| **ReAct 工具调用**   | 角色决策时可调用 16 个本地工具，LLM 决策→执行工具→观察结果→再次决策，最多 3 轮循环（代码在 `src/core/character/tick.py`），让角色"先查询再行动"           |
+| 全链路可观测         | 每个决策周期可追踪、可审计、可调试                                                                                                                        |
+| 多端触达             | 支持 Web Dashboard、QQ、飞书等多渠道交互                                                                                                                  |
+| **QQ 群聊智能回复**  | 不再局限于被 @ 时才回复——读取所有群消息，结合角色名命中、疑问/情绪启发式与轻量级 LLM 判断智能决策是否插话，自然融入群聊                                   |
+| **多段回复**         | 长回复自动按段落拆分为多条消息依次发送，段间附带打字间隔，更像真人说话节奏                                                                                |
+| **主动分享**         | 角色在 Tick 中产生分享意图时（`proactiveShareIntent`），会主动把小镇中刚发生的事推送给你，无需你先开口                                                    |
+| **反思系统**         | 角色定期从记忆流中归纳出高层认知（`ReflectionService.check_and_reflect`），影响后续决策，让陪伴更"懂你"                                                   |
+| **LLM 记忆评分**     | 通过 `MEMORY_LLM_SCORING_ENABLED` 开关启用 LLM 对事件重要程度进行 1-10 分评分（基于情感强度、关系影响、稀缺性、后续影响），替代默认固定分值 5             |
+| **角色日记**         | 基于一段时间内的记忆事件，由 LLM 生成第一人称叙事日记（日/周/月/年四种周期），作为角色情感与经历的浓缩归档，不替代事件级真相源                            |
+| **Person Memory**    | 角色对不同用户的专属记忆归档，记录偏好、互动历史与情感连接，按热度排序，让角色在后续对话中体现「我记得你」                                                |
+| **通知系统**         | 角色主动分享、系统事件等通过通知中心推送给用户，支持单条/全部已读标记                                                                                     |
+| **Docker 一键部署**  | 提供完整的 Docker Compose 编排（多阶段构建 + Nginx 反代 + Profile 按需启动），支持开发/生产/可观测性多种部署模式                                          |
 
 ---
 
 ## 技术栈速览
 
-| 层次 | 选型 |
-|------|------|
-| Agent 框架 | LangGraph (Python 3.13) |
-| Web 框架 | FastAPI |
-| 包管理 | uv |
-| 异步驱动 | asyncpg + SQLAlchemy 2.0 (async, 混合策略) |
-| ORM 迁移 | alembic |
-| 前端 | React 19.2 + TypeScript 7.0 + Vite (Rolldown) 8.1 + React Compiler |
-| 前端状态 | TanStack Router 1.170 + TanStack Query 5.101 + Zustand 5.0 + Zod 4.4 |
-| 前端 Lint | oxlint + oxfmt |
-| 前端组件 | shadcn/ui + Tailwind CSS v4 + Framer Motion |
-| 主数据库 | PostgreSQL 18 + pgvector + pg_uuidv7 + JSONB + 分区表 |
-| 缓存/实时 | Redis 8.0 |
-| 消息队列 | Redis Streams |
-| 连接池 | PgBouncer |
-| 工具调用 | MCP 协议（自研 + 社区现成） |
-| 可观测性 | OpenTelemetry + Langfuse + Prometheus + Grafana + Jaeger + Loki |
+| 层次       | 选型                                                                 |
+| ---------- | -------------------------------------------------------------------- |
+| Agent 框架 | LangGraph (Python 3.13)                                              |
+| Web 框架   | FastAPI                                                              |
+| 包管理     | uv                                                                   |
+| 异步驱动   | asyncpg + SQLAlchemy 2.0 (async, 混合策略)                           |
+| ORM 迁移   | alembic                                                              |
+| 前端       | React 19.2 + TypeScript 7.0 + Vite (Rolldown) 8.1 + React Compiler   |
+| 前端状态   | TanStack Router 1.170 + TanStack Query 5.101 + Zustand 5.0 + Zod 4.4 |
+| 前端 Lint  | oxlint + oxfmt                                                       |
+| 前端组件   | shadcn/ui + Tailwind CSS v4 + Framer Motion                          |
+| 主数据库   | PostgreSQL 18 + pgvector + pg_uuidv7 + JSONB + 分区表                |
+| 缓存/实时  | Redis 8.0                                                            |
+| 消息队列   | Redis Streams                                                        |
+| 连接池     | PgBouncer                                                            |
+| 工具调用   | 本地工具注册表（ToolRegistry，进程内 async 函数，ReAct 循环）        |
+| 可观测性   | OpenTelemetry + Langfuse + Prometheus + Grafana + Jaeger + Loki      |
 
 > 数据持久化统一基于 **PostgreSQL 18 + pgvector**（结构化数据 + 向量检索 + JSONB 灵活字段 + 分区表）。主键采用 **UUID v7**（时间有序，索引友好）。详见 [架构设计](docs/architecture.md)。
 
@@ -92,6 +93,7 @@ uvicorn src.main:app --reload --port 8000
 ```
 
 启动成功后：
+
 - API 文档：http://localhost:8000/docs
 - OneBot 反向 WebSocket 端点：`ws://localhost:8000/ws/onebot/v12`
 
@@ -108,7 +110,7 @@ pnpm dev                          # 默认监听 http://localhost:5173
 推荐使用 Docker Compose 一键拉起完整依赖栈：
 
 ```bash
-docker compose up -d              # 启动 PG / Redis / MinIO / MCP Servers / 后端 / 前端
+docker compose up -d              # 启动 PG / Redis / 后端（含本地工具） / 前端
 ```
 
 详细部署架构、容器化方案与容量规划见 [部署与运维](docs/deployment.md)。
@@ -147,37 +149,38 @@ ONEBOT_GROUP_CHARACTER_MAP={"987654321":"01964000-0000-7000-8000-000000000002"}
 
 ### 设计文档
 
-| 文档 | 内容 |
-|------|------|
-| [总体架构设计](docs/architecture.md) | 分层架构、数据流闭环、技术栈、关键架构决策 |
-| [角色设计](docs/character-design.md) | 角色档案、实时状态、记忆模型、计划系统、关系图谱、角色卡 |
-| [小镇设计](docs/town-design.md) | 世界地图、场景清单、移动矩阵、资源系统、节日与事件 |
-| [世界引擎设计](docs/world-engine.md) | World Tick / Character Tick / 演化列表 / 作息 / 动态耗时 |
-| [Action系统设计](docs/action-system.md) | Action 定义、结构化决策、参数化、完成事件、主动分享、LLM 边界 |
-| [记忆系统设计](docs/memory-system.md) | 三层记忆、pgvector 检索、反思、规划 |
-| [模块与MCP系统设计](docs/module-system.md) | 模块管理器、生命周期、MCP 工具调用层 |
-| [消息服务设计](docs/messaging-service.md) | 多平台接入、消息标准化、主动推送、群聊智能回复、多段回复 |
+| 文档                                          | 内容                                                                   |
+| --------------------------------------------- | ---------------------------------------------------------------------- |
+| [总体架构设计](docs/architecture.md)          | 分层架构、数据流闭环、技术栈、关键架构决策                             |
+| [详细架构设计](docs/detailed-architecture.md) | 数据库设计、缓存设计、核心循环、工具系统、可观测性、部署的深度细节参考 |
+| [角色设计](docs/character-design.md)          | 角色档案、实时状态、记忆模型、计划系统、关系图谱、角色卡               |
+| [小镇设计](docs/town-design.md)               | 世界地图、场景清单、移动矩阵、资源系统、节日与事件                     |
+| [世界引擎设计](docs/world-engine.md)          | World Tick / Character Tick / 演化列表 / 作息 / 动态耗时               |
+| [Action系统设计](docs/action-system.md)       | Action 定义、结构化决策、参数化、完成事件、主动分享、LLM 边界          |
+| [记忆系统设计](docs/memory-system.md)         | 三层记忆、pgvector 检索、反思、规划                                    |
+| [模块与工具系统设计](docs/module-system.md)   | 模块管理器、生命周期、本地工具调用层（ToolRegistry）                   |
+| [消息服务设计](docs/messaging-service.md)     | 多平台接入、消息标准化、主动推送、群聊智能回复、多段回复               |
 
 ### 接口与数据
 
-| 文档 | 内容 |
-|------|------|
-| [数据模型设计](docs/data-model.md) | 全部 DDL、ER 图、索引策略 |
-| [API设计文档](docs/api-spec.md) | RESTful 端点、WebSocket/SSE、请求/响应示例 |
-| [配置参考](docs/config-reference.md) | 环境变量、config.yaml、模块配置 |
+| 文档                                 | 内容                                       |
+| ------------------------------------ | ------------------------------------------ |
+| [数据模型设计](docs/data-model.md)   | 全部 DDL、ER 图、索引策略                  |
+| [API设计文档](docs/api-spec.md)      | RESTful 端点、WebSocket/SSE、请求/响应示例 |
+| [配置参考](docs/config-reference.md) | 环境变量、config.yaml、模块配置            |
 
 ### 工程实践
 
-| 文档 | 内容 |
-|------|------|
-| [前端设计](docs/frontend-design.md) | 页面结构、目录结构、实时数据流 |
-| [可观测性设计](docs/observability.md) | 埋点矩阵、链路追踪、指标与告警 |
-| [部署与运维](docs/deployment.md) | 部署架构、容器化、环境变量、容量规划 |
+| 文档                                         | 内容                                                                 |
+| -------------------------------------------- | -------------------------------------------------------------------- |
+| [前端设计](docs/frontend-design.md)          | 页面结构、目录结构、实时数据流                                       |
+| [可观测性设计](docs/observability.md)        | 埋点矩阵、链路追踪、指标与告警                                       |
+| [部署与运维](docs/deployment.md)             | 部署架构、容器化、环境变量、容量规划                                 |
 | [Docker 部署指南](docs/docker-deployment.md) | 完整 Docker Compose 编排、多阶段构建、Profile 按需启动、生产环境配置 |
-| [开发指南](docs/development-guide.md) | 本地开发、代码规范、测试、贡献流程 |
-| [新手学习指南](docs/getting-started.md) | 手把手教学，从零到运行 |
-| [项目不足审查与改进](docs/gap-analysis.md) | 九大维度项目不足审查 + yuiju 项目对比分析 + 改进路线图 |
-| [开发路线图](docs/roadmap.md) | 分阶段任务清单、里程碑、风险与依赖 |
+| [开发指南](docs/development-guide.md)        | 本地开发、代码规范、测试、贡献流程                                   |
+| [新手学习指南](docs/getting-started.md)      | 手把手教学，从零到运行                                               |
+| [项目不足审查与改进](docs/gap-analysis.md)   | 九大维度项目不足审查 + yuiju 项目对比分析 + 改进路线图               |
+| [开发路线图](docs/roadmap.md)                | 分阶段任务清单、里程碑、风险与依赖                                   |
 
 ---
 
@@ -192,7 +195,7 @@ ai-town/
 │   │   │   ├── agents/         # 角色实现
 │   │   │   ├── memory/         # 记忆系统（含 LLM 评分、反思、Embedding Worker）
 │   │   │   ├── modules/        # 模块管理器
-│   │   │   ├── tools/          # MCP 集成（含插件开关）
+│   │   │   ├── tools/          # 本地工具注册表（含 ReAct 循环）
 │   │   │   ├── messaging/      # 消息服务（含主动分享）
 │   │   │   ├── adapters/       # 平台适配器（OneBot 等）
 │   │   │   ├── api/            # FastAPI 路由（按资源拆分 11 模块 + 全局异常处理）
@@ -212,14 +215,8 @@ ai-town/
 │   │   │   └── lib/            # API 客户端 + TanStack Query hooks
 │   │   ├── Dockerfile          # 多阶段构建（pnpm + Vite → Nginx）
 │   │   └── nginx.conf          # SPA 回退 + API 反代 + WebSocket 反代
-│   ├── mcp-servers/            # MCP Server 集合 (自研: code-executor/shop/social/kb)
-│   │   ├── Dockerfile          # 通用模板（--build-arg SERVER=<name>）
-│   │   ├── code-executor/      # 沙箱代码执行（端口 8001）
-│   │   ├── shop-simulator/     # 商店模拟（端口 8004）
-│   │   ├── character-social/   # 角色社交（端口 8006）
-│   │   └── knowledge-base/     # 小镇设定库（端口 8005）
 │   └── shared/                 # 前后端共享 (types / openapi)
-├── docs/                       # 项目文档（19 篇设计文档 + 部署/审查/路线图）
+├── docs/                       # 项目文档（21 篇设计文档 + 4 套规范 + 部署/审查/路线图）
 ├── docker-compose.yml          # 完整生产部署编排（含 Profile 按需启动）
 ├── config.yaml
 ├── .env.example
@@ -230,13 +227,13 @@ ai-town/
 
 ## 设计原则
 
-| 原则 | 说明 |
-|------|------|
+| 原则     | 说明                                                         |
+| -------- | ------------------------------------------------------------ |
 | 状态驱动 | LLM 是决策和生成能力，不是状态真相源；所有状态变更由代码执行 |
-| 事实优先 | 所有可追溯事实必须落到行为记录或明确的状态字段中 |
-| 闭环演化 | 行为沉淀为记忆 → 记忆影响未来决策 → 形成可追溯的生活轨迹 |
-| 模块解耦 | 核心引擎与功能模块分离，模块可独立开关、独立升级 |
-| 可观测性 | 埋点即契约，所有关键路径必须有 Trace 覆盖 |
+| 事实优先 | 所有可追溯事实必须落到行为记录或明确的状态字段中             |
+| 闭环演化 | 行为沉淀为记忆 → 记忆影响未来决策 → 形成可追溯的生活轨迹     |
+| 模块解耦 | 核心引擎与功能模块分离，模块可独立开关、独立升级             |
+| 可观测性 | 埋点即契约，所有关键路径必须有 Trace 覆盖                    |
 
 ---
 

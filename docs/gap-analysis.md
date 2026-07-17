@@ -6,6 +6,8 @@
 > - 参考项目：yuiju monorepo（`packages/world`、`packages/message`、`packages/utils`、`packages/web`、`apps/site`）
 > - 撰写日期：2026-07-12
 > - 更新日期：2026-07-14（标注已完成项 ✅）
+>
+> **2026-07-15 追加说明**：原 MCP Server 架构已全部迁移为本地工具调用（`src/tools/`）。本文档中涉及 `packages/mcp-servers/`、`src/mcp/`、`MCPClient`、`mcp:enabled` 等内容均为迁移前的历史记录，保留以供追溯。当前工具系统设计见 [module-system.md](module-system.md)。
 
 ## 零、改进进度总览（2026-07-14 更新）
 
@@ -133,7 +135,9 @@ src/core/
 
 **现状**：`src/modules/` 包含 `character/`、`duration/`、`movement/`、`relation/`、`schedule/`、`town/`。
 
-**决策**：暂不重命名 `modules/`。这些模块虽名为"modules"，但在代码中已被广泛引用，重命名收益有限、风险较高。文档中明确"可插拔模块"特指 `packages/mcp-servers/` 下的 MCP Server 即可。
+**决策**：暂不重命名 `modules/`。这些模块虽名为"modules"，但在代码中已被广泛引用，重命名收益有限、风险较高。
+
+> 2026-07-15 更新：原 `packages/mcp-servers/` 下的 MCP Server 已全部迁移为 `src/tools/` 下的本地工具（进程内 async 函数，5 个命名空间共 16 个工具）。"可插拔模块"概念现统一指向 `src/tools/` 下的工具命名空间，可通过 Redis hash `tools:enabled` 单独开关。
 
 ### 2.3 依赖管理
 
@@ -419,7 +423,7 @@ ignore = ["E501"]
 | `world-engine.md`      | 世界引擎    | 完整                 |
 | `action-system.md`     | Action 系统 | 完整                 |
 | `memory-system.md`     | 记忆系统    | 完整                 |
-| `module-system.md`     | 模块与 MCP  | 完整                 |
+| `module-system.md`     | 模块与工具  | 完整                 |
 | `messaging-service.md` | 消息服务    | 完整                 |
 | `data-model.md`        | 数据模型    | 完整                 |
 | `api-spec.md`          | API 设计    | 完整但可能滞后       |
@@ -452,9 +456,10 @@ ignore = ["E501"]
 **问题**：`development-guide.md` 第 64-80 行描述的后端代码结构包含 `src/agents/`、`src/tools/base.py`、`src/tools/registry.py`、`src/core/action_system.py`、`src/core/actions/`，但实际代码中：
 
 - 不存在 `src/agents/` 目录（角色实现实际在 `src/core/character_tick.py`）
-- 不存在 `src/tools/` 目录（MCP 集成在 `src/mcp/`）
 - 不存在 `src/core/action_system.py`（Action 系统在 `src/actions/`）
 - `src/core/actions/` 不存在（实际是 `src/actions/`）
+
+> 2026-07-15 更新：`src/tools/` 目录现已存在（自 MCP 迁移后创建），包含 `registry.py` + 5 个工具实现模块（shop/knowledge/social/world/self_info），共 16 个本地工具。原 `src/mcp/` 已删除。
 
 **改进建议**：同步文档与代码结构，或考虑调整代码结构以匹配文档。
 
@@ -904,7 +909,7 @@ pnpm run type-check
 
 每个工具有独立的 schema 定义和实现，标准化封装。
 
-**aitown 现状**：MCP 工具分散在 `packages/mcp-servers/` 各 Server 中，缺少统一的工具 schema 定义层。`src/mcp/client.py` 是 MCP 客户端，但没有标准化的工具封装模式。
+**aitown 现状**（2026-07-15 更新）：原 MCP 工具分散在 `packages/mcp-servers/` 各 Server 中、`src/mcp/client.py` 充当 MCP 客户端。该问题已通过迁移至 `src/tools/` 解决——现由 `ToolRegistry`（`src/tools/registry.py`）统一注册 16 个本地工具（5 命名空间：shop/knowledge/social/world/self_info），每个工具由 `@register_tool` 装饰器声明 schema（Pydantic BaseModel 入参 + 返回值类型），并由 ReAct 循环（`src/core/character/tick.py` L123-160）统一调度。
 
 #### 7.1.12 日记系统
 
@@ -966,7 +971,7 @@ const MODEL_SOURCE_FAILURE_COOLDOWN_MS = 5 * 60 * 1000;
 | 路由组织         | ✅ 541 行 + 11 个路由模块                               | 分包路由                       | 已消除        | P1         | ✅   |
 | 记忆系统         | Episode + Reflection                                    | + Person Memory + Diary + Heat | 中            | P2         | ❌   |
 | Prompt 管理      | ✅ YAML 外置 + 人设分层                                 | 集中在 `utils/src/prompt/`     | 已消除        | P1         | ✅   |
-| LLM 工具系统     | MCP Server 分散                                         | 标准化工具封装                 | 中            | P2         | ❌   |
+| LLM 工具系统     | ✅ ToolRegistry + 16 本地工具（5 命名空间）+ ReAct 循环  | 标准化工具封装                 | 已消除        | P2         | ✅   |
 | 多模型备用源     | 单一 endpoint                                           | 多源 + 冷却切换                | 高            | P1         | ❌   |
 | 日记系统         | 无                                                      | 有（day/week/month/year）      | 低            | P2         | ❌   |
 | 文档站           | 无                                                      | VitePress                      | 低            | P2         | ❌   |

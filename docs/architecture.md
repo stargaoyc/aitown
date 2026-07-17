@@ -1869,15 +1869,16 @@ shutdown 顺序（逆序）：
 
 ## 附录：相关文档
 
-| 主题                  | 文档                                         |
-| --------------------- | -------------------------------------------- |
-| 角色设计              | [character-design.md](character-design.md)   |
-| 小镇与场景            | [town-design.md](town-design.md)             |
-| 世界引擎与角色 Tick   | [world-engine.md](world-engine.md)           |
-| Action 系统与执行闭环 | [action-system.md](action-system.md)         |
-| 记忆系统与 pgvector   | [memory-system.md](memory-system.md)         |
-| 模块管理与本地工具    | [module-system.md](module-system.md)         |
-| 数据模型 DDL          | [data-model.md](data-model.md)               |
-| 部署与高可用          | [deployment.md](deployment.md)               |
-| Docker 部署指南       | [docker-deployment.md](docker-deployment.md) |
-| 项目不足审查与改进    | [gap-analysis.md](gap-analysis.md)           |
+| 主题                  | 文档                                                 |
+| --------------------- | ---------------------------------------------------- |
+| 详细架构设计          | [detailed-architecture.md](detailed-architecture.md) |
+| 角色设计              | [character-design.md](character-design.md)           |
+| 小镇与场景            | [town-design.md](town-design.md)                     |
+| 世界引擎与角色 Tick   | [world-engine.md](world-engine.md)                   |
+| Action 系统与执行闭环 | [action-system.md](action-system.md)                 |
+| 记忆系统与 pgvector   | [memory-system.md](memory-system.md)                 |
+| 模块管理与本地工具    | [module-system.md](module-system.md)                 |
+| 数据模型 DDL          | [data-model.md](data-model.md)                       |
+| 部署与高可用          | [deployment.md](deployment.md)                       |
+| Docker 部署指南       | [docker-deployment.md](docker-deployment.md)         |
+| 项目不足审查与改进    | [gap-analysis.md](gap-analysis.md)                   |

@@ -183,7 +183,7 @@ def tick_character(self, cid: UUID) -> None:
 | 测试名用 `test_{行为}_{条件}_{预期}` | `test_tick_character_when_inactive_should_skip` |
 | 一个测试只验证一个行为 | 不要在一个测试里塞多个断言 |
 | 用 AAA 模式 | Arrange / Act / Assert |
-| mock 外部依赖 | DB / Redis / LLM / MCP 在单元测试中 mock |
+| mock 外部依赖 | DB / Redis / LLM / 工具在单元测试中 mock |
 | 集成测试用 testcontainers | 真实 PG + Redis，不用 mock |
 | 测试数据自包含 | 不依赖其他测试的执行顺序 |
 
@@ -208,7 +208,7 @@ async def test_eat_action_when_hungry_should_increase_satiety():
 |----------|------|------|
 | 单元测试 | `packages/backend/tests/` | `test_{module}.py` |
 | 集成测试 | `packages/backend/tests/` | `test_{module}_integration.py` |
-| MCP 服务器测试 | `packages/mcp-servers/{name}/tests/` | `test_*.py` |
+| 本地工具测试 | `packages/backend/tests/` | `test_tools_*.py` |
 
 ---
 

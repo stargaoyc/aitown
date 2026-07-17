@@ -61,7 +61,7 @@
 | **安全** | `security/` | Prompt 防护、限流 | `PromptGuard`/`RateLimiter` | 在安全层做业务逻辑 |
 | **可观测性** | `observability/` | 日志、指标、追踪、Langfuse | `setup_logging()`/metrics 装饰器 | 在观测层修改业务状态 |
 | **模块系统** | `modules/` | 可插拔功能扩展 | 模块接口 | 模块直接耦合核心流程 |
-| **MCP 客户端** | `mcp/` | MCP 工具调用 | `MCPClient.call_tool()` | 在 MCP 层做业务决策 |
+| **本地工具** | `tools/` | 本地工具调用（进程内 async 函数） | `ToolRegistry.call_tool_with_context()` | 在工具层做业务决策 |
 | **调度器** | `scheduler/` | 定时任务（分区预创建等） | `PartitionScheduler` | 在调度器里写业务逻辑 |
 
 ### 上下文间通信规则
@@ -89,7 +89,7 @@
 ├──────────────────────────────────────────────────┤
 │  Core 层 (core/ + actions/ + memory/)  核心域逻辑 │
 ├──────────────────────────────────────────────────┤
-│  Infrastructure 层 (db/ + llm/ + mcp/ + adapters/)│
+│  Infrastructure 层 (db/ + llm/ + tools/ + adapters/)│
 ├──────────────────────────────────────────────────┤
 │  Cross-cutting (observability/ + security/ +      │
 │                  cost_control/ + auth/)            │
@@ -126,8 +126,8 @@
 | 追踪配置 | `observability/tracing.py` | `setup_tracing()` |
 | Langfuse 集成 | `observability/langfuse_*.py` | Langfuse 包装器 |
 | 可插拔模块 | `modules/` | `CharacterModule`/`TownModule` |
-| MCP 客户端 | `mcp/client.py` | `MCPClient` |
-| MCP 服务器 | `packages/mcp-servers/` | 独立进程 |
+| 本地工具注册表 | `tools/registry.py` | `ToolRegistry` |
+| 本地工具实现 | `tools/{shop,knowledge,social,world,self_info}.py` | 进程内 async 函数 |
 | 定时任务 | `scheduler/` | `PartitionScheduler` |
 | 配置 | `config.py` + `.env` + `configs/` | `Settings` |
 
